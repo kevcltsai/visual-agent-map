@@ -64,7 +64,7 @@ async function harness({ items, caps = { imageInput: { maxEdgePx: 1568, maxBytes
   const notices = [];
   const fakeCrypto = { ...crypto, randomUUID: () => control.queue.length ? control.queue.shift() : crypto.randomUUID() };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices) }, 'node:crypto': fakeCrypto }, {
-    requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {},
+    createSvg: dom.createSvg, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {},
     // A picture that always loads, 4 x 4, so fitImageForInput leaves a small data URL alone.
     createEl: tag => tag === 'img' ? { set src(v) { this._src = v; Promise.resolve().then(() => this.onload?.()); }, naturalWidth: 4, naturalHeight: 4 } : { getContext: () => null }
   });
@@ -276,12 +276,24 @@ test('send D5: a picture that cannot be read abandons the turn with a Notice: no
   await g.send('x'); assert.deepEqual(asked(g), []); assert.equal(g.chat.draft, 'x');
 });
 
-test('send: a runtime without image input abandons the turn with a Notice (nothing read, nothing sent)', async () => {
+test('send (G05): a runtime without image input says so at selection time and refuses to send: nothing read, no AI call, no Notice, the draft stays', async () => {
   const h = await harness({ caps: {} });
+  assert.equal(h.view.chatImageNotice(), null, 'no picture chosen: nothing to say');
   h.select('img1');
+  assert.equal(h.view.chatImageNotice(), 'This model cannot read pictures. Pick another model or select no picture. Nothing was sent.');
   await h.send('place anchors');
-  assert.deepEqual(asked(h), []); assert.equal(h.control.reads, 0); assert.equal(h.chat.draft, 'place anchors');
-  assert.deepEqual(plain(h.notices), ['This model cannot read pictures. Pick another model or select no picture. Nothing was sent.']);
+  assert.deepEqual(asked(h), []); assert.equal(h.control.requests.length, 0); assert.equal(h.control.reads, 0); assert.equal(h.chat.draft, 'place anchors');
+  assert.deepEqual(plain(h.notices), [], 'the explanation is on screen already, no late Notice');
+  h.select('img2');
+  assert.equal(h.view.chatImageNotice(), null, 'an ordinary picture is never sent, so the model does not matter');
+});
+
+test('send (G05): with image input there is no explanation and the picture goes', async () => {
+  const h = await harness();
+  h.select('img1');
+  assert.equal(h.view.chatImageNotice(), null);
+  await h.send('place anchors');
+  assert.equal(h.control.requests.length, 1);
 });
 
 test('send: Stop while the picture is being prepared abandons the turn: no AI call, draft back, the late read changes nothing', async () => {
@@ -349,6 +361,18 @@ test('send: a retry reads the picture again (origin carries only the id)', async
   await h.view.sendMapChat(origin);
   assert.equal(h.control.reads, 2);
   assert.match(h.control.requests[1].imageDataUrl, /^data:image\//);
+});
+
+test('send (G05): a retry after switching to a model without image input is still refused by the read backstop: nothing read, no AI call, a Notice', async () => {
+  const h = await harness();
+  h.select('img1');
+  await h.send('place anchors');
+  const origin = h.chat.transcriptList[0].origin;
+  h.control.caps = {};
+  await h.view.sendMapChat(origin);
+  assert.equal(h.control.reads, 1, 'only the first send read the picture');
+  assert.equal(h.control.requests.length, 1, 'the retry made no AI call');
+  assert.deepEqual(plain(h.notices), ['This model cannot read pictures. Pick another model or select no picture. Nothing was sent.']);
 });
 
 // ---- plan and mode -------------------------------------------------------------------------------------------------
@@ -572,11 +596,11 @@ test('F-a M1 a follow-up that waited is sent with the picture the chip still sho
 function canvas(h) {
   h.view.stageEl = dom.element('div'); h.app.vault.getResourcePath = () => 'app://x';
   h.view.renderCanvasItems();
-  return () => dom.find(h.view.stageEl, i => i.hasClass('vam-canvas-image') && i.dataset.itemId === 'img1');
+  return () => dom.find(h.view.stageEl, i => i.hasClass?.('vam-canvas-image') && i.dataset.itemId === 'img1');
 }
-const dots = el => dom.findAll(el, i => i.hasClass('is-preview'));
-const solid = el => dom.findAll(el, i => i.hasClass('vam-anchor') && !i.hasClass('is-preview'));
-const countText = el => dom.find(el, i => i.hasClass('vam-annotated-count')).text;
+const dots = el => dom.findAll(el, i => i.hasClass?.('is-preview'));
+const solid = el => dom.findAll(el, i => i.hasClass?.('vam-anchor') && !i.hasClass('is-preview'));
+const countText = el => dom.find(el, i => i.hasClass?.('vam-annotated-count')).text;
 const threeAnchors = [addAnchor('p1', 0.1, 0.2, 'A'), addAnchor('p2', 0.5, 0.5, 'B'), addAnchor('p3', 1, 0, 'C')];
 async function planned(actions = threeAnchors) {
   const h = await harness(); const el = canvas(h); h.select('img1');
@@ -1062,3 +1086,204 @@ for (const [name, flag] of [['paired region with the flag', true], ['converted p
     assert.equal(entry, null);
     assert.equal(h.contents.get(node.path), before, 'the cover embed is refused');
   });
+
+// ---- G06a: move_anchor is a plan, written once on confirmation -----------------------------------------------------------
+
+const moveAnchor = (anchorId, x, y, imageId = 'img1') => ({ kind: 'move_anchor', imageId, anchorId, x, y });
+const settled = h => until(() => h.chat.calls.filter(c => c[0] === 'settle').length >= 2);
+const posOf = async (h, id = 'old1') => plain((await h.image()).anchors.find(a => a.id === id)?.at);
+
+test('G06a: a suggested move waits as a plan, writes nothing (map file, undo stack) until Apply, then moves the anchor once', async () => {
+  const h = await harness(); h.select('img1');
+  h.control.reply = async () => ({ reply: 'Chuck is lower', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+  const fileBefore = h.contents.get(MAP);
+  await h.send('the Chuck anchor is misplaced');
+  assert.equal(h.chat.plans.length, 1);
+  assert.equal(h.chat.plans[0].reasons.length, 1);
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 }, 'pending: not moved');
+  assert.equal(h.contents.get(MAP), fileBefore, 'pending: Map.md is untouched');
+  assert.equal(h.view.history.undoEntry, undefined, 'pending: nothing on the undo stack');
+  h.chat.plans[0].apply(); await settled(h);
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.6, y: 0.7 });
+  assert.equal((await h.image()).anchors.length, 1);
+  assert.equal(h.chat.lines.at(-1).filter(l => l.status === 'failed').length, 0);
+});
+
+test('G06a: Cancel on a suggested move writes nothing', async () => {
+  const h = await harness(); h.select('img1');
+  h.control.reply = async () => ({ reply: 'r', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+  await h.send('x');
+  const fileBefore = h.contents.get(MAP);
+  h.chat.plans[0].cancel();
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 });
+  assert.equal(h.contents.get(MAP), fileBefore);
+  assert.equal(h.view.history.undoEntry, undefined);
+});
+
+test('G06a (counter-example): move_anchor is never applied directly: "apply at once" and auto-apply both still wait for confirmation', async () => {
+  for (const mode of ['direct', 'auto']) {
+    const h = await harness(); h.select('img1');
+    if (mode === 'direct') h.view.chatImageMode = () => 'direct'; else h.view.chatAutoApply = true;
+    h.control.reply = async () => ({ reply: 'r', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+    await h.send('x');
+    assert.equal(h.chat.plans.length, 1, mode);
+    assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 }, mode);
+    assert.equal(h.view.history.undoEntry, undefined, mode);
+  }
+});
+
+test('G06a: the applied move is one undo step: undo restores the old position, redo moves it again', async () => {
+  const h = await harness(); h.select('img1');
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  h.control.reply = async () => ({ reply: 'r', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+  await h.send('x');
+  const before = plain(await h.saved());
+  h.chat.plans[0].apply(); await settled(h);
+  const after = plain(await h.saved());
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.deepEqual(plain(await h.saved()), before, 'one undo restores the old position');
+  assert.equal(h.view.history.undoEntry.label, 'earlier');
+  await h.view.travel(true);
+  assert.deepEqual(plain(await h.saved()), after);
+});
+
+test('G06a (counter-example): an anchor deleted, an image deleted or an image turned plain while the plan waits is stale: Apply writes nothing', async () => {
+  const cases = {
+    'anchor deleted': items => items.map(i => i.id === 'img1' ? { ...i, anchors: [] } : i),
+    'image deleted': items => items.filter(i => i.id !== 'img1'),
+    'image turned plain': items => items.map(i => i.id === 'img1' ? { id: 'img1', kind: 'image', path: i.path, x: i.x, y: i.y, w: i.w, h: i.h } : i)
+  };
+  for (const [name, change] of Object.entries(cases)) {
+    const h = await harness(); h.select('img1');
+    h.control.reply = async () => ({ reply: 'r', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+    await h.send('x');
+    await h.edit(change);
+    const fileBefore = h.contents.get(MAP);
+    h.view.history.undoEntry = undefined;
+    h.chat.plans[0].apply(); await settled(h);
+    assert.equal(h.contents.get(MAP), fileBefore, `${name}: Map.md is not written`);
+    assert.equal(h.view.history.undoEntry, undefined, `${name}: no undo step`);
+    assert.deepEqual(statuses(h.chat.lines.at(-1).filter(l => /^(Skipped|Done)/.test(l.text))), ['skipped'], name);
+  }
+});
+
+test('G06a (counter-example): the picture replaced by another file under the same id while the plan waits is stale: Apply writes nothing', async () => {
+  const h = await harness(); h.select('img1');
+  h.control.reply = async () => ({ reply: 'r', actions: [{ ...moveAnchor('old1', 0.6, 0.7), imageRef: 'attachments/a.png' }], rejected: [] });
+  await h.send('x');
+  await h.edit(items => items.map(i => i.id === 'img1' ? { ...i, path: 'attachments/b.png' } : i));
+  const fileBefore = h.contents.get(MAP);
+  h.chat.plans[0].apply(); await settled(h);
+  assert.equal(h.contents.get(MAP), fileBefore, 'Map.md is not written');
+  assert.equal(h.view.history.undoEntry, undefined, 'no undo step');
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 });
+  assert.deepEqual(statuses(h.chat.lines.at(-1).filter(l => /^(Skipped|Done)/.test(l.text))), ['skipped']);
+});
+
+test('G06a (counter-example): an anchor that has no 2D position is skipped, never "done" without moving', async () => {
+  const items = [ANNOTATED({ anchors: [{ id: 'old1', at: { kind: 'image-3d', x: 1, y: 2, z: 3 }, note: 'Chuck' }] }), PLAIN()];
+  const h = await harness({ items });
+  const lines = await h.apply([{ kind: 'move_anchor', imageId: 'img1', anchorId: 'old1', x: 0.6, y: 0.7 }]);
+  assert.deepEqual(statuses(lines), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.view.history.undoEntry, undefined);
+});
+
+// ---- G06b: the on-canvas preview of a suggested move_anchor ------------------------------------------------------------
+const movePlanned = async (action = moveAnchor('old1', 0.6123, 0.7)) => {
+  const h = await harness(); const el = canvas(h); h.select('img1');
+  h.control.reply = async () => ({ reply: 'Chuck is lower', actions: [action], rejected: [] });
+  await h.send('the Chuck anchor is misplaced');
+  return { h, el, card: h.chat.plans[0] };
+};
+const moveTargets = el => dom.findAll(el, i => i.hasClass?.('is-move-target'));
+const moveLinks = el => dom.findAll(el, i => i.hasClass?.('vam-anchor-move-link'));
+const lineOf = el => dom.findAll(moveLinks(el)[0], i => i.tag === 'line')[0]?.attrs;
+
+test('G06b preview: a pending move_anchor draws a dashed marker at the suggested spot and a light link to the unmoved anchor, with a text equivalent', async () => {
+  const { h, el } = await movePlanned();
+  assert.equal(moveTargets(el()).length, 1, 'one dashed marker');
+  const [mark] = moveTargets(el());
+  assert.equal(mark.tag, 'span'); assert.ok(mark.hasClass('is-preview')); assert.equal(mark.children.length, 0, 'a fixed span');
+  assert.deepEqual(plain([mark.style.left, mark.style.top]), ['61.23%', '70%']);
+  assert.equal(moveLinks(el()).length, 1, 'one link');
+  assert.deepEqual(plain(lineOf(el())), { x1: '10', y1: '10', x2: '61.23', y2: '70' });
+  const real = solid(el());
+  assert.equal(real.length, 1); assert.deepEqual(plain([real[0].style.left, real[0].style.top]), ['10%', '10%'], 'the real anchor stays where it is');
+  assert.equal(countText(el()), '1 anchor(s)', 'a move adds no anchor to the count');
+  assert.equal(el().attrs['aria-label'], 'Annotated image: Cow cuts. Plan preview: 1 anchor(s) would move.');
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 }, 'the data is not moved');
+  assert.equal(h.view.history.undoEntry, undefined);
+  h.view.stageEl = dom.element('div'); h.view.renderCanvasItems();
+  const again = dom.find(h.view.stageEl, i => i.hasClass?.('is-annotated'));
+  assert.equal(moveTargets(again).length, 1, 'a full redraw keeps the preview'); assert.equal(moveLinks(again).length, 1);
+});
+
+test('G06b apply: Apply takes the preview away and moves the anchor once; one undo restores it', async () => {
+  const { h, el, card } = await movePlanned();
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  const before = plain(await h.saved());
+  card.apply(); await settled(h);
+  assert.equal(moveTargets(el()).length, 0); assert.equal(moveLinks(el()).length, 0); assert.equal(h.view.chatPreview, null);
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.6123, y: 0.7 });
+  assert.equal(el().attrs['aria-label'], 'Annotated image: Cow cuts');
+  await h.view.travel(false);
+  assert.deepEqual(plain(await h.saved()), before, 'one undo restores the old position');
+  assert.equal(h.view.history.undoEntry.label, 'earlier');
+});
+
+test('G06b (counter-example): Cancel, the next message, abort and a map switch clear the preview with zero writes; a picture change keeps it', async () => {
+  let o = await movePlanned(); let file = o.h.contents.get(MAP);
+  o.card.cancel();
+  assert.equal(moveTargets(o.el()).length + moveLinks(o.el()).length, 0, 'cancelled'); assert.equal(o.h.contents.get(MAP), file); assert.equal(o.h.view.history.undoEntry, undefined);
+  o = await movePlanned(); file = o.h.contents.get(MAP); o.h.chat.isBusy = false;
+  o.h.control.reply = async () => ({ reply: 'No change', actions: [], rejected: [] });
+  await o.h.send('and then?');
+  assert.equal(moveTargets(o.el()).length + moveLinks(o.el()).length, 0, 'next message'); assert.equal(o.h.contents.get(MAP), file); assert.equal(o.h.view.history.undoEntry, undefined);
+  o = await movePlanned(); file = o.h.contents.get(MAP); o.h.view.abortMapChat();
+  assert.equal(moveTargets(o.el()).length + moveLinks(o.el()).length, 0, 'aborted'); assert.equal(o.h.contents.get(MAP), file);
+  o = await movePlanned(); file = o.h.contents.get(MAP);
+  o.h.view.map = { ...o.h.view.map, id: 'map-b' }; o.h.view.placeChatPanel = () => {}; o.h.view.syncChatNarrow = () => {};
+  o.h.view.mountMapChat(dom.element('div'), dom.element('div'));
+  assert.equal(moveTargets(o.el()).length + moveLinks(o.el()).length, 0, 'map switched'); assert.equal(o.h.view.chatPreview, null); assert.equal(o.h.contents.get(MAP), file);
+  o = await movePlanned(); o.h.view.setChatImage('img2');
+  assert.equal(moveTargets(o.el()).length, 1, 'picture change: the plan is still pending');
+});
+
+test('G06b (counter-example): the anchor deleted while the preview is up: no marker, no link, nothing throws; Apply is skipped and writes nothing', async () => {
+  const { h, el, card } = await movePlanned();
+  await h.edit(items => items.map(i => i.id === 'img1' ? { ...i, anchors: [] } : i));
+  h.view.stageEl = dom.element('div'); h.view.renderCanvasItems(); h.view.syncAnchorPreview();
+  const again = dom.find(h.view.stageEl, i => i.hasClass?.('is-annotated'));
+  assert.equal(moveTargets(again).length, 0); assert.equal(moveLinks(again).length, 0);
+  assert.equal(again.attrs['aria-label'], 'Annotated image: Cow cuts', 'no phantom move in the text');
+  const file = h.contents.get(MAP);
+  card.apply(); await settled(h);
+  assert.equal(h.contents.get(MAP), file); assert.equal(h.view.history.undoEntry, undefined);
+  assert.equal(h.view.chatPreview, null); void el;
+});
+
+test('G06b (counter-example): the preview is a drawing only: the map, file, share snapshot and export hold no marker, link or suggested position; a hostile coordinate stays a clamped number', async () => {
+  const { h, el } = await movePlanned();
+  const has = value => /0\.6123|is-move-target|vam-anchor-move-link/.test(JSON.stringify(value ?? null));
+  assert.equal(has(h.view.map), false, 'map');
+  await h.view.persist(); assert.equal(has([...h.contents.values()]), false, 'files on disk');
+  const snapshot = h.view.shareSnapshot();
+  assert.equal(has({ map: snapshot.map, notes: [...snapshot.notes.values()].map(n => n.title) }), false, 'share');
+  const source = h.view.mapExportSource();
+  assert.equal(has([...source.texts()].map(t => dom.texts(t))), false, 'export');
+  h.view.chatPreview = { token: h.view.chatPlanToken, anchors: [], moves: [{ imageId: 'img1', anchorId: 'old1', x: 9, y: -4 }, { imageId: 'img1', anchorId: 'old1', x: Number.NaN, y: 0 }] };
+  h.view.syncAnchorPreview();
+  assert.equal(moveTargets(el()).length, 1, 'only the finite one is drawn');
+  assert.deepEqual(plain([moveTargets(el())[0].style.left, moveTargets(el())[0].style.top]), ['100%', '0%']);
+});
+
+test('G06b (counter-example): the picture file replaced while the preview is up: no marker, no link and no mention in the label, as Apply would skip it', async () => {
+  const { h } = await movePlanned({ ...moveAnchor('old1', 0.6123, 0.7), imageRef: 'attachments/a.png' });
+  assert.equal(moveTargets(dom.find(h.view.stageEl, i => i.hasClass?.('is-annotated'))).length, 1, 'same file: drawn');
+  await h.edit(items => items.map(i => i.id === 'img1' ? { ...i, path: 'attachments/other.png' } : i));
+  h.view.stageEl = dom.element('div'); h.view.renderCanvasItems();
+  const again = dom.find(h.view.stageEl, i => i.hasClass?.('is-annotated'));
+  assert.equal(moveTargets(again).length, 0); assert.equal(moveLinks(again).length, 0);
+  assert.equal(again.attrs['aria-label'], 'Annotated image: Cow cuts');
+});

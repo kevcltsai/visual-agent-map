@@ -89,7 +89,14 @@ export function describeArgumentProgress(state: ArgumentMapData, owned: boolean,
       action: "resume"
     };
   if (run.stopReason === "error")
-    return { tone: "warn", title: t("ui.argument_bar_paused"), detail: t("ui.argument_bar_error"), action: "resume" };
+    return {
+      tone: "warn",
+      title: t("ui.argument_bar_paused"),
+      detail: t(
+        run.errorDetail === "write_discarded" ? "ui.argument_paused_reason_write_discarded" : "ui.argument_bar_error"
+      ),
+      action: "resume"
+    };
   return {
     tone: "paused",
     title: t("ui.argument_bar_paused"),

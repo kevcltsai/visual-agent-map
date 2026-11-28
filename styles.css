@@ -335,6 +335,9 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-style-popover-choice:focus-visible, .vam-style-popover-branch input:focus-visible { outline: 2px solid var(--vam-focus); outline-offset: 1px; }
 .vam-style-popover .vam-color-swatch.is-none { background: transparent; border-style: dashed; border-color: var(--vam-muted); }
 .vam-style-popover-branch { gap: var(--vam-space-1); font-size: var(--vam-card-summary-size); cursor: pointer; }
+.vam-batch-popover { bottom: 100%; margin-bottom: var(--vam-space-1); }
+.vam-batch-popover-mixed { color: var(--vam-muted); font-size: var(--vam-card-summary-size); }
+.vam-batch-size-input { width: 6em; }
 .menu-item .vam-menu-hint { margin-left: auto; padding-left: 12px; color: var(--text-faint); font-size: var(--font-ui-smaller); }
 /* A greyed card action says why on the line under its name (V3.3 P1.8), lined up with the title past the icon. */
 .menu-item.vam-menu-has-reason { flex-wrap: wrap; }
@@ -342,12 +345,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
 .vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }
-.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }
+.vam-status-idea::before, .vam-status-blocked::before { border: 1.5px solid var(--text-muted); background: transparent; }
 .vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }
 .vam-status-completed::before { background: var(--interactive-accent); }
-.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
-.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }
+.vam-status-queued, .vam-status-waiting { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
+.vam-status-queued::before, .vam-status-waiting::before { border: 1.5px solid var(--interactive-accent); background: transparent; }
 .vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }
 .vam-status-error::before { background: var(--color-red); }
 /* V3.3 P1.2: an AI card that needs a rerun (orange dot) or did not finish (red ×): a mark plus words, never colour alone. */
@@ -355,6 +358,10 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-status-stale::before { background: var(--vam-warning); }
 .vam-status-failed { color: color-mix(in srgb, var(--vam-error) 80%, var(--vam-text)); }
 .vam-status-failed::before { content: "\00d7"; width: auto; height: auto; border-radius: 0; background: none; color: var(--vam-error); font-weight: 700; vertical-align: 0; }
+/* D2-3: waiting is the queued ring above; blocked an orange ring (cannot run yet); stopped a grey square (stop). */
+.vam-status-blocked { color: color-mix(in srgb, var(--vam-warning) 80%, var(--vam-text)); }
+.vam-status-blocked::before { border-color: var(--vam-warning); }
+.vam-status-stopped::before { border-radius: 0; }
 /* An unsaved streaming summary: grey italic words in the header, the summary below shows the text as it comes. */
 .vam-status-preview { color: var(--vam-muted); font-style: italic; }
 .vam-status-preview::before { display: none; }
@@ -940,6 +947,9 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-map-chat-chips:empty { display: none; }
 .vam-map-chat-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 1px 4px 1px 8px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-secondary); font-size: var(--font-ui-smaller); }
 .vam-map-chat-chip.is-auto { padding-right: 8px; border-style: dashed; }
+.vam-view .vam-map-chat-chip-sent { flex: 0 0 auto; margin-left: 4px; color: var(--text-muted); }
+.vam-view .vam-map-chat-image-notice { flex: 0 0 100%; margin: 0; color: var(--text-warning); font-size: var(--font-ui-smaller); }
+.vam-map-chat-composer button.vam-map-chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
 .vam-view .vam-map-chat-refs-label { flex: 0 0 100%; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-view .vam-map-chat-chip-icon, .vam-view .vam-map-chat-seen-icon { display: inline-flex; flex: 0 0 auto; align-items: center; color: var(--text-muted); }
 .vam-view .vam-map-chat-chip-icon svg, .vam-view .vam-map-chat-seen-icon svg { width: 12px; height: 12px; }
@@ -1714,6 +1724,20 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-map-search-count { flex: none; min-width: 3ch; color: var(--text-muted); font-size: var(--font-ui-small); white-space: nowrap; }
 .vam-view .vam-map-search-close { flex: none; padding: 0 8px; background: transparent; box-shadow: none; }
 .vam-view .vam-map-search-close:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-map-search { flex-wrap: wrap; }
+.vam-view .vam-map-search-scope { display: flex; flex: none; gap: 2px; }
+.vam-view .vam-map-search-scope-btn { padding: 0 8px; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-view .vam-map-search-scope-btn.is-on { background: var(--background-modifier-hover); color: var(--text-normal); font-weight: var(--font-semibold); }
+.vam-view .vam-map-search-scope-btn:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-map-search-results { display: none; flex: 1 0 100%; max-height: 40vh; overflow-y: auto; }
+.vam-view .vam-map-search-results.is-open { display: block; }
+.vam-view .vam-map-search-results-note { padding: 4px 2px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-view .vam-map-search-result { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px; border-top: 1px solid var(--background-modifier-border); }
+.vam-view .vam-map-search-result-label { display: flex; flex-direction: column; min-width: 0; }
+.vam-view .vam-map-search-result-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-view .vam-map-search-result-map { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-view .vam-map-search-result-actions { display: flex; flex: none; gap: 4px; }
+.vam-view .vam-map-search-result-actions button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-view .vam-node.is-search-match { outline: 2px dashed var(--interactive-accent); outline-offset: 2px; }
 .vam-view .vam-node.is-search-current { outline: 3px solid var(--interactive-accent); outline-offset: 3px; }
 /* A branch the search opened only for itself: dotted, so it reads as temporary. */
@@ -1798,10 +1822,15 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-anchor { position: absolute; z-index: 1; box-sizing: border-box; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0; border: 2px solid var(--interactive-accent); border-radius: 50%; background: transparent; box-shadow: 0 0 0 1px var(--background-primary); cursor: pointer; transition: transform 0.1s ease; }
 .vam-view .vam-anchor.is-preview { border-style: dashed; border-color: var(--interactive-accent); background: color-mix(in srgb, var(--background-primary) 55%, transparent); pointer-events: none; cursor: default; }
 .vam-view .vam-anchor-preview-note { position: absolute; left: 0; top: 100%; margin-top: 6px; font-size: var(--font-ui-smaller); color: var(--text-muted); pointer-events: none; }
+.vam-view .vam-anchor-move-link { position: absolute; inset: 0; pointer-events: none; }
+.vam-view .vam-anchor-move-link svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.vam-view .vam-anchor-move-link line { stroke: var(--text-faint); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 /* A waiting plan's new cards (V3.3 E3): dashed, in the accent colour, marked Preview; drawn only, they take no pointer. */
 .vam-view .vam-plan-ghosts { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; user-select: none; }
 .vam-view .vam-plan-ghost-edge { position: absolute; height: 0; border-top: 1.5px dashed var(--interactive-accent); transform-origin: 0 0; }
-.vam-view .vam-plan-ghost { position: absolute; box-sizing: border-box; padding: 6px 10px; border: 1.5px dashed var(--interactive-accent); border-radius: var(--vam-radius-card, 12px); background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)); color: var(--interactive-accent); font-weight: 500; overflow-wrap: anywhere; }
+.vam-view .vam-plan-ghost { position: absolute; box-sizing: border-box; padding: 6px 10px; border: 1.5px dashed var(--interactive-accent); border-radius: var(--vam-radius-card, 12px); background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)); color: var(--interactive-accent); font-weight: 500; overflow: hidden; }
+/* One line: the dashed card is exactly the box it was laid out in, so it never runs into a card below (E3-x); the plan card lists every title in full. */
+.vam-view .vam-plan-ghost-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vam-view .vam-plan-ghost-label { display: block; font-size: var(--font-ui-smaller); font-weight: 400; opacity: 0.8; }
 .vam-view .vam-plan-ghost.is-more { font-style: italic; }
 .vam-view .vam-anchor.is-linked { border-color: var(--background-primary); background: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); }
@@ -2142,6 +2171,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-run-all-track { stroke: color-mix(in srgb, var(--interactive-accent) 25%, transparent); }
 .vam-view .vam-run-all-arc { stroke: var(--interactive-accent); stroke-linecap: round; }
 .vam-edge.vam-edge-prompt { stroke: var(--text-faint); stroke-width: 1.2; }
+/* D2-4: a selected AI card shows what it depends on. Run = an AI dependency (accent, heavier); read = an ordinary card it reads (dashed, muted). An overlay joins a pair that has no tree line drawn; semantic lines are never marked. */
+.vam-edges .vam-edge-dep-overlay { fill: none; pointer-events: none; }
+.vam-edges .vam-edge.is-dep-run, .vam-edges .vam-edge-dep-overlay.is-dep-run { stroke: var(--interactive-accent); stroke-width: 3; opacity: 1; }
+.vam-edges .vam-edge.is-dep-read, .vam-edges .vam-edge-dep-overlay.is-dep-read { stroke: var(--text-muted); stroke-width: 2; stroke-dasharray: 4 4; opacity: 1; }
 .vam-prompt-arrow { fill: var(--text-faint); stroke: none; }
 .vam-menu-hint { margin-inline-start: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 
@@ -2157,6 +2190,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-living-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .vam-living-editor .vam-ai-card-pop-question { flex: 1; min-height: 180px; height: auto; resize: vertical; }
 .vam-living-editor .vam-ai-card-pop-foot { gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+.vam-living-editor .vam-ai-card-pop-foot button.mod-cta { background: color-mix(in srgb, var(--interactive-accent) 75%, black); color: var(--text-on-accent); }
+.vam-living-editor .vam-ai-card-pop-foot button.mod-cta:hover { background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 75%, black); color: var(--text-on-accent); }
 .vam-living-editor-status { font-size: var(--font-ui-small); color: var(--text-muted); }
 .vam-living-editor-close-choices { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .vam-living-editor-close-choices[hidden] { display: none; }
@@ -2201,8 +2236,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-map-chat-resume-open:hover { color: var(--text-normal); }
 .vam-map-chat-resume-open:focus-visible, .vam-map-chat-resume-close:focus-visible, .vam-map-chat-resume-locate:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-resume-icon .svg-icon { width: 14px; height: 14px; }
-.vam-map-chat-resume { padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); font-size: var(--font-ui-smaller); }
-.vam-map-chat-resume[hidden] { display: none; }
+.vam-map-chat-resume, .vam-map-chat-impact { padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); font-size: var(--font-ui-smaller); }
+.vam-map-chat-resume[hidden], .vam-map-chat-impact[hidden] { display: none; }
 .vam-map-chat-resume-head { display: flex; align-items: center; justify-content: space-between; font-weight: var(--font-semibold); }
 .vam-map-chat-resume-note, .vam-map-chat-resume-empty, .vam-map-chat-resume-record, .vam-map-chat-resume-gone { color: var(--text-muted); }
 .vam-map-chat-resume-list { margin: 4px 0 0; padding: 0; list-style: none; }
@@ -2211,6 +2246,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-map-chat-resume-record { flex-basis: 100%; }
 .vam-map-chat-resume-record[hidden] { display: none; }
 .vam-map-chat-resume-locate { padding: 0 8px; height: 24px; font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-map-chat-impact-heading { margin-top: 6px; font-weight: var(--font-semibold); }
+.vam-map-chat-impact .vam-map-chat-resume-record { flex-basis: auto; }
+.vam-map-chat-impact .vam-map-chat-resume-record[hidden] { display: none; }
 
 /* B09: the selection bar's reason line (V3.3 P1.8f) and the reason under a greyed row of its ⋯ menu. */
 .vam-selection-bar.has-why { flex-wrap: wrap; row-gap: var(--vam-space-1); }

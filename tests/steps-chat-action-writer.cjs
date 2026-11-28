@@ -1,8 +1,8 @@
 // ChatActionWriter (experiences/visual-map/chat-action-writer.ts) on its own: fake ports and a fake map, no view, no real waiting.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load, obsidian } = require('./support.cjs');
-const { ChatActionWriter } = load('experiences/visual-map/chat-action-writer.ts', { obsidian: {} });
+const { load, obsidian, i18nSource } = require('./support.cjs');
+const { ChatActionWriter, chatFailureReason } = load('experiences/visual-map/chat-action-writer.ts', { obsidian: {} });
 const { t } = load('i18n.ts');
 const { contentHash } = load('core/map-chat-context.ts');
 
@@ -76,7 +76,7 @@ function world(options = {}) {
       map.nodes.push(node('n1', args[0]?.id ?? null));
       notes.set('n1', { title: args[1], summary: '', detail: '' });
     },
-    noteChange: async (found, patch) => { log('noteChange', found.id, patch); Object.assign(notes.get(found.id), patch); },
+    noteChange: async (found, patch) => { log('noteChange', found.id, patch); Object.assign(notes.get(found.id), patch); return 'written'; },
     moveTopic: async (found, parent) => { log('moveTopic', found.id, parent.id); found.parentId = parent.id; },
     removeToUnassignedEntry: async (found, branch) => { log('removeToUnassignedEntry', found.id, branch); return { parkedPaths: () => [`Unassigned/${found.path}`] }; },
     chatMoveBefore: async () => true, chatReorderChildren: async () => {}, arrangeAll: () => {}, focusNode: () => {}, flushChatRender: () => {},
@@ -126,6 +126,19 @@ test('chat action writer: rename_topic writes the title and moves the baseline; 
   assert.deepEqual(stale.only('noteChange'), []);
 });
 
+test('chat action writer: D1-x2 - a note write the guarded commit discarded is skipped as stale, and the baseline does not move', async () => {
+  for (const action of [{ kind: 'rename_topic', nodeId: 'a', title: 'A2' }, { kind: 'update_summary', nodeId: 'a', summary: 'S2' }, { kind: 'edit_topic_note', nodeId: 'a', detail: 'D2' }]) {
+    const w = world();
+    w.ports.noteChange = async (found, patch) => { w.calls.push(['noteChange', found.id, plain(patch)]); return 'discarded'; };
+    const baseline = w.baseline();
+    baseline.topicHashes.a.detailHash = contentHash('');
+    const before = JSON.stringify(baseline.topicHashes);
+    const { outcome } = await apply(w, action, baseline);
+    assert.deepEqual(outcome, skippedOutcome('ui.map_chat_skip_stale'), action.kind);
+    assert.equal(JSON.stringify(baseline.topicHashes), before, action.kind);
+  }
+});
+
 test('chat action writer: move_topic moves the card and follows it in the baseline; a move under its own descendant is a cycle', async () => {
   const w = world();
   const baseline = w.baseline();
@@ -161,6 +174,30 @@ test('chat action writer: add_relation and remove_relation change Map.md through
   const missing = await apply(w, { kind: 'remove_relation', fromId: 'a', toId: 'b' });
   assert.deepEqual(missing.outcome, skippedOutcome('ui.map_chat_skip_relation_missing'));
   assert.equal(w.only('mapChange').length, 2, 'a refused one writes nothing');
+});
+
+test('chat action writer: a relation to a reference is re-checked at write time: reference removed between plan and write is skipped, two references are refused', async () => {
+  const kr = (id, extra = {}) => ({ id, mapId: 'other', nodeId: 'n1', parentId: 'a', x: 1, y: 1, pathHint: 'O/Map.md', ...extra });
+  const w = world();
+  w.map.knowledgeRefs = [kr('ref-1'), kr('ref-2')];
+  const ok = await apply(w, { kind: 'add_relation', fromId: 'a', toId: 'ref-1', relationKind: 'supports' });
+  assert.deepEqual(ok.outcome, { status: 'done' });
+  assert.deepEqual(plain(w.map.topicRelations), [{ kind: 'supports', from: 'a', to: 'ref-1' }]);
+  const both = await apply(w, { kind: 'add_relation', fromId: 'ref-1', toId: 'ref-2', relationKind: 'related' });
+  assert.deepEqual(both.outcome, skippedOutcome('ui.map_chat_skip_relation_not_allowed'));
+  // The reference is removed after the check on the screen map but before the write: the second check on the map being edited sees it gone.
+  const w2 = world();
+  w2.map.knowledgeRefs = [kr('ref-1')];
+  const real = w2.ports.mapChange;
+  w2.ports.mapChange = async change => { w2.map.knowledgeRefs = []; return real(change); };
+  const gone = await apply(w2, { kind: 'add_relation', fromId: 'a', toId: 'ref-1', relationKind: 'supports' });
+  assert.deepEqual(gone.outcome, skippedOutcome('ui.map_chat_skip_topic_gone'));
+  assert.deepEqual(plain(w2.map.topicRelations ?? []), []);
+  // Already gone when the item is applied: skipped before any write.
+  const w3 = world();
+  const early = await apply(w3, { kind: 'add_relation', fromId: 'a', toId: 'ref-1', relationKind: 'supports' });
+  assert.deepEqual(early.outcome, skippedOutcome('ui.map_chat_skip_topic_gone'));
+  assert.equal(w3.only('mapChange').length, 0);
 });
 
 test('chat action writer: set_appearance writes only the cards whose appearance changes, in one transaction and one history step', async () => {
@@ -767,4 +804,21 @@ test('book plan chat, AI lock: a locked card is left as it is and named locked; 
   root.cards.get('r.md').aiLocked = true;
   assert.deepEqual(plain(await applyBookThreadEdit(root.deps, threadAction('x'), { bookPlan: root.baselineOf([]) })), skippedOutcome('ui.ai_locked_notice'));
   assert.deepEqual(root.writes, []);
+});
+
+// The result line of a failed chat action must not show an internal code (e.g. "changed-target"); the code stays in the exchange log only.
+test('a failed chat action line shows plain words, never an internal code, in all three languages', () => {
+  const codes = ['changed-target', 'changed-target-identity', 'changed-configuration', 'changed-source-identity', 'changed-source-resolution',
+    'missing-target', 'stale-base', 'base-mismatch', 'stale-or-cancelled-write', 'stale-generation', 'locked-target', 'missing-or-locked-target',
+    'unauthorized-source', 'missing-source', 'invalid-source', 'ambiguous-source', 'empty-prompt', 'self-reference', 'living-node-cycle',
+    'living-node-busy', 'map-file-source', 'target-unavailable', 'some-future-code'];
+  for (const code of codes) {
+    const reason = chatFailureReason(new Error(code));
+    assert.ok(reason && !reason.includes(code) && !/\b[a-z0-9]+(-[a-z0-9]+)+\b/.test(reason), `${code} -> ${reason}`);
+  }
+  assert.equal(chatFailureReason(new Error('The disk is full')), 'The disk is full'); // a real sentence is kept
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const source = i18nSource(language);
+    for (const key of ['ui.map_chat_fail_changed', 'ui.map_chat_fail_unknown']) assert.match(source, new RegExp(`"${key}": "[^"]+"`), `${language} ${key}`);
+  }
 });

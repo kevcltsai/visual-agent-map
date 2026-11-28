@@ -36,8 +36,8 @@ const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, a
   setPointerCapture() {}, focus() { this.focused++; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
   querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} });
 
-async function harness({ bHasSameTitle = false } = {}) {
-  const { repo, app, contents } = fixture('en', { linkIndex: true });
+async function harness({ bHasSameTitle = false, renameEvents = false } = {}) {
+  const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   app.metadataCache.getFirstLinkpathDest = (linkPath, fromPath) => {
     const path = resolverFor(() => [...contents.keys()])(linkPath, fromPath);
     return path === undefined ? null : app.vault.getAbstractFileByPath(path);
@@ -67,10 +67,32 @@ async function harness({ bHasSameTitle = false } = {}) {
   await repo.rebuildDerivedData();
   const notices = [];
   const Notice = dom.makeNotice(notices);
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment });
+  const { default: Plugin, VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment });
+  let mutate = async work => { await work(); };
+  let host;
+  if (renameEvents) {
+    // Like Obsidian: every moved file reports a vault rename event, handled by the plugin's real rename handler; the
+    // views' writes run through the plugin's real write queue, so its own moves arrive while it is writing.
+    const handlers = {};
+    app.vault.on = (name, handler) => { handlers[name] = handler; return {}; };
+    const reporting = rename => async (item, target) => {
+      const from = item.path;
+      const moved = [...files.entries()].filter(([path, file]) => file instanceof obsidian.TFile && (path === from || path.startsWith(`${from}/`)));
+      await rename(item, target);
+      for (const [old, file] of moved) handlers.rename?.(file, old);
+    };
+    app.vault.rename = reporting(app.vault.rename);
+    app.fileManager.renameFile = reporting(app.fileManager.renameFile);
+    host = new Plugin();
+    Object.assign(host, { app, repo, settings, registerEvent: () => {}, logs: { appendLog() {} }, saveData: async () => {} });
+    host.scheduleExternalReconciliation = () => {};
+    host.views = () => [];
+    host.registerVaultEvents();
+    mutate = work => host.mutate(work);
+  }
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: scope => repo.rebuildDerivedData(Array.isArray(scope) ? { roots: [], paths: scope } : scope), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
-    mutate: async work => { await work(); }
+    mutate: work => mutate(work)
   });
   const open = async path => {
     const view = new VisualAgentMapView({ app }, plugin);
@@ -84,7 +106,7 @@ async function harness({ bHasSameTitle = false } = {}) {
     return view;
   };
   const viewA = await open(MAP_A), viewB = await open(MAP_B);
-  return { repo, app, contents, plugin, viewA, viewB, notices, ids: { top: top.id, p: p.id, q: q.id, anchor: anchor.id }, paths: { p: p.path, q: q.path } };
+  return { repo, app, contents, plugin, host, viewA, viewB, notices, ids: { top: top.id, p: p.id, q: q.id, anchor: anchor.id }, paths: { p: p.path, q: q.path } };
 }
 
 const card = { inside: true, closest: () => null };
@@ -205,4 +227,45 @@ test('B27: a paste into B leaves every source note of A byte for byte, hand-writ
   assert.equal(copies.map(n => titleOf(h, n)).sort().join(), 'P,Q');
   for (const copy of copies) assert.ok(h.contents.has(copy.path) && copy.path.startsWith(`${TOPICS}/map-b/`), copy.path);
   for (const path of notes) assert.equal(sha(h.contents.get(path)), hashes.get(path), `${path} is not rewritten`);
+});
+
+test('B27x: undo and redo of a paste into B, with the real rename events, leave every source note of A byte for byte', async () => {
+  const h = await harness({ renameEvents: true });
+  const { createHash } = require('node:crypto');
+  const sha = text => createHash('sha256').update(text).digest('hex');
+  const notes = [...under(h, `${TOPICS}/map-a/Notes/`).keys()];
+  assert.equal(notes.length, 3);
+  // Hand-written, not as VAM writes them: single-quoted references and a user paragraph after the references block.
+  for (const path of notes)
+    h.contents.set(path, `${h.contents.get(path).replace(/^  - "(.*)"$/gm, "  - '$1'")}\nA line the user wrote last.\n`);
+  assert.ok(notes.some(path => /^  - '/m.test(h.contents.get(path))), 'a source note has single-quoted references');
+  const hashes = new Map(notes.map(path => [path, sha(h.contents.get(path))]));
+  const settle = async () => { for (let i = 0; i < 5; i++) { await h.host.queue; await tick(); } };
+  const unchanged = step => { for (const path of notes) assert.equal(sha(h.contents.get(path)), hashes.get(path), `${step}: ${path} is not rewritten`); };
+  pasteIntoB(h, copyBranch(h, ['p']));
+  await until(() => h.viewB.map.nodes.length === 3); await settle();
+  unchanged('paste');
+  // Mod+Z and Mod+Shift+Z run the step through the plugin's write queue (enqueue).
+  await h.plugin.mutate(() => h.viewB.travel(false)); await settle();
+  assert.equal(h.viewB.map.nodes.length, 1, 'undo takes the copies off B');
+  unchanged('undo');
+  await h.plugin.mutate(() => h.viewB.travel(true)); await settle();
+  assert.equal(h.viewB.map.nodes.length, 3, 'redo brings them back');
+  unchanged('redo');
+});
+
+test('B27x counter-example: a note renamed outside VAM still rebuilds every map, and VAM\'s own undo only map B', async () => {
+  const h = await harness({ renameEvents: true });
+  const scopes = [];
+  const rebuild = h.host.rebuildDerivedData.bind(h.host);
+  h.host.rebuildDerivedData = scope => { scopes.push(scope); return rebuild(scope); };
+  const settle = async () => { for (let i = 0; i < 5; i++) { await h.host.queue; await tick(); } };
+  pasteIntoB(h, copyBranch(h, ['p']));
+  await until(() => h.viewB.map.nodes.length === 3); await settle();
+  await h.plugin.mutate(() => h.viewB.travel(false)); await settle();
+  assert.equal(JSON.stringify(scopes.map(scope => scope?.roots)), JSON.stringify([[`${TOPICS}/map-b`]]), 'the undo rebuilds map B only');
+  scopes.length = 0;
+  const anchor = h.app.vault.getAbstractFileByPath(h.viewB.map.nodes[0].path);
+  await h.app.fileManager.renameFile(anchor, `${TOPICS}/map-b/Notes/Renamed.md`); await settle();
+  assert.deepEqual(scopes, [undefined], 'a rename in the file explorer rebuilds everything, as before');
 });

@@ -41,6 +41,9 @@ test('Claude isolated research reports web activity in the Codex event shape and
   await assert.rejects(runWith([subagent, { ...done('s2'), parent_tool_use_id: 'task-1' }]), /did not perform web search|沒有實際執行網路搜尋/, 'only the main agent counts');
   assert.equal(JSON.parse(await runWith([use('s3', 'WebSearch'), done('s3')], { onWebSearchEvent: () => { throw new Error('UI failure'); } })).summary, 'S', 'a telemetry consumer error does not fail the task');
   assert.equal(JSON.parse(await runWith([], { webSearchOnly: false })).summary, 'S', 'ordinary tasks do not require search');
+  // D1-x5: an optional web search (a Living Node with web policy "optional") may answer without searching, as on Codex.
+  assert.equal(JSON.parse(await runWith([], { optionalWebSearch: true })).summary, 'S', 'an optional web search is not required');
+  await assert.rejects(runWith([], { optionalWebSearch: false }), error => error.name === 'SearchNotPerformedError', 'a required web search still needs a retrieval');
 });
 test('Claude stream mode skips plain-text warning lines between JSON records', async () => {
   const { EventEmitter } = require('node:events');

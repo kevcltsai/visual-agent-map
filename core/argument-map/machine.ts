@@ -1116,7 +1116,8 @@ const analysisActionsSafe = (state: ArgumentMapData): ArgumentAction[] =>
 // ---- pause and resume -------------------------------------------------------------------------------------------------------------
 export function applyPause(
   state: ArgumentMapData,
-  reason: Extract<StopReason, "user" | "interrupted" | "error">
+  reason: Extract<StopReason, "user" | "interrupted" | "error">,
+  detail?: "write_discarded"
 ): ArgumentMapData {
   live(state);
   if (!["user", "interrupted", "error"].includes(reason)) throw new GateError("unknown pause reason");
@@ -1130,6 +1131,8 @@ export function applyPause(
   for (const h of next.hypotheses) for (const need of h.needs) if (need.state === "searching") need.state = "pending";
   next.run.status = "paused";
   next.run.stopReason = reason;
+  if (reason === "error" && detail) next.run.errorDetail = detail;
+  else delete next.run.errorDetail;
   return next;
 }
 
@@ -1141,5 +1144,6 @@ export function applyResume(state: ArgumentMapData): ArgumentMapData {
   const next = clone(state);
   next.run.status = "running";
   delete next.run.stopReason;
+  delete next.run.errorDetail;
   return next;
 }

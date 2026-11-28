@@ -521,6 +521,27 @@ integrationTest('map chat: one reply applies add_child, rename_topic, move_topic
   eq(lines.map(l => l.text.split(':')[0]), ['Done', 'Done', 'Done', 'Done']);
 });
 
+// D1-x2 (V3.3 D1 P3.9): the guarded writer says "discarded" when the note changed between the chat's gate and the write; that action
+// is reported as skipped, pushes no undo step and leaves the bytes as the other writer left them.
+integrationTest('map chat: D1-x2 - an edit discarded at commit (the card got locked after the gate) is skipped, pushes no undo step and writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const earlier = { undo: async () => {}, redo: async () => {}, label: 'earlier' };
+  h.view.history.push(earlier);
+  const path = h.view.map.nodes.find(n => n.id === h.ids.a).path;
+  const process = h.app.vault.process;
+  let injected = null;
+  h.app.vault.process = async (file, change) => {
+    if (file.path === path && !injected) { injected = h.contents.get(path).replace(/^---\n/, '---\nai-locked: true\n'); h.contents.set(path, injected); }
+    return process.call(h.app.vault, file, change);
+  };
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'AI summary' }], {}, undefined, topicBaseline(h));
+  assert.ok(injected, 'the lock was set after the gate, before the commit');
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(path), injected, 'the file is byte-identical to what the other writer left');
+  assert.equal(h.view.history.undoEntry, earlier, 'no undo step was pushed for the discarded write');
+  assert.notEqual(lines[0].text.split(':')[0], 'Done');
+});
+
 integrationTest('map chat: ticket 09 - a tree reply where one subtopic has no summary still adds it; it keeps the placeholder and stays unresearched', async () => {
   const h = await harness(); await h.view.hydrate();
   const lines = await apply(h, [
@@ -4106,12 +4127,13 @@ integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops hal
   let asked = 0; const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 8 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))], {}, () => ++asked < 6);
   assert.ok(lines.some(l => l.status === 'skipped')); assert.equal(counts.rebuild, 1);
 });
-integrationTest('B2-0 F4: an outside change to Map.md in the middle of a batch still raises the conflict window, once, and the batch goes on', async () => {
+integrationTest('B2-0 F4: an outside change to Map.md in the middle of a batch is kept (no conflict window: the staged cards are put on it) and the batch goes on', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); let created = 0;
   const createNote = h.repo.createNote.bind(h.repo);
   h.repo.createNote = async (...args) => { const made = await createNote(...args); if (++created === 4) await h.repo.saveMap(MAP, { ...(await h.repo.readMap(MAP)), title: 'Edited outside' }); return made; };
   const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 7 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))]);
-  assert.equal((h.control.modals ?? []).length, 1, 'the conflict window was asked once'); assert.ok(lines.filter(l => l.status === 'done').length >= 8);
+  assert.equal((h.control.modals ?? []).length, 0, 'no conflict window: the staged cards are put on their version'); assert.ok(lines.filter(l => l.status === 'done').length >= 8);
+  assert.equal((await h.repo.readMap(MAP)).title, 'Edited outside', 'their change is kept'); assert.equal((await h.repo.readMap(MAP)).nodes.length, 8);
 });
 
 
@@ -6606,6 +6628,33 @@ test('E3 gate: a plan whose map is read-only shows Apply greyed with the reason;
   assert.equal(applied, 1, 'applied once');
 });
 
+// ---- V3.3 F07a: suggested relations on the plan card, each with its own Adopt ----------------------------------------------------
+test('F07a card: the heading, one row per suggestion with "Reason: … Source: …" and Adopt; a blocked row is greyed with why; Adopt once; untrusted text stays text', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('q'); f.panel.finish('a reply', []);
+  let adopted = 0; let block = null;
+  const evil = '<img src=x onerror=alert(1)>';
+  const rows = [
+    { text: 'Link “A” to “B” (Prerequisite)', reason: 'B builds on A.', source: '[S1]', state: 'pending', blocked: () => block, adopt() { adopted++; rows[0].state = 'adopted'; } },
+    { text: 'Link “A” to “C” (Related)', reason: evil, source: evil, state: 'pending', blocked: () => null, adopt() {} }
+  ];
+  f.panel.showPlan({ reasons: [], items: [], estimate: 'e', state: 'pending', noApply: true, suggestions: rows, apply() { throw new Error('no apply'); }, cancel() {} });
+  const texts = () => findAll(f.panel.logEl, i => i.hasClass?.('vam-map-chat-suggestions')).flatMap(box => findAll(box, i => typeof i.text === 'string' && i.text).map(i => i.text));
+  assert.ok(texts().includes('Suggested relations (at most 5)'), 'the heading');
+  assert.ok(texts().includes('Reason: B builds on A. Source: [S1]'));
+  assert.equal(f.panel.logEl.querySelector('.vam-map-chat-plan-apply'), null, 'no Apply');
+  assert.equal(findAll(f.panel.logEl, i => i.tag === 'img' || i.tag === 'script').length, 0, 'text, never an element');
+  const buttons = () => findAll(f.panel.logEl, i => i.hasClass?.('vam-map-chat-suggestion-adopt'));
+  assert.deepEqual(buttons().map(b => b.text), ['Adopt', 'Adopt']);
+  block = 'Apply is off: the map is read-only while it is presented.'; f.panel.refreshPlan();
+  assert.equal(buttons()[0].disabled, true, 'greyed'); assert.ok(texts().includes(block), 'with the reason');
+  block = null; f.panel.refreshPlan();
+  const first = buttons()[0]; first.click(); first.click();
+  assert.equal(adopted, 1, 'adopted once');
+  f.panel.refreshPlan();
+  assert.ok(texts().includes('Adopted')); assert.equal(buttons().length, 1, 'the adopted row has no button');
+});
+
 // ---- persona G12: a move_topic without beforeId leaves no hole in the old branch (real Lane L coordinates: parent above, old parent below) ----
 integrationTest('persona G12: moving a card with its own branch up under another parent pulls the old parent\'s other children up to it, no big hole', async () => {
   const h = await harness(); await h.view.hydrate();
@@ -6633,7 +6682,7 @@ integrationTest('persona G12: moving a card with its own branch up under another
 });
 
 // ---- P4a: picture chip, "before AI edits the picture" switch, "AI looked at this picture", "Undo this reply" ---------------------
-const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts', name: 'a.png' }) => {
+const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts', name: 'a.png' }, extra = {}) => {
   const state = { image: start, mode: 'preview', listeners: [], sets: [], undo: new Map(), undone: [], later: 0 };
   const token = { label: 'reply' };
   const f = panelFixture({
@@ -6641,7 +6690,8 @@ const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts
     watchImage: changed => { state.listeners.push(changed); return () => { state.listeners.splice(state.listeners.indexOf(changed), 1); }; },
     setImageMode: mode => { state.sets.push(mode); state.mode = mode; },
     replyUndoState: t2 => state.undo.get(t2) ?? 'top',
-    undoReply: async t2 => { if ((state.undo.get(t2) ?? 'top') !== 'top') { state.later++; return 'later'; } state.undo.set(t2, 'undone'); state.undone.push(t2); return 'undone'; }
+    undoReply: async t2 => { if ((state.undo.get(t2) ?? 'top') !== 'top') { state.later++; return 'later'; } state.undo.set(t2, 'undone'); state.undone.push(t2); return 'undone'; },
+    ...extra
   });
   f.panel.setOpen(true);
   const set = image => { state.image = image; state.listeners.forEach(fn => fn()); };
@@ -6669,6 +6719,39 @@ test('P4a chip: an annotated picture reads "Selected: annotated image · words" 
   f.set({ id: 'i2', kind: 'plain', note: '', name: 'b.png' }); assert.deepEqual(chipTexts(), ['Selected: image · b.png']);
   f.set(null); assert.deepEqual(chipTexts(), []);
   f.panel.dispose(); assert.equal(f.state.listeners.length, 0, 'the panel stops listening when the view closes');
+});
+
+// V3.3 G05 / P5.4: the chip says the picture goes to the AI; a runtime that cannot read pictures is told at selection time, Send is off.
+test('G05 chip: an annotated picture chip says "This image goes to the AI" beside its label; an ordinary one does not', () => {
+  const f = imageHostFixture(); const sent = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-sent')).map(i => i.text);
+  f.panel.refreshSelection();
+  assert.deepEqual(sent(), ['This image goes to the AI']);
+  f.set({ id: 'i2', kind: 'plain', note: '', name: 'b.png' }); assert.deepEqual(sent(), [], 'an ordinary picture is never sent');
+});
+
+test('G05 no image input: the explanation shows under the chip at once, Send is disabled and pressing Send or Enter asks the host for nothing; with image input there is no explanation', () => {
+  const state = { notice: 'This model cannot read pictures. Pick another model or select no picture. Nothing was sent.' };
+  const f = imageHostFixture(undefined, { imageNotice: () => state.notice });
+  f.panel.refreshSelection();
+  const notice = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-image-notice')).map(i => i.text);
+  assert.deepEqual(notice(), [state.notice]);
+  assert.equal(f.parts.send().disabled, true);
+  f.panel.inputEl.value = 'hello'; f.panel.inputEl.fire('input');
+  f.parts.send().click(); pressEnter(f.panel);
+  assert.equal(f.calls.send, 0, 'nothing is sent');
+  state.notice = null; f.panel.refreshSelection();
+  assert.deepEqual(notice(), []); assert.equal(f.parts.send().disabled, false);
+  f.parts.send().click(); assert.equal(f.calls.send, 1);
+});
+
+test('G05-x no image input: the chip does not say the picture goes to the AI while the model cannot read it; it says so again once it can', () => {
+  const state = { notice: 'This model cannot read pictures. Pick another model or select no picture. Nothing was sent.' };
+  const f = imageHostFixture(undefined, { imageNotice: () => state.notice });
+  const sent = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-sent')).map(i => i.text);
+  f.panel.refreshSelection();
+  assert.deepEqual(sent(), [], 'no "goes to the AI" next to "cannot read pictures"');
+  state.notice = null; f.panel.refreshSelection();
+  assert.deepEqual(sent(), ['This image goes to the AI']);
 });
 
 test('P4a switch: a named group of two aria-pressed buttons, only while a picture is chosen; clicking switches, remembers through the host, and a second click on the same button changes nothing', () => {
@@ -6977,7 +7060,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 34 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 36 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
@@ -10619,6 +10702,42 @@ const makeLivingCard = async h => {
   await h.view.hydrate();
   return path;
 };
+// D1-x4: a rename is an AI write too, so a lock set while the reply ran refuses it at commit; a Living Node card's rename stays allowed.
+integrationTest('map chat: D1-x4 - a rename whose card got ai-locked after the gate is skipped, writes nothing and pushes no undo step', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const earlier = { undo: async () => {}, redo: async () => {}, label: 'earlier' };
+  h.view.history.push(earlier);
+  const path = h.node('a').path;
+  const process = h.app.vault.process;
+  let injected = null;
+  h.app.vault.process = async (file, change) => {
+    if (file.path === path && !injected) { injected = h.contents.get(path).replace(/^---\n/, '---\nai-locked: true\n'); h.contents.set(path, injected); }
+    return process.call(h.app.vault, file, change);
+  };
+  const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Locked rename' }], {}, undefined, topicBaseline(h));
+  assert.ok(injected, 'the lock was set after the gate, before the commit');
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(path), injected, 'the title on disk is unchanged');
+  assert.equal(h.view.history.undoEntry, earlier, 'no undo step was pushed');
+});
+
+integrationTest('map chat: D1-x4 - a rename of an unlocked Living Node card still writes (the rename exemption)', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const path = await makeLivingCard(h);
+  const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Living renamed' }], {}, undefined, livingBaseline(h));
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  assert.equal((await h.note('a')).title, 'Living renamed');
+  assert.match(h.contents.get(path), /Known output/);
+});
+
+integrationTest('map chat: D1-x4 - a normal rename writes and leaves one undo step', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Plain rename' }], {}, undefined, topicBaseline(h));
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  assert.equal((await h.note('a')).title, 'Plain rename');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+});
+
 integrationTest('map chat: configure_ai_card on an existing AI card applies when stamped; a genuine edit is "changed"; an outline-only card is "not shown"', async () => {
   const h = await harness(); await h.view.hydrate();
   const path = await makeLivingCard(h);
@@ -10683,4 +10802,30 @@ test('P4.8 resume: a host without the summary has no entry; the words follow the
   const { f, open } = summaryFixture({ state: 'empty', items: [] });
   f.setLanguage('zh-TW'); f.panel.relabel(); await open(); assert.match(visibleText(summaryBlock(f)), /資料不足，沒有可恢復的紀錄/); assert.match(visibleText(find(f.panel.el, i => hasClass(i, 'vam-map-chat-resume-open'))), /恢復摘要/);
   f.setLanguage('en');
+});
+// ---- F09 impact analysis: a read-only block in the same window, shown by the view's card menu (no message, no turn, no record) ------
+const impactItem = (extra = {}) => ({ section: 'direct', kinds: ['relation'], nodeId: 'a', title: 'Topic A', ...extra });
+const impactResult = (extra = {}) => ({ state: 'items', targetId: 'a', targetTitle: 'Target', direct: [impactItem(), impactItem({ kinds: ['descendant', 'living'], nodeId: 'gone', title: 'Old' }), impactItem({ kinds: ['reference'], refId: 'r1', title: '' })], speculative: [impactItem({ section: 'speculative', kinds: [], nodeId: 'b', title: 'Topic B', matched: 'Target' })], hidden: { direct: 0, speculative: 0 }, ...extra });
+const impactBlock = f => find(f.panel.el, i => hasClass(i, 'vam-map-chat-impact'));
+test('F09 impact: the block opens the window, lists direct and guessed items apart with their reasons, and each located item has a Locate button', () => {
+  const located = []; const f = panelFixture({ locateTopic: id => { located.push(id); return true; } });
+  assert.equal(impactBlock(f).hidden, true, 'hidden until asked: no new Tab stop');
+  f.panel.showImpact(impactResult());
+  assert.equal(impactBlock(f).hidden, false); assert.equal(f.panel.isOpen, true);
+  const text = visibleText(impactBlock(f));
+  assert.match(text, /Impact of “Target” \(read only\)/); assert.match(text, /Direct dependencies \(connected\) \(3\)/); assert.match(text, /May be affected \(guess\) \(1\)/);
+  assert.match(text, /Relation/); assert.match(text, /Subtopic · Living Node source/); assert.match(text, /“Reference card”/); assert.match(text, /Guess: the text mentions “Target”/);
+  assert.match(text, /Cannot locate/, 'a card that is gone');
+  const buttons = findAll(impactBlock(f), i => i.tag === 'button' && hasClass(i, 'vam-map-chat-impact-locate'));
+  assert.equal(buttons.length, 3); buttons[2].click(); eq(located, ['b']);
+  assert.equal(f.panel.hasMessages, false, 'not a message'); eq(f.panel.completedTurns(), []);
+});
+test('F09 impact: a missing card, an empty result, the cap note, closing, a new conversation and the interface language', () => {
+  const f = panelFixture({ locateTopic: () => true });
+  f.panel.showImpact(impactResult({ state: 'missing', direct: [], speculative: [] })); assert.match(visibleText(impactBlock(f)), /no longer on the map/);
+  f.panel.showImpact(impactResult({ state: 'empty', direct: [], speculative: [] })); assert.match(visibleText(impactBlock(f)), /Nothing is connected/);
+  f.panel.showImpact(impactResult({ hidden: { direct: 5, speculative: 0 } })); assert.match(visibleText(impactBlock(f)), /5 more not shown/);
+  findAll(impactBlock(f), i => hasClass(i, 'vam-map-chat-resume-close'))[0].click(); assert.equal(impactBlock(f).hidden, true);
+  f.panel.showImpact(impactResult()); f.panel.reset(); assert.equal(impactBlock(f).hidden, true);
+  f.panel.showImpact(impactResult()); f.setLanguage('zh-TW'); f.panel.relabel(); assert.match(visibleText(impactBlock(f)), /直接依賴（有連線）/); assert.match(visibleText(impactBlock(f)), /可能影響（推測）/); f.setLanguage('en');
 });

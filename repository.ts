@@ -197,6 +197,8 @@ export interface BrokenTopic {
 const NOTE_CSS_CLASS = "visual-agent-map-node";
 /** Longest `last-error` stored in a note. */
 export const LAST_ERROR_LIMIT = 300;
+/** The shared AI writer gate refused the bytes being replaced (a Living Node, damaged markers): nothing was written. */
+export class AiWriterRefusal extends Error {}
 /** The failure reason kept on a note: the raw error message, whitespace collapsed, cut to {@link LAST_ERROR_LIMIT}. */
 export function failureReason(error: unknown): string {
   const raw = (error as { message?: unknown } | null | undefined)?.message;
@@ -945,18 +947,22 @@ export class Repository {
       expectedContent?: string;
       /** Unintegrated AI writer: refuse even a flag-only card, using the actual bytes at commit. */
       rejectAiCard?: boolean;
+      /** AI writer whose write is exempt from the Living Node refusal (a chat rename): refuse only a note locked at commit. */
+      rejectAiLock?: boolean;
       /** Gets the file text the callback was given (so a check can look at the text as it is now, not as the caller last read it). */
       authorize?: (current?: string) => boolean;
       finalize?: (content: string) => string | null;
     } = {}
   ): Promise<"written" | "discarded"> {
-    const { expectedContent, authorize, finalize, rejectAiCard, ...writeOptions } = options;
+    const { expectedContent, authorize, finalize, rejectAiCard, rejectAiLock, ...writeOptions } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
       if (
         rejectAiCard
           ? this.aiWriteBlocked(content, expectedContent, () => !authorize || authorize(content))
-          : (expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))
+          : rejectAiLock
+            ? this.aiWriteBlocked(content, expectedContent, () => !authorize || authorize(content))
+            : (expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))
       ) {
         outcome = "discarded";
         return content;
@@ -1024,8 +1030,9 @@ export class Repository {
    */
   private admitAiWriter(content: string): void {
     const state = livingMarkerState(content);
-    if (state === "corrupt") throw new Error(this.message("error.living_node_markers_damaged"));
-    if (isLivingNodeNote(content, frontmatter(content))) throw new Error(this.message("ui.living_node_use_run_card"));
+    if (state === "corrupt") throw new AiWriterRefusal(this.message("error.living_node_markers_damaged"));
+    if (isLivingNodeNote(content, frontmatter(content)))
+      throw new AiWriterRefusal(this.message("ui.living_node_use_run_card"));
   }
 
   /** Settle only the still-running managed note, without reverting a status the owner changed meanwhile. */

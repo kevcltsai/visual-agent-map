@@ -4,7 +4,10 @@ import {
   anchorRelationAllowed,
   ANCHOR_LIMIT,
   findAnnotatedImage,
-  type AnchorRelation
+  isImage2dAnchor,
+  updateAnchor,
+  type AnchorRelation,
+  type AnnotatedImageItem
 } from "./canvas-items";
 import type { Transaction, TransactionEntry } from "./map-transaction";
 import { randomUUID } from "node:crypto";
@@ -14,6 +17,8 @@ import { addedMermaidBlocks } from "../../ai/mermaid-safety";
 import { frontmatter } from "../../core/repository-frontmatter";
 import { saveLivingConfig, type LivingConfigSave } from "./living-node-runtime";
 import { promptSourceLinks } from "./prompt-run";
+import { livingSaveReason } from "./living-node-trial-reason";
+import { errorMessage } from "../../core/error-message";
 import {
   canParent,
   clone,
@@ -24,6 +29,7 @@ import {
   setTopicRelations,
   type TopicRelation
 } from "../../map-model";
+import { readKnowledgeRefs } from "./knowledge-refs";
 import { ringMemberIds } from "../../map-layout-text";
 import { isTopicMarker } from "../../topic-markers";
 import { ringMembers } from "./image-ring";
@@ -96,6 +102,32 @@ export const chatAppearanceChange = (
   addStyles: action.formats ?? [],
   removeStyles: action.removeFormats ?? []
 });
+/** Codes thrown when the target moved on after the message was sent; the chat line says so in words. */
+const CHANGED_CODES = new Set([
+  "changed-target",
+  "changed-target-identity",
+  "changed-configuration",
+  "changed-source-identity",
+  "changed-source-resolution",
+  "missing-target",
+  "missing-or-locked-target",
+  "target-unavailable",
+  "stale-base",
+  "base-mismatch",
+  "stale-or-cancelled-write",
+  "stale-generation"
+]);
+/**
+ * The reason line of a chat action that threw: plain words for an internal code (the code itself stays in the log), the
+ * message as it is for a real sentence.
+ */
+export function chatFailureReason(error: unknown): string {
+  const message = errorMessage(error);
+  if (!/^[a-z0-9]+(-[a-z0-9]+)+$/.test(message)) return message;
+  if (CHANGED_CODES.has(message)) return t("ui.map_chat_fail_changed");
+  const key = livingSaveReason(error);
+  return key ? t(key) : t("ui.map_chat_fail_unknown");
+}
 export const skipped = (key: TranslationKey): ChatOutcome => ({ status: "skipped", reason: t(key) });
 const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   outside_vault: "ui.map_chat_guard_outside_vault",
@@ -173,7 +205,8 @@ export interface ChatWriterPorts {
     current: () => boolean,
     allowSource: (path: string) => boolean
   ): Promise<MapNode | undefined>;
-  noteChange(node: MapNode, patch: NotePatch): Promise<void>;
+  /** "discarded": the guarded commit refused the write (the note changed or got locked after the gate); nothing was written. */
+  noteChange(node: MapNode, patch: NotePatch): Promise<"written" | "discarded">;
   moveTopic(node: MapNode, parent: MapNode): Promise<void>;
   removeToUnassignedEntry(node: MapNode, branch: boolean, adopterId?: string): Promise<TransactionEntry | undefined>;
   chatMoveBefore(node: MapNode, parent: MapNode, before: MapNode): Promise<boolean>;
@@ -327,7 +360,8 @@ export class ChatActionWriter {
         run.created.push(created.id);
         run.notes?.add(created.id);
         if (action.ref) run.refs.set(action.ref, created.id);
-        if (action.summary) await this.ports.noteChange(created, { summary: action.summary });
+        if (action.summary && (await this.ports.noteChange(created, { summary: action.summary })) === "discarded")
+          return skipped("ui.map_chat_skip_stale");
         return done;
       }
       case "configure_ai_card": {
@@ -414,6 +448,8 @@ export class ChatActionWriter {
       case "add_anchor":
       case "link_anchor":
         return this.chatChangeAnchor(action, real, run);
+      case "move_anchor":
+        return this.chatMoveAnchor(action);
       case "set_appearance":
         return this.chatSetAppearance(action, real, run);
       case "collapse_topic":
@@ -475,7 +511,7 @@ export class ChatActionWriter {
         if (blocked.includes("ai_locked")) return skipped("ui.ai_locked_notice");
         if (blocked.includes("read_only")) return skipped("ui.living_node_use_run_card");
         run.notes?.add(node.id);
-        await this.ports.noteChange(
+        const written = await this.ports.noteChange(
           node,
           action.kind === "rename_topic"
             ? { title: action.title }
@@ -483,6 +519,7 @@ export class ChatActionWriter {
               ? { summary: action.summary }
               : { detail }
         );
+        if (written === "discarded") return skipped("ui.map_chat_skip_stale");
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
@@ -756,8 +793,17 @@ export class ChatActionWriter {
     const fromId = real(action.fromId),
       toId = real(action.toId);
     if (fromId === null || toId === null) return skipped("ui.map_chat_skip_parent_missing");
-    const ends = [fromId, toId].map(id => this.map?.nodes.find(node => node.id === id));
-    if (ends.some(node => !node)) return skipped("ui.map_chat_skip_topic_gone");
+    // An end is a card of this map or (adding only) one of its knowledge references, never both ends references (V3.3 P4.4).
+    const endsOf = (map: MapDocument): { gone: boolean; bothRefs: boolean } => {
+      const refIds = new Set(readKnowledgeRefs(map).map(ref => ref.id));
+      const kinds = [fromId, toId].map(id =>
+        map.nodes.some(node => node.id === id) ? "card" : refIds.has(id) ? "ref" : "gone"
+      );
+      return { gone: kinds.includes("gone"), bothRefs: kinds[0] === "ref" && kinds[1] === "ref" };
+    };
+    const early0 = endsOf(this.map);
+    if (early0.gone) return skipped("ui.map_chat_skip_topic_gone");
+    if (early0.bothRefs) return skipped("ui.map_chat_skip_relation_not_allowed");
     const pair = (link: TopicRelation): boolean =>
       (link.from === fromId && link.to === toId) || (link.from === toId && link.to === fromId);
     const link: TopicRelation = {
@@ -780,7 +826,14 @@ export class ChatActionWriter {
     const box: { refused: TranslationKey | null } = { refused: null };
     await this.ports.mapChange(map => {
       const list = map.topicRelations ?? [];
-      box.refused = refusal(list);
+      // The write is checked again on the map being edited: a reference may have been removed since.
+      const now = endsOf(map);
+      box.refused =
+        action.kind === "add_relation" && now.gone
+          ? "ui.map_chat_skip_topic_gone"
+          : now.bothRefs
+            ? "ui.map_chat_skip_relation_not_allowed"
+            : refusal(list);
       if (box.refused) return;
       if (action.kind === "remove_relation") {
         setTopicRelations(
@@ -889,6 +942,42 @@ export class ChatActionWriter {
       run.ringAdded.set(action.imageId, added);
     }
     return { status: "done" };
+  }
+  /**
+   * move_anchor (G06a): runs only from a confirmed plan. The same Map.md write as dragging an anchor by hand (`updateAnchor`),
+   * checked again against the map being edited: a picture that was deleted or turned back into an ordinary one, or an anchor
+   * that is gone, is stale and writes nothing. Never on an AIM map.
+   */
+  private async chatMoveAnchor(action: Extract<MapChatAction, { kind: "move_anchor" }>): Promise<ChatOutcome> {
+    if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const items = this.map.canvasItems ?? [];
+    const image = findAnnotatedImage(items, action.imageId);
+    if (!image)
+      return skipped(
+        items.some(item => item.id === action.imageId && item.kind === "image")
+          ? "ui.map_chat_skip_image_plain"
+          : "ui.map_chat_skip_image_gone"
+      );
+    /** Why this write is stale or cannot move the anchor now; null = it can. */
+    const refusal = (current: AnnotatedImageItem): TranslationKey | null => {
+      // The picture file was replaced since the suggestion: the position was meant for another picture.
+      if (action.imageRef !== undefined && current.path !== action.imageRef) return "ui.map_chat_skip_image_gone";
+      const anchor = current.anchors.find(entry => entry.id === action.anchorId);
+      // Only a 2D position can be moved; never answer "done" without moving.
+      return anchor && isImage2dAnchor(anchor) ? null : "ui.map_chat_skip_anchor_gone";
+    };
+    const early = refusal(image);
+    if (early) return skipped(early);
+    const box: { refused: TranslationKey | null } = { refused: null };
+    await this.ports.mapChange(map => {
+      const current = findAnnotatedImage(map.canvasItems ?? [], action.imageId);
+      box.refused = current ? refusal(current) : "ui.map_chat_skip_image_gone";
+      if (!box.refused)
+        map.canvasItems = updateAnchor(map.canvasItems ?? [], action.imageId, action.anchorId, {
+          at: { x: action.x, y: action.y }
+        });
+    }, false);
+    return box.refused ? skipped(box.refused) : { status: "done" };
   }
   /**
    * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every

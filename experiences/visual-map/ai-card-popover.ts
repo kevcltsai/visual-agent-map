@@ -60,6 +60,8 @@ export class AiCardPopover {
   private preview = false;
   private busy = false;
   private trialRunning = false;
+  private trialWaiting = false;
+  private readonly convertEl?: HTMLButtonElement;
   private readonly cleanups: Array<() => void> = [];
   private parentEl: HTMLElement | null = null;
   private destroyed = false;
@@ -134,9 +136,10 @@ export class AiCardPopover {
     this.track(this.saveEl, "ui.ai_card_save");
     if (host.convert) {
       const convert = foot.createEl("button", { text: t("ui.living_node_convert"), attr: { type: "button" } });
+      this.convertEl = convert;
       this.track(convert, "ui.living_node_convert");
       this.on(convert, "click", () => {
-        if (this.busy || this.dirty()) return;
+        if (this.busy || this.trialRunning || this.dirty()) return;
         void host.convert?.();
       });
     }
@@ -317,7 +320,23 @@ export class AiCardPopover {
     this.stopTrialEl.disabled = !this.trialRunning;
     this.adoptEl.disabled = !this.preview || this.busy || this.dirty() || !this.host.adopt;
     this.questionEl.disabled = this.busy;
-    this.statusEl.setText(this.busy ? t("ui.ai_running") : this.dirty() ? t("ui.living_node_dirty") : "");
+    if (this.convertEl) this.convertEl.disabled = this.trialRunning;
+    this.statusEl.setText(
+      this.busy && this.trialWaiting
+        ? `${t("ui.ai_card_status_waiting")}: ${t("ui.living_node_trial_waiting_consent")}`
+        : this.busy
+          ? t("ui.ai_running")
+          : this.dirty()
+            ? t("ui.living_node_dirty")
+            : ""
+    );
+  }
+
+  /** The first-send usage question is open: the trial is waiting for the user, not running. */
+  setTrialWaiting(waiting: boolean): void {
+    if (this.destroyed || this.trialWaiting === waiting) return;
+    this.trialWaiting = waiting;
+    this.refresh();
   }
 
   private async save(close = false): Promise<void> {
@@ -351,6 +370,7 @@ export class AiCardPopover {
       this.preview = await this.host.trial(this.values());
     } finally {
       this.trialRunning = false;
+      this.trialWaiting = false;
       this.busy = false;
       if (!this.destroyed) {
         this.refresh();
@@ -370,7 +390,13 @@ export class AiCardPopover {
       this.preview = false;
     } finally {
       this.busy = false;
-      if (!this.destroyed) this.refresh();
+      if (!this.destroyed) {
+        this.refresh();
+        // The adopt button is now disabled and took the focus with it: keep the keyboard (and Escape) in this editor.
+        const doc = this.el.ownerDocument;
+        const active = doc?.activeElement ?? null;
+        if (!active || active === doc?.body || !this.el.contains(active)) this.trialEl.focus();
+      }
     }
   }
 

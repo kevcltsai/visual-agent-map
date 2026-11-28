@@ -95,7 +95,11 @@ function pausedParts(
   const run = state.run;
   if (run.status !== "paused" || run.phase !== phase) return null;
   const reason =
-    run.stopReason === undefined ? undefined : PAUSE_REASON_KEY[run.stopReason as keyof typeof PAUSE_REASON_KEY];
+    run.stopReason === "error" && run.errorDetail === "write_discarded"
+      ? "ui.argument_paused_reason_write_discarded"
+      : run.stopReason === undefined
+        ? undefined
+        : PAUSE_REASON_KEY[run.stopReason as keyof typeof PAUSE_REASON_KEY];
   const lines = reason ? [t("ui.argument_reason_0", t(reason))] : [];
   // Decision #66 (R1 M1): an unfinished map made before question types is never resumed; the card says how to start a new one instead.
   if (isLegacyFacetMap(state))

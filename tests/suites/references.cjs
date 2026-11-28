@@ -254,3 +254,31 @@ test('source identity: two notes with one basename at different paths get two nu
   const out = api.resolveDetailReferences('A[S1] B[S2] C[[same]]', groups);
   assert.equal(out, `A[^1] B[^2] C${'Source to confirm: same'}\n\n[^1]: [[Maps/A/same.md|same]]%%vam-src:-:${api.sourceRevision('a')}%%\n[^2]: [[Maps/B/same.md|same]]%%vam-src:-:${api.sourceRevision('b')}%%\n`);
 });
+
+// V3.3 #05-x: every path that hands a note to a research as a reference document gives its footnote the source's path, node id and revision.
+test('source identity (chat attachment): a note dropped on the chat is cited with its node id and the revision of the file', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const { chatResearchReferenceGroups } = load('experiences/visual-map/chat-research-sources.ts', { obsidian });
+  const file = '---\nagent-map-node: true\nnode-id: rd-old\n---\nOld research body\n';
+  const groups = chatResearchReferenceGroups({ files: [{ path: 'Notes/rd-old.md', content: file }], activeFile: null, snippets: [] });
+  assert.equal(api.resolveDetailReferences('Claim[S1]', groups), `Claim[^1]\n\n[^1]: [[Notes/rd-old.md|rd-old]]%%vam-src:rd-old:${api.sourceRevision(file)}%%\n`);
+});
+
+test('source identity: a self-written "[S1]: [[note]]" definition (no .md) leaves one definition, VAM\'s with the identity, and the label stays one', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const path = 'Agent Workspace/Topics/Research Demo/Notes/rd-old';
+  const file = '---\nagent-map-node: true\nnode-id: rd-old\n---\nOld research body\n';
+  const groups = [{ id: 'g', documents: [{ path: `${path}.md`, content: file }] }];
+  const identity = `[[${path}.md|rd-old]]%%vam-src:rd-old:${api.sourceRevision(file)}%%`;
+  // The sample's shape: four writer footnotes, [S1] used in the body, a table and a callout, and the model's own definition line for [S1].
+  const reply = `### Evidence\nOlder lab note about 20 adults.[[${path}]] [S1]\n\n| claim | source |\n|---|---|\n| small study | [S1] |\n\n> Spindle evidence is thin.[S1]\n\n### Sources\n\n[^1]: https://a.example\n[^2]: https://b.example\n[^3]: https://c.example\n[^4]: https://d.example\n\n[S1]: [[${path}]]\n`;
+  const out = api.resolveDetailReferences(reply, groups);
+  assert.equal(out, `### Evidence\nOlder lab note about 20 adults.[[${path}]] [^5]\n\n| claim | source |\n|---|---|\n| small study | [^5] |\n\n> Spindle evidence is thin.[^5]\n\n### Sources\n\n[^1]: https://a.example\n[^2]: https://b.example\n[^3]: https://c.example\n[^4]: https://d.example\n\n[^5]: ${identity}`);
+  assert.equal(out.match(/^\[\^5\]:/gm).length, 1, 'one definition for the label');
+  assert.equal(api.resolveDetailReferences(out, groups, out), out, 'the same source and revision re-run is byte-identical');
+  // An ordinary line that merely starts with the marker keeps its text.
+  assert.ok(api.resolveDetailReferences('[S1]: says the lab note\n', groups).includes('says the lab note'));
+  // The same self-written definition with trailing words, in a list item or in a quote is dropped too.
+  for (const line of [`[S1]: [[${path}]] — the lab note`, `- [S1]: [[${path}]]`, `> [S1]: [[${path}]]`])
+    assert.equal(api.resolveDetailReferences(`Claim[S1]\n\n${line}\n`, groups), `Claim[^1]\n\n[^1]: ${identity}\n`, line);
+});

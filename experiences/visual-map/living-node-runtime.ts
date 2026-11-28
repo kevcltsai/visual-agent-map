@@ -11,7 +11,13 @@ import type { Repository, Note } from "../../repository";
 import type { MapDocument } from "../../map-model";
 import type { ReferenceGroup } from "../../ai/reference-materials";
 import { isAiCard, promptSourceLinks, splitPrompt } from "./prompt-run";
-import { introducesLivingCycle, planLivingMap, type LivingMapCard } from "./living-node-map";
+import {
+  introducesLivingCycle,
+  livingDependencyGraph,
+  planLivingMap,
+  type LivingDependencyGraph,
+  type LivingMapCard
+} from "./living-node-map";
 import {
   readLivingReferences,
   livingConfigPrompt,
@@ -95,7 +101,8 @@ export interface LivingRoundPort {
   onAiLatestDropped?(id: string, reason: string): void;
   log?(level: "debug", message: string): void;
   confirm(model: string, run: () => Promise<void>): Promise<boolean>;
-  onStart(total: number): void;
+  /** `total` is the cards to process (`queued`, in order); `excluded` (blocked before the start, locked targets) settle at once outside it. */
+  onStart(total: number, excluded: readonly string[], queued: readonly string[]): void;
   /** Trial cards are an execution boundary: skipped themselves, used frozen when valid, otherwise blocking their dependents. */
   onTrialBoundary?(boundary: { skipped: string[]; frozen: string[]; blocked: string[] }): void;
   onRunning(id: string): void;
@@ -462,7 +469,12 @@ async function readInputs(
     return picked.length ? picked.join("\n\n") : undefined;
   };
   // Own user material participates in the input revision independently from AI-generated records.
-  add("self:" + id, snapshot.note.title, ownKnowledge(snapshot.note));
+  // The latest summary a commit wrote from this card's own output (D1-x9) is not new user material: it must not make the card stale again.
+  const own =
+    base.output.text.trim() && snapshot.note.summary?.trim() === base.output.text.trim()
+      ? { ...snapshot.note, summary: "" }
+      : snapshot.note;
+  add("self:" + id, snapshot.note.title, ownKnowledge(own));
   for (const source of resolved.sources) {
     if (port.signal.aborted || !port.current()) throw new Error("cancelled");
     if (!allowedLivingNotePath(port.app, source.path)) throw new Error("unauthorized-source");
@@ -700,7 +712,11 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     };
     const dispatch = async (): Promise<void> => {
       if (!current()) return;
-      port.onStart(plan.order.length + plan.blocked.size + plan.lockedTargets.length);
+      port.onStart(
+        plan.order.length,
+        [...plan.blocked.keys(), ...plan.lockedTargets],
+        plan.order.map(item => item.id)
+      );
       results = await executeLivingPlan(plan, {
         signal: lease.signal,
         inspect: async id => {
@@ -1045,17 +1061,59 @@ export async function livingReplacedSources(
   );
 }
 
+/** A card that exists only in the open editor: tried from memory, never written (A23). */
+export interface LivingTrialDraft {
+  path: string;
+  title: string;
+  parentId: string | null;
+  model: string;
+}
+
 /** Build a draft request without executing dependencies, and an adoption guard over the same effective inputs. */
-export async function prepareLivingTrial(port: LivingTrialPort, id: string, prompt: string) {
+export async function prepareLivingTrial(port: LivingTrialPort, id: string, prompt: string, draft?: LivingTrialDraft) {
   const initialMap = await port.repo.readMap(port.mapPath);
-  const initial = await prepareMap(port, initialMap);
+  const draftContent = draft ? "---\nai-card: true\n---\n# " + draft.title + "\n" : "";
+  /** The map as saved, plus the unsaved card as an empty AI card (no file, no knowledge) when the editor is on a new card. */
+  const prepareWithDraft = async (map: MapDocument) => {
+    const prepared = await prepareMap(port, map);
+    if (draft) {
+      prepared.cards.push({
+        id,
+        parentId: draft.parentId,
+        path: draft.path,
+        prompt: "",
+        aiCard: true,
+        aiLocked: false,
+        hasKnowledge: false,
+        sourceUnavailable: false,
+        explicitRefs: []
+      });
+      prepared.snapshots.set(id, {
+        note: {
+          title: draft.title,
+          prompt: "",
+          model: draft.model,
+          aiCard: true,
+          aiLocked: false,
+          summary: "",
+          preview: "",
+          detail: "",
+          thinkingOrigin: "",
+          newFindings: ""
+        } as unknown as Note,
+        content: draftContent
+      });
+    }
+    return prepared;
+  };
+  const initial = await prepareWithDraft(initialMap);
   const target = initial.cards.find(card => card.id === id);
   const original = initial.snapshots.get(id);
   if (!target || !original || original.note.aiLocked || !port.current()) throw new Error("missing-or-locked-target");
   const build = async (formal: boolean) => {
     const map = await port.repo.readMap(port.mapPath);
     if (!port.current() || map.id !== initialMap.id) throw new Error("cancelled");
-    const { cards, snapshots } = await prepareMap(port, map);
+    const { cards, snapshots } = await prepareWithDraft(map);
     const saved = snapshots.get(id);
     const card = cards.find(item => item.id === id);
     if (!saved || !card || !sameLivingTarget(target, card) || saved.note.aiLocked) throw new Error("changed-target");
@@ -1165,7 +1223,8 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
   };
   const adoption: LivingAdoptionCheck = {
     isCurrent: () => port.current(),
-    readSavedContent: async () => (await port.repo.readNoteSnapshot(target.path, initialMap)).content,
+    readSavedContent: async () =>
+      draft ? draftContent : (await port.repo.readNoteSnapshot(target.path, initialMap)).content,
     inspect: async () => {
       const live = await build(true);
       return {
@@ -1192,12 +1251,15 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
 }
 
 /** Local validity inspection makes no AI calls. A stale upstream is derived, not persisted as a knowledge change. */
-export async function inspectLivingValidity(port: LivingTrialPort) {
+export async function inspectLivingValidity(
+  port: LivingTrialPort & { onDependencies?: (graph: LivingDependencyGraph) => void }
+) {
   const map = await port.repo.readMap(port.mapPath);
   // One pass reads each note once: the view's reads are reused, and every other read is shared across cards.
   const noteReads = port.noteReads ?? createNoteReadContext(map);
   const { snapshots, cards } = await prepareMap(port, map, noteReads);
   const planned = planLivingMap(cards, [], sourceResolver(port.app));
+  port.onDependencies?.(livingDependencyGraph(cards, planned));
   const validity = new Map<string, "none" | "valid" | "stale">();
   for (const card of cards) {
     if (!isAiCard(card)) continue;

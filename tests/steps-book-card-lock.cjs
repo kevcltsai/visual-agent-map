@@ -110,15 +110,15 @@ const menuRows = (h, nodeKey) => {
 const menuOf = (h, nodeKey) => menuRows(h, nodeKey).filter(i => !i.disabled).map(i => i.title);
 const atPhase = (h, phase) => { h.plugin.getBookPipelineProgress = () => (phase ? progress({ phase }) : undefined); h.view.bookPipelineSeen = null; };
 
-test('book lock: while the book writes, a card has no AI explore, no Style and no edge +; Note and More stay (the menu greys Research, the new topics, card settings and select subtopics, with the book lock as the reason)', async () => {
+test('book lock: while the book writes, a card has no AI explore and no edge +; Style (B19b-x, decision #62), Note and More stay (the menu greys Research, the new topics, card settings and select subtopics, with the book lock as the reason)', async () => {
   const h = await harness({ book: true, stages: { a: 'planned', b: 'planned' } });
   for (const phase of ['planning', 'writing', 'gate2']) {
     atPhase(h, phase);
     const stage = h.paint();
     assert.equal(byCls(stage, 'vam-ai-explore').length, 0, `${phase}: no Research`);
-    // B08: the toolbar has no Add; the edge + and Style go with the structure lock.
+    // B08: the toolbar has no Add; the edge + goes with the structure lock. B19b-x: Style is not structure, it stays.
     assert.equal(byCls(stage, 'vam-card-edge-add').length, 0, `${phase}: no edge +`);
-    assert.equal(byCls(stage, 'vam-card-tool-style').length, 0, `${phase}: no Style`);
+    assert.equal(byCls(stage, 'vam-card-tool-style').length, 3, `${phase}: Style stays on every card`);
     assert.equal(byCls(stage, 'vam-detail-button').length, 3, `${phase}: Note stays on every card`);
     assert.equal(byCls(stage, 'vam-card-tool-more').length, 3, `${phase}: More stays on every card`);
     const rows = menuRows(h, 'root');
@@ -131,6 +131,7 @@ test('book lock: while the book writes, a card has no AI explore, no Style and n
       assert.equal(row.cls, 'vam-menu-has-reason', `${phase}: ${gone}'s row wraps the reason onto its own line`);
       assert.equal(row.fn, undefined, `${phase}: ${gone} has no click`);
     }
+    assert.ok(items.includes(tr('ui.card_menu_style')), `${phase}: the right-click Style stays usable (B19b-x)`);
     assert.ok(items.includes(tr('ui.card_menu_open_note')), `${phase}: read-only items stay`);
     assert.ok(items.includes(tr('ui.book_card_menu')), `${phase}: the book's own submenu (chapter role) stays`);
   }
@@ -143,7 +144,7 @@ test('book lock: the saved phase counts when the runner knows nothing (after a r
   let stage = h.paint();
   assert.equal(byCls(stage, 'vam-ai-explore').length, 0, 'stopped but not abandoned: still locked');
   assert.equal(byCls(stage, 'vam-card-edge-add').length, 0, 'stopped: no edge +');
-  assert.equal(byCls(stage, 'vam-card-tool-style').length, 0, 'stopped: no Style');
+  assert.equal(byCls(stage, 'vam-card-tool-style').length, 3, 'stopped: Style stays (B19b-x)');
   atPhase(h, 'gate1');
   stage = h.paint();
   assert.equal(byCls(stage, 'vam-ai-explore').length, 0, 'gate 1: no AI');
@@ -231,6 +232,61 @@ test('book lock: a structure lock adds no text block from any entry (the panel a
   h.view.addTextNodeUnder(node);
   await settle();
   assert.notEqual(await h.view.app.vault.read(file), before, 'once the book is done a text block is added');
+});
+
+// V3.3 G04-z: the right-click goes through the real viewport binding (setupCanvasImageInput), which used to be bound only while the
+// canvas was editable, so a card never got its menu while the notes loaded although its ⋯ did.
+const cardMenus = h => {
+  const opened = [];
+  const chain = it => ({ setTitle(x) { it.title = x; return this; }, setIcon() { return this; }, setDisabled(d) { it.disabled = d; return this; }, setChecked() { return this; }, setWarning() { return this; }, setSubmenu() { return { addItem() { return this; }, addSeparator() { return this; } }; }, onClick(fn) { it.fn = fn; return this; }, dom: { addClass(c) { it.cls = c; }, createSpan(o) { it.hints.push(o.text); } } });
+  h.view.newMenu = () => { const items = []; opened.push(items); return { setUseNativeMenu() {}, addItem(build) { const it = { hints: [] }; build(chain(it)); items.push(it); return this; }, addSeparator() { return this; }, showAtPosition() {}, showAtMouseEvent() {} }; };
+  return opened;
+};
+const boundCardRightClick = (h, target) => {
+  h.view.viewportEl = dom.element('div');
+  h.view.setupCanvasImageInput();
+  h.view.viewportEl.fire('contextmenu', { target: { closest: sel => (sel === '.vam-node' ? target : null) }, clientX: 5, clientY: 5 });
+};
+test('G04-z: while the notes load the real contextmenu binding opens the card list, rows greyed with the reason, same as ⋯; selection mode, presentation and other targets open nothing', async () => {
+  const h = await harness({ book: false });
+  h.plugin.mutate = async () => { throw new Error('nothing may be written'); };
+  h.view.noteLoad = { framed: false };
+  h.paint();
+  // Re-render while loading, then right-click through the binding.
+  const stage = h.paint();
+  h.view.contentEl = stage;
+  const card = h.view.cardEls.get(h.ids.a);
+  const more = byCls(card, 'vam-card-tool-more')[0];
+  more.getBoundingClientRect = () => ({ left: 0, bottom: 0 });
+  const opened = cardMenus(h);
+  boundCardRightClick(h, card);
+  assert.equal(opened.length, 1, 'the right-click opens while the notes load');
+  more.fire('click', { metaKey: false, ctrlKey: false });
+  assert.equal(opened.length, 2, '⋯ opens too');
+  const [context, moreRows] = [opened[0], opened[1]];
+  for (const row of context) {
+    assert.equal(row.disabled, true, `${row.title} greyed`);
+    assert.deepEqual(row.hints, [tr('ui.card_action_off_notes_loading')], `${row.title} gives the reason`);
+    assert.equal(row.fn, undefined, `${row.title} has no click`);
+  }
+  // ⋯ is the right-click list minus the toolbar's own actions (one registry, addCardActions): same state, same reason.
+  assert.ok(context.length >= moreRows.length, 'the right-click list has every ⋯ row');
+  for (const row of moreRows) {
+    assert.equal(row.disabled, true, `⋯ ${row.title} greyed`);
+    assert.deepEqual(row.hints, [tr('ui.card_action_off_notes_loading')], `⋯ ${row.title}: same reason as the right-click`);
+  }
+  // Another target while loading (the empty canvas) still opens nothing.
+  h.view.viewportEl.fire('contextmenu', { target: { closest: () => null }, clientX: 5, clientY: 5 });
+  assert.equal(opened.length, 2, 'the empty canvas stays shut');
+  // Topic selection: ⋯ is not drawn, so no menu.
+  h.view.selection.toggleMultiSelect();
+  boundCardRightClick(h, card);
+  assert.equal(opened.length, 2, 'no card menu in topic selection');
+  h.view.selection.toggleMultiSelect();
+  // Presenting opens none.
+  h.view.presentation = {};
+  boundCardRightClick(h, card);
+  assert.equal(opened.length, 2, 'no card menu while presenting');
 });
 
 test('notes loading (decision #35, P1.1): the card ⋯ and right-click open, every row greyed with "notes loading" and no click; nothing is written', async () => {

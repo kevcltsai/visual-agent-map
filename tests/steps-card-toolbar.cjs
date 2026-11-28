@@ -274,12 +274,47 @@ test('B08 style popover: "apply to the whole branch" styles the card and its sub
   assert.equal(h.view.history.canUndo, false, 'the branch change was one step');
 });
 
-test('B08 toolbar: the picture-book structure lock hides Style; the AI lock hides AI explore, Run and Settings', async () => {
+test('B08 toolbar (B19b-x, decision #62: the structure lock covers parent and order only): Style stays under the picture-book structure lock; the AI lock hides AI explore, Run and Settings', async () => {
   const h = await harness([['a', null, { noAi: true }], ['b', null]]);
   h.view.bookLock = () => ({ ai: false, structure: true });
-  assert.deepEqual(kinds(paint(h, 'a')), ['vam-ai-explore', 'vam-detail-button', 'vam-card-tool-more']);
+  assert.deepEqual(kinds(paint(h, 'a')), ['vam-ai-explore', 'vam-card-tool-style', 'vam-detail-button', 'vam-card-tool-more']);
   h.view.bookLock = () => ({ ai: true, structure: false });
   assert.deepEqual(kinds(paint(h, 'b')), ['vam-card-tool-ai-lock', 'vam-detail-button', 'vam-card-tool-more']);
+});
+
+test('B19b-x style popover under both picture-book locks: every choice writes (colour only topic-color, the rest only topic-style, the whole branch too); Map.md unchanged', async () => {
+  const h = await harness([['a', null, { noAi: true }], ['kid', 'a', { noAi: true }], ['other', null, { noAi: true }]]);
+  h.view.bookLock = () => ({ ai: true, structure: true });
+  const map = () => h.contents.get(MAP);
+  const before = { a: h.raw('a'), kid: h.raw('kid'), other: h.raw('other'), map: map() };
+  const lines = s => s.split('\n');
+  const { choice } = openStyle(h, 'a');
+  choice('color-red').click();
+  await until(() => h.raw('a') !== before.a);
+  await settle();
+  assert.deepEqual(lines(h.raw('a')).filter(l => !lines(before.a).includes(l)).map(l => l.split(':')[0]), ['topic-color'], 'colour: only the topic-color key is added');
+  assert.deepEqual(lines(before.a).filter(l => !lines(h.raw('a')).includes(l)), [], 'colour: nothing else is removed or rewritten');
+  assert.equal(h.raw('kid'), before.kid, 'colour: the subtopic is not touched');
+  assert.equal(map(), before.map, 'colour: Map.md unchanged');
+  const colored = h.raw('a');
+  for (const id of ['bold', 'border-thick', 'line-thick', 'size-large']) {
+    const was = h.raw('a');
+    choice(id).click();
+    await until(() => h.raw('a') !== was);
+    await settle();
+  }
+  assert.match(h.raw('a'), /topic-style:[\s\S]*bold[\s\S]*text-large/, 'bold, outline, line and size all written');
+  const strip = s => s.replace(/^topic-style:.*(\n\s+- .*)*\n?/m, '');
+  assert.equal(strip(h.raw('a')), strip(colored), 'styles: only the topic-style key changes');
+  const kidBefore = h.raw('kid');
+  choice('branch').checked = true; choice('branch').change();
+  choice('size-small').click();
+  await until(() => h.raw('kid') !== kidBefore);
+  await settle();
+  assert.match(h.raw('kid'), /text-small/, 'the whole branch is styled under the lock');
+  assert.equal(strip(h.raw('kid')), strip(before.kid), 'branch: only topic-style changes on the subtopic');
+  assert.equal(h.raw('other'), before.other, 'a card outside the branch is not touched');
+  assert.equal(map(), before.map, 'Map.md unchanged (no parent, order or position change)');
 });
 
 test('B08 style popover: a refused choice puts the saved pressed state back (no colour stays pressed)', async () => {

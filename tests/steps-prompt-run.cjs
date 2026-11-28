@@ -101,7 +101,7 @@ test('runPromptItems: post-order calls, statuses, outcome counts; a failing chil
   assert.equal(statuses.get('a').status, 'blocked'); assert.equal(statuses.get('a').reason, 'below: A1');
   assert.equal(statuses.get('root').status, 'blocked', 'the grandparent is stuck too');
   assert.match(statuses.get('a1').reason, /boom/);
-  eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false });
+  eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
 });
 
 test('runPromptItems: Stop returns the running card to idle and starts nothing new', async () => {
@@ -243,7 +243,8 @@ async function harness(spec, { confirm = true } = {}) {
     view.livingValidity = await inspectLivingValidity({
       app, repo, calls: host.aiCalls, mapPath: MAP, viewSession: 'test-validity',
       signal: new AbortController().signal, current: () => true,
-      language: () => 'English', mapSources: async () => []
+      language: () => 'English', mapSources: async () => [],
+      onDependencies: graph => { view.livingGraph = graph; }
     });
   };
   // A second view of the same map on the same plugin (another pane or window).
@@ -345,7 +346,7 @@ test('Run All: one call per unlocked AI card, dependency order, optional web on 
     assert.equal(call.options.task.webSearchOnly, true);
     assert.equal(call.options.task.optionalWebSearch, true);
   }
-  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   for (const [key] of TREE) assert.equal(stamp(h, key).result, 'ok');
   assert.match(h.raw('root'), /> Result: root/);
 });
@@ -501,6 +502,72 @@ test('toolbar Run all: disabled with a hint without an AI card; progress "n / N"
   assert.equal(h.view.promptBatch.outcome.stopped, true);
 });
 
+// ---- V3.3 P3.6: n / N only once the round is planned, and the last count (D2-2) ---------------------------------------
+const MISSING = { prompt: 'Find facts\nSources: [[Missing]]' };
+const countOf = h => {
+  const bar = element('div');
+  h.view.renderRunAllButton(bar);
+  const button = find(bar, i => i.tag === 'button' && i.cls?.includes('is-running'));
+  return { button, count: button && find(button, i => i.cls?.includes('vam-run-all-count'))?.text };
+};
+
+test('D2-2 progress: no "n / N" before the round is planned; N leaves out cards blocked before the start and locked cards', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING], ['lk', null, { locked: true }]]);
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  const early = countOf(h);
+  assert.ok(early.button, 'the stop button shows at once');
+  assert.equal(early.count, undefined, 'no "0 / 0" before the total is known');
+  await until(() => h.calls.length === 1);
+  assert.equal(countOf(h).count, '1 / 5', 'the blocked "solo" and the locked "lk" are not in N, nor counted as finished');
+  h.view.stopPromptBatch(); await h.done();
+  const g = await harness([['solo', null, MISSING]]);
+  await g.runAll(); await g.done();
+  assert.equal(g.view.promptBatch.total, 0, 'nothing to process: N is 0, so no "0 / 0" either');
+  assert.equal(g.view.promptBatch.outcome.blocked, 1);
+});
+
+test('D2-2 last count: the end notice lists each class that happened; "done" is changed + no-change only, reused is not done', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING]]);
+  h.plan.fail.add('leaf1');
+  await h.runAll(); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 2, failed: 1, blocked: 3, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run finished: 2 done, 1 failed, 3 blocked');
+  h.plan.fail.delete('leaf1');
+  h.view.promptBatch = undefined;
+  await h.runAll(); await h.done();
+  // Run All forces every card: the two that were already done run again and write nothing new.
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 1, stopped: false, noChange: 2, cancelled: 0, skipped: 0, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run finished: 5 done (2 with no change), 1 blocked');
+  // Run Card on root: its valid dependencies are reused, and reused is not done.
+  h.view.promptBatch = undefined;
+  h.view.startPromptRun([h.node('root').id]); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 1, failed: 0, blocked: 0, stopped: false, noChange: 1, cancelled: 0, skipped: 0, reused: 4 });
+  assert.equal(h.notices.at(-1), 'Run finished: 1 done (1 with no change), 4 already up to date');
+  const s = await harness(TREE);
+  s.plan.hang.add('leaf1');
+  await s.runAll();
+  await until(() => s.calls.length === 1);
+  s.view.stopPromptBatch(); await s.done();
+  eq(s.view.promptBatch.outcome, { done: 0, failed: 0, blocked: 0, stopped: true, noChange: 0, cancelled: 5, skipped: 0, reused: 0 });
+  assert.equal(s.notices.at(-1), 'Run stopped: 5 cancelled');
+});
+
+test('D2-2 chat: a run_living_* round where every card was already current says so, not "done"', async () => {
+  const h = await harness(TREE);
+  const first = await h.view.runChatSelection({ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] });
+  eq(first, { status: 'done' });
+  // The planner forces its targets today, so a whole reused round comes from the round's count, stubbed here.
+  const counts = { done: 0, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0 };
+  h.view.runLivingBatch = async () => ({ ...counts, reused: 5 });
+  for (const [action, nodeIds] of [['run_living_all', []], ['run_living_card', [h.node('side').id]]]) {
+    const outcome = await h.view.runChatSelection({ kind: 'run_map_action', action, nodeIds });
+    eq(outcome, { status: 'skipped', reason: 'already up to date, nothing was run' }, action);
+  }
+  h.view.runLivingBatch = async () => ({ ...counts, reused: 0 });
+  eq(await h.view.runChatSelection({ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] }), { status: 'skipped', reason: 'There are no Prompt topics to run.' });
+});
+
 // ---- menus ------------------------------------------------------------------------------------------------------------
 const canvasEvent = { clientX: 110, clientY: 45, preventDefault() {}, target: { closest: () => null } };
 const titles = menu => menu.items.map(i => i.title ?? '|');
@@ -570,6 +637,103 @@ test('arrows: a line whose parent is an AI card gets a marker-start arrow and a 
   assert.equal(g.view.edgesEl.children.some(c => c.tag === 'defs' && c.children.length), false);
 });
 
+test('D2-4 dependency highlight: selecting an AI card marks the planner edges in place; semantic lines never; no selection leaves the DOM as without a graph', async () => {
+  const h = await harness([['A', null], ['B', 'A'], ['C', 'A'], ['O', 'A', { noAi: true }], ['D', 'C'], ['E', null], ['F', null, { noAi: true }]]);
+  const { view } = h;
+  const id = key => h.node(key).id;
+  const refs = async (key, ...targets) => {
+    const file = h.app.vault.getAbstractFileByPath(h.node(key).path);
+    await h.app.vault.process(file, text => text.replace(/^---\n/, '---\nliving-node-refs:\n' + targets.map(t => `  - "card:${id(t)}"\n`).join('')));
+  };
+  await refs('B', 'D');
+  await refs('A', 'E');
+  // A-F is a semantic line; A-C is a parent and child that also hold a relation, so only the relation line is drawn.
+  h.mapDoc.topicRelations = [{ kind: 'supports', from: id('A'), to: id('F') }, { kind: 'related', from: id('A'), to: id('C') }];
+  await view.hydrate();
+  assert.ok(view.livingGraph, 'the graph comes with the validity pass');
+  view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+  view.edgesEl = dom.createSvg('svg');
+  view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  const snap = () => JSON.stringify(view.edgesEl.children);
+  const graph = view.livingGraph;
+  view.livingGraph = undefined;
+  view.drawEdges();
+  const noGraph = snap();
+  view.livingGraph = graph;
+  view.drawEdges();
+  const before = snap();
+  assert.equal(before, noGraph, 'a graph with no selection changes nothing');
+  let draws = 0;
+  const draw = view.drawEdges;
+  view.drawEdges = function () { draws++; return draw.call(this); };
+  const marked = cls => view.edgesEl.children.filter(c => c.classes?.includes(cls));
+  const pair = c => c.getAttribute('data-dep') ?? [...view.edgeEls].find(([, p]) => p === c)?.[0];
+  const keyName = new Map(h.mapDoc.nodes.map(n => [n.id, [...h.byKey].find(([, v]) => v.id === n.id)[0]]));
+  const label = list => list.map(c => pair(c).split('\u0000').map(x => keyName.get(x)).join('>')).sort();
+  view.applySelectionChange(view.selection.click(id('A')));
+  assert.deepEqual(label(marked('is-dep-run')), ['A>B', 'A>C', 'A>E', 'B>D', 'C>D']);
+  assert.deepEqual(label(marked('is-dep-read')), ['A>O']);
+  const overlays = marked('vam-edge-dep-overlay');
+  assert.deepEqual(label(overlays), ['A>C', 'A>E', 'B>D'], 'pairs without a drawn tree line get an overlay');
+  assert.ok(overlays.every(o => o.getAttribute('d')), 'each overlay has a path');
+  assert.equal(view.edgesEl.children.at(-1), overlays.at(-1), 'overlays sit on top');
+  for (const path of view.relationEls.values()) assert.equal(path.classes.some(c => c.startsWith('is-dep')), false, 'semantic lines never');
+  view.applySelectionChange(view.selection.click(id('O')));
+  assert.equal(marked('is-dep-run').length + marked('is-dep-read').length, 0, 'an ordinary card highlights nothing');
+  view.applySelectionChange(view.selection.click(id('A')));
+  view.applySelectionChange(view.selection.clickEmpty());
+  assert.equal(snap(), before, 'clearing the selection restores the DOM');
+  assert.equal(draws, 0, 'selection never redraws the edges');
+});
+
+test('D2-4 dependency highlight: a structural change drops the stale graph (no highlight until the next hydrate); a position-only change keeps it', async () => {
+  const h = await harness([['A', null], ['B', 'A'], ['X', null]]);
+  const { view } = h;
+  const id = key => h.node(key).id;
+  await view.hydrate();
+  assert.ok(view.livingGraph);
+  view.render = () => {};
+  const setup = () => {
+    view.cardEls = new Map(view.map.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+    view.edgesEl = dom.createSvg('svg');
+    view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+    view.drawEdges();
+  };
+  const marks = () => view.edgesEl.children.filter(c => c.classes?.some(cls => cls.startsWith('is-dep') || cls === 'vam-edge-dep-overlay'));
+  // Position only (and the sibling order, as a drop among siblings rewrites it): the planner sees the same cards.
+  await view.mapChange(map => {
+    map.nodes.find(n => n.id === id('B')).x += 40;
+    map.nodes.reverse();
+  });
+  assert.ok(view.livingGraph, 'a position-only write keeps the graph');
+  await view.mapChange(map => { map.nodes.find(n => n.id === id('B')).parentId = id('X'); });
+  setup();
+  view.applySelectionChange(view.selection.click(id('A')));
+  assert.equal(marks().length, 0, 'the old parent shows no A>B line or overlay');
+  view.applySelectionChange(view.selection.click(id('X')));
+  assert.equal(marks().length, 0, 'the new parent waits for the next hydrate');
+  await view.hydrate();
+  setup();
+  view.applySelectionChange(view.selection.click(id('X')));
+  assert.equal(marks().filter(c => c.classes.includes('is-dep-run')).length, 1, 'after hydrate X marks X>B');
+});
+
+test('D2-4 dependency highlight: an AI child reading its ordinary parent marks the tree line, no overlay', async () => {
+  const h = await harness([['P', null, { noAi: true }], ['C', 'P']]);
+  const { view } = h;
+  const file = h.app.vault.getAbstractFileByPath(h.node('C').path);
+  await h.app.vault.process(file, text => text.replace(/^---\n/, '---\nliving-node-refs:\n' + `  - "card:${h.node('P').id}"\n`));
+  await view.hydrate();
+  view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+  view.edgesEl = dom.createSvg('svg');
+  view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  view.drawEdges();
+  view.applySelectionChange(view.selection.click(h.node('C').id));
+  const tree = view.edgeEls.get(`${h.node('P').id}\u0000${h.node('C').id}`);
+  assert.ok(tree.classes.includes('is-dep-read'));
+  assert.equal(view.edgesEl.children.filter(c => c.classes?.includes('vam-edge-dep-overlay')).length, 0);
+});
+
 test('card face: a star and one state glyph by the name, the question line under it; done has no glyph, locked has none', async () => {
   const h = await harness([['a', null, { prompt: 'Why is the sky blue?\nsecond line' }]]);
   const node = h.node('a');
@@ -596,7 +760,7 @@ test('card face: a star and one state glyph by the name, the question line under
   assert.equal(ordinary.card.dataset.aiCard, undefined);
 });
 
-test('V3.3 P1.2: running, stale and failed AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
+test('V3.3 P1.2 / D2-3: running, waiting, failed, blocked, stopped and stale AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');
   const face = () => {
@@ -610,7 +774,7 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
     return f;
   };
   const chips = header => findAll(header, i => i.cls?.split(' ').includes('vam-status'));
-  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Not finished']]) {
+  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['waiting', 'vam-status-waiting', 'Waiting'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Failed'], ['blocked', 'vam-status-blocked', 'Blocked'], ['stopped', 'vam-status-stopped', 'Stopped']]) {
     const f = paint(status);
     const [chip, ...rest] = chips(f.header);
     assert.equal(rest.length, 0, `${status}: one label`);
@@ -622,6 +786,68 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
   }
   for (const status of ['done', 'pending']) assert.equal(chips(paint(status).header).length, 0, `${status}: no header label`);
   assert.equal(chips(paint('stale', { aiLocked: true }).header).length, 0, 'locked: the lock label takes the place');
+  assert.equal(find(paint('pending').title, i => i.cls?.includes('vam-ai-glyph-pending'))?.attrs.title.split('\n')[0], 'Not run yet', 'pending: its glyph has words too');
+});
+
+test('D2-3 card face: a failed, blocked or stopped card whose knowledge is out of date shows both labels; repainting keeps two', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  h.view.livingValidity.set(node.id, 'stale');
+  for (const [status, text] of [['failed', 'Failed'], ['blocked', 'Blocked'], ['stopped', 'Stopped']]) {
+    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' });
+    card.createEl('h3', { cls: 'vam-card-title' });
+    const texts = () => findAll(header, i => i.cls?.split(' ').includes('vam-status')).map(i => i.text);
+    h.view.aiStatusMemo.set(node.id, status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    eq(texts(), [text, 'Needs rerun'], status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    eq(texts(), [text, 'Needs rerun'], `${status}: repainting does not stack labels`);
+  }
+  h.view.livingValidity.set(node.id, 'valid');
+  const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' });
+  card.createEl('h3', { cls: 'vam-card-title' });
+  h.view.aiStatusMemo.set(node.id, 'failed');
+  h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+  eq(findAll(header, i => i.cls?.split(' ').includes('vam-status')).map(i => i.text), ['Failed'], 'old knowledge still valid: no rerun label');
+});
+
+test('D2-3 real round: queued cards wait, the running one runs, a blocked one says blocked; Stop leaves the unreached ones stopped', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING]]);
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  const state = key => { h.view.aiStatusMemo.clear(); return h.view.aiStatusOf(h.node(key).id); };
+  eq(['leaf1', 'mid', 'root', 'solo'].map(state), ['running', 'waiting', 'waiting', 'blocked']);
+  h.view.stopPromptBatch(); await h.done();
+  eq(['leaf1', 'mid', 'root', 'solo'].map(state), ['stopped', 'stopped', 'stopped', 'blocked'], 'after the round');
+  const f = await harness(TREE);
+  f.plan.fail.add('leaf1');
+  await f.runAll(); await f.done();
+  f.view.aiStatusMemo.clear();
+  eq(['leaf1', 'mid', 'root'].map(key => f.view.aiStatusOf(f.node(key).id)), ['failed', 'blocked', 'blocked'], 'a failure is "failed", the cards that needed it "blocked"');
+});
+
+test('D2-3 Stop: a locked card was never part of the round, so it is skipped in the count and not stopped on its face', async () => {
+  const h = await harness([...TREE, ['lk', null, { locked: true }]]);
+  h.plan.hang.add('leaf1');
+  // The toolbar refuses a locked target; a caller that does not (chat tools) puts it in the round as excluded.
+  void h.view.runLivingBatch([h.node('root').id, h.node('lk').id]);
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  h.view.stopPromptBatch(); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 1, failed: 0, blocked: 0, stopped: true, noChange: 0, cancelled: 4, skipped: 1, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run stopped: 1 done, 4 cancelled, 1 skipped');
+  h.view.aiStatusMemo.clear();
+  assert.notEqual(h.view.aiStatusOf(h.node('lk').id), 'stopped');
+  assert.equal(h.view.aiStatusOf(h.node('leaf1').id), 'stopped');
+});
+
+test('D2-3 Stop before the round is planned still says the run stopped', async () => {
+  const h = await harness(TREE);
+  await h.runAll();
+  h.view.stopPromptBatch(); await h.done();
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.view.promptBatch.outcome.stopped, true);
+  assert.equal(h.notices.at(-1), 'Run stopped: no card ran');
 });
 
 test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown with the selection); other states do not', async () => {
@@ -651,7 +877,7 @@ test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown 
 });
 
 // ---- review fixes: stale state between batches, popover prefill, save path ----------------------------------------------
-test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (stale after a Prompt edit, not done)', async () => {
+test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (waiting, its knowledge stale after a Prompt edit)', async () => {
   const h = await harness([['Y', null], ['X', null]]);
   await h.runAll(); await h.done();
   assert.equal(h.status('X'), 'done');
@@ -662,9 +888,10 @@ test('two batches: a card not yet reached by batch 2 is not shown done from batc
   h.plan.hang.add('Y');
   await h.runAll();
   await until(() => h.calls.filter(c => c.key === 'Y').length === 2);
-  assert.equal(h.status('X'), undefined, 'batch 1 left nothing for X');
+  assert.equal(h.status('X'), 'waiting', 'batch 2 queued X; batch 1 left nothing for it');
   h.view.aiStatusMemo.clear();
-  assert.equal(h.view.aiStatusOf(h.node('X').id), 'stale');
+  assert.equal(h.view.aiStatusOf(h.node('X').id), 'waiting', 'not reached yet: waiting, never done');
+  assert.equal(h.view.livingValidity.get(h.node('X').id), 'stale', 'its knowledge is still out of date');
   h.view.stopPromptBatch(); await h.done();
 });
 
@@ -686,6 +913,79 @@ test('popover prefill: a card with only a Prompt (no `ai-card`) opens with its q
   eq(findAll(h.pop(), i => i.cls?.includes('vam-ai-card-pop-chip-name')).map(i => i.text), ['N']);
   h.view.openAiCardPopover(h.node('B'));
   assert.equal(h.question().value, '');
+});
+
+test('popover room (D1-x10): a pane squeezed under 320px by Obsidian side panels folds them, left first, until the editor fits; a wide pane folds nothing', async () => {
+  const dock = () => ({ collapsed: false, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const narrow = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(), right = dock();
+  narrow.view.app.workspace = { ...narrow.view.app.workspace, leftSplit: left, rightSplit: right };
+  narrow.overlay.clientWidth = 42;
+  narrow.view.openAiCardPopover(narrow.node('A'));
+  assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'opening folds the left panel first');
+  narrow.view.makeRoomForAiCard();
+  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'still narrow after the layout settled: the right panel folds too');
+  const wide = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const l2 = dock(), r2 = dock();
+  wide.view.app.workspace = { ...wide.view.app.workspace, leftSplit: l2, rightSplit: r2 };
+  wide.overlay.clientWidth = 504;
+  wide.view.openAiCardPopover(wide.node('A'));
+  assert.deepEqual([l2.collapsed, r2.collapsed], [false, false], 'a pane with room keeps both panels');
+});
+
+test('popover room (D1-x10b): a panel the user opens again while the editor is open is never folded again', async () => {
+  const dock = () => ({ collapsed: false, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(), right = dock();
+  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+  h.overlay.clientWidth = 42;
+  h.view.openAiCardPopover(h.node('A'));
+  h.view.makeRoomForAiCard();
+  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'both panels folded once to make room');
+  left.expand();
+  right.expand();
+  h.view.makeRoomForAiCard();
+  h.view.makeRoomForAiCard();
+  assert.deepEqual([left.collapsed, right.collapsed], [false, false], 'the user reopened both: the next resizes leave them open');
+});
+
+test('popover room (D1-x10b): closing the editor reopens only the panel it folded, not one the user folded', async () => {
+  const dock = collapsed => ({ collapsed, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(true), right = dock(false);
+  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+  h.overlay.clientWidth = 42;
+  h.view.openAiCardPopover(h.node('A'));
+  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'the user had folded the left; the editor folds the right');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null);
+  assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'closing reopens the right only; the user\'s left fold stays');
+});
+
+test('popover room (D1-x10c): a pane squeezed to 0px by both side panels still folds one', async () => {
+  const dock = () => ({ collapsed: false, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(), right = dock();
+  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+  h.overlay.clientWidth = 0;
+  h.view.openAiCardPopover(h.node('A'));
+  assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'a 0px pane is squeezed, not unmeasured');
+});
+
+test('popover room (D1-x10c): a right panel the user had folded, unfolded by the reader, is folded back on close and the room is measured again', async () => {
+  const dock = collapsed => ({ collapsed, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(true), right = dock(true);
+  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+  h.overlay.clientWidth = 600;
+  h.view.plugin.openDetails = async () => { right.expand(); h.overlay.clientWidth = 40; };
+  h.view.openAiCardPopover(h.node('A'));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(right.collapsed, true, 'the reader squeezed the pane: measured again after it opened, the right panel folds');
+  right.expand();
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null);
+  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'closing leaves the panels folded as the user had them');
 });
 
 test('popover close: Esc, Close or discard returns focus to the card it was opened from (A34)', async () => {
@@ -1001,8 +1301,8 @@ test('two views: a second view joins the running progress instead of starting or
   assert.ok(second.promptRunning());
   h.plan.go();
   await until(() => h.view.promptBatch.outcome && second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
-  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   assert.equal(h.calls.length, 5);
   assert.equal(second.promptBatch.finished, second.promptBatch.total);
   assert.equal(h.status('root'), 'done');
@@ -1051,7 +1351,7 @@ test('closing a view only unsubscribes; the last view closing cancels the run', 
   assert.equal(second.promptBatch.outcome, undefined, 'the run goes on for the remaining view');
   h.plan.go();
   await until(() => second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
 
   const g = await harness(TREE);
   const other = await g.otherView();
@@ -1151,7 +1451,7 @@ test('a view that switches maps leaves the run; the round it started keeps readi
   const before = h.raw('side');
   h.plan.go();
   await until(() => second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   assert.ok(reads.length > 0 && keys.length > 0, 'the round read sources and checked busy after the switch');
   eq([...new Set(reads)], [MAP], 'sources come from the original map');
   eq([...new Set(keys)], ['multi-research:' + MAP], 'the busy check is for the original map');
@@ -1215,7 +1515,10 @@ test('reason: a failed card and the cards blocked by it keep a short reason in t
 
 test('reason: each error class is stored as a short code and shows its own line on the card; raw error text is never stored', async () => {
   const cases = [
-    ['provider', { errors: new Error('connect ECONNRESET /Users/me/secret') }, 'provider-failed', 'ui.living_node_trial_reason_provider'],
+    ['provider', { errors: new Error('connect EPROTO /Users/me/secret') }, 'provider-failed', 'ui.living_node_trial_reason_provider'],
+    ['network-reset', { errors: new Error('connect ECONNRESET /Users/me/secret') }, 'network-failed', 'ui.living_node_trial_reason_network'],
+    ['network-fetch', { errors: Object.assign(new Error('fetch failed'), { cause: new Error('getaddrinfo ENOTFOUND /Users/me/secret') }) }, 'network-failed', 'ui.living_node_trial_reason_network'],
+    ['network-etimedout', { errors: new Error('connect ETIMEDOUT /Users/me/secret') }, 'network-failed', 'ui.living_node_trial_reason_network'],
     ['timeout', { errors: new Error('Request timed out') }, 'timeout', 'ui.living_node_trial_reason_timeout'],
     ['not-json', { reply: 'this is not json {' }, 'validation-rejected', 'ui.living_node_trial_reason_validation'],
     ['bad-answer', { reply: JSON.stringify({ baseRevision: 'x', requiresWeb: false, operations: 'nope' }) }, 'validation-rejected', 'ui.living_node_trial_reason_validation'],
@@ -1226,7 +1529,7 @@ test('reason: each error class is stored as a short code and shows its own line 
     for (const [kind, value] of Object.entries(how)) h.plan[kind].set('solo', value);
     await h.runAll(); await h.done();
     assert.equal(reasonOf(h, 'solo'), code, name);
-    assert.doesNotMatch(h.raw('solo'), /Unexpected token|ECONNRESET|secret|not valid JSON/, name + ' raw text not stored');
+    assert.doesNotMatch(h.raw('solo'), /Unexpected token|ECONNRESET|ENOTFOUND|fetch failed|EPROTO|secret|not valid JSON/, name + ' raw text not stored');
     assert.equal(livingState.livingReasonKey(await livingOf(h, 'solo')), key, name);
   }
 });
@@ -1247,6 +1550,12 @@ test('reason codes map to lines: unknown code gets the generic line, trial-reaso
   assert.equal(code(new Error('living-node-context-too-large')), 'range-too-large');
   assert.equal(code(new Error('cancelled')), 'failed');
   assert.equal(code('plain text'), 'provider-failed');
+  assert.equal(code(new Error('read ECONNRESET')), 'network-failed');
+  assert.equal(mapped('network-failed'), 'ui.living_node_trial_reason_network');
+  // D1-x5: a search that did not happen is stamped as a web failure, so the card shows the web line.
+  const notSearched = S.load('ai/search-not-performed.ts').searchNotPerformedError();
+  assert.equal(code(notSearched), 'web-required');
+  assert.equal(mapped(code(notSearched)), 'ui.living_node_trial_reason_web');
 });
 
 test('reason: a missing required source is reported as missing-source', async () => {
@@ -1674,4 +1983,125 @@ test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers on
   h.view.paintCardToolbar(ready, node, true);
   assert.ok(buttons(ready).length > 1, 'editable again: the other tools are back');
   assert.ok(buttons(ready).some(b => hasCls(b, 'vam-card-tool-more')));
+});
+
+// ---- D1-x7: adopting a trial is the same commit as a formal Run Card; an unsaved draft can be tried ------------------------
+const sameNoteButTime = text => String(text)
+  // The save step the adopter needs writes the source refs, which also feed the input revision: the only two non-time differences.
+  .replace(/^living-node-refs:\n(  - .*\n)*/m, '')
+  .replace(/^(updated|living-node-input-revision|living-node-last-attempt|living-node-last-successful-check|living-node-last-content-change|living-node-commit|living-node-receipts|living-node-generation):.*\n?/gm, '')
+  .replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, 'T')
+  .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, 'U');
+
+test('D1-x7 adopt = formal submit: the adopted note has the same frontmatter, summary, status and knowledge revision as a Run Card of the same settings', async () => {
+  const formal = await popoverHarness([['A', null, { prompt: 'Why?\nSources: [[N]]' }], ['N', null, { noAi: true }]]);
+  formal.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  formal.view.startPromptRun([formal.node('A').id]); await formal.done();
+  assert.match(formal.raw('A'), /Result: A/, 'the formal run wrote the result');
+  const adopted = await trialHarness();
+  await adopted.ready();
+  adopted.saveButton().click(); // adoption needs the exact same configuration saved first
+  await until(() => adopted.view.history.past.length > 0);
+  for (let i = 0; i < 30; i++) await dom.tick();
+  adopted.button('Adopt trial').click();
+  await until(() => /Result: A/.test(adopted.raw('A')));
+  for (let i = 0; i < 20; i++) await dom.tick();
+  eq(sameNoteButTime(adopted.raw('A')), sameNoteButTime(formal.raw('A')), 'same bytes except time fields');
+  const a = await adopted.repo.readNote(adopted.node('A').path, adopted.mapDoc), f = await formal.repo.readNote(formal.node('A').path, formal.mapDoc);
+  assert.equal(a.summary, f.summary); assert.equal(a.livingNode.summary, f.livingNode.summary);
+  assert.equal(a.livingNode.knowledgeRevision, f.livingNode.knowledgeRevision);
+  assert.equal(a.status, f.status);
+  assert.equal(a.summary, 'Result: A', 'D1-x9: adopt updates the latest summary like a formal run');
+  assert.match(adopted.raw('A'), /## Current Summary\n\nResult: A\n/);
+  assert.ok(adopted.reader.some(r => r[0] === 'official'), 'the reader is handed back to the official note');
+});
+
+// ---- D1-x9: a successful commit updates the latest summary (frontmatter `summary` + `## Current Summary`) -------------------
+const summaryOf = raw => raw.match(/## Current Summary\n\n([\s\S]*?)\n\n## /)?.[1].split('\n\n')[0];
+const fmSummary = raw => require('./support.cjs').obsidian.parseYaml(raw.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]).summary;
+
+test('D1-x9 formal Run Card: a new latest summary replaces the placeholder in frontmatter and Current Summary, in the same single write as the knowledge commit', async () => {
+  const h = await popoverHarness([['A', null, {}]]);
+  assert.match(summaryOf(h.raw('A')), /\S/);
+  assert.equal(summaryOf(h.raw('A')), 'No conclusion yet', 'starts as the placeholder, which is not user content');
+  const file = h.app.vault.getAbstractFileByPath(h.node('A').path);
+  const states = [];
+  const process = h.app.vault.process;
+  h.app.vault.process = async (f, change) => { const r = await process(f, change); if (f === file) states.push(h.raw('A')); return r; };
+  h.view.startPromptRun([h.node('A').id]); await h.done();
+  assert.equal(fmSummary(h.raw('A')), 'Result: A');
+  assert.equal(summaryOf(h.raw('A')), 'Result: A');
+  const firstRegion = states.findIndex(t => /### Current output[\s\S]*Result: A/.test(t));
+  const firstSummary = states.findIndex(t => summaryOf(t) === 'Result: A' && fmSummary(t) === 'Result: A');
+  assert.ok(firstRegion >= 0);
+  assert.equal(firstSummary, firstRegion, 'summary and knowledge land in one write');
+  assert.equal((await h.repo.readNote(h.node('A').path, h.mapDoc)).summary, 'Result: A');
+});
+
+test('D1-x9 a later commit with a new summary updates it again; the same summary is not rewritten; a hand-edited summary is kept', async () => {
+  const h = await popoverHarness([['A', null, {}]]);
+  h.view.startPromptRun([h.node('A').id]); await h.done();
+  const origRun = h.host.aiCalls.run;
+  let next = null;
+  h.host.aiCalls.run = (prepared, options, finish) => next === null ? origRun(prepared, options, finish)
+    : (h.calls.push({ key: 'A', input: prepared.input, options }), finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: false, operations: next === '' ? [] : [{ kind: 'output', text: next, evidence: [] }] }), { signal: options.signal, parsed() {} }));
+  const run = async text => {
+    next = text; const count = h.calls.length;
+    h.view.promptBatch = null; h.view.startPromptRun([h.node('A').id]);
+    await until(() => h.view.promptBatch?.outcome && h.calls.length > count);
+    for (let i = 0; i < 15; i++) await dom.tick();
+  };
+  await run('Second');
+  assert.equal(fmSummary(h.raw('A')), 'Second');
+  assert.equal(summaryOf(h.raw('A')), 'Second');
+  // no effective change: the summary section and key stay byte for byte
+  const before = h.raw('A');
+  await run('Second');
+  assert.equal(summaryOf(h.raw('A')), summaryOf(before));
+  assert.equal(fmSummary(h.raw('A')), 'Second');
+  // the user edits the summary: protected; the AI result still lands in the Living region
+  await h.repo.updateNote(h.node('A').path, { summary: 'Mine' });
+  await run('Third');
+  assert.match(h.raw('A'), /### Current output[\s\S]*Third/, 'the AI result lands in the knowledge region');
+  assert.equal(summaryOf(h.raw('A')), 'Mine');
+  assert.equal(fmSummary(h.raw('A')), 'Mine');
+});
+
+test('D1-x11 a hand edit of the output (made in the native editor) is kept by the next AI commit; the AI result goes to AI latest', async () => {
+  const h = await popoverHarness([['A', null, {}]]);
+  h.view.startPromptRun([h.node('A').id]); await h.done();
+  const origRun = h.host.aiCalls.run;
+  let next = null;
+  h.host.aiCalls.run = (prepared, options, finish) => next === null ? origRun(prepared, options, finish)
+    : (h.calls.push({ key: 'A', input: prepared.input, options }), finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: false, operations: [{ kind: 'output', text: next, evidence: [] }] }), { signal: options.signal, parsed() {} }));
+  const path = h.node('A').path;
+  assert.match(h.raw('A'), /> Result: A/);
+  h.contents.set(path, h.raw('A').replace('> Result: A', '> My own words'));
+  next = 'Machine second';
+  const count = h.calls.length;
+  h.view.promptBatch = null; h.view.startPromptRun([h.node('A').id]);
+  await until(() => h.view.promptBatch?.outcome && h.calls.length > count);
+  for (let i = 0; i < 15; i++) await dom.tick();
+  assert.match(h.raw('A'), /> My own words/, 'the human edit survives');
+  assert.match(h.raw('A'), /### AI latest[\s\S]*> Machine second/, 'the AI result lands in the AI latest area');
+});
+
+test('D1-x7 an unsaved new Living card can be tried (A23): it runs the draft, writes nothing, creates no formal config; an empty Prompt is still refused', async () => {
+  const h = await trialHarness();
+  const vault = () => [...h.contents.entries()].map(([k, v]) => k + '\n' + v).join('\n--\n');
+  h.view.openAiCardPopover(null);
+  const button = h.button;
+  assert.equal(button('Try prompt').disabled, true, 'empty Prompt: refused');
+  const before = vault();
+  h.question().value = 'What is new?'; h.question().input();
+  assert.equal(button('Try prompt').disabled, false, 'a non-empty unsaved draft may be tried');
+  button('Try prompt').click();
+  await until(() => ['ready', 'error', 'invalid'].includes(h.view.aiCardOpen?.trial.state)).catch(() => {});
+  for (let i = 0; i < 10; i++) await dom.tick();
+  assert.equal(h.view.aiCardOpen.trial.state, 'ready', 'the source watcher does not drop a draft preview');
+  assert.equal(h.calls.length, 1, 'one AI call');
+  assert.ok(h.reader.some(r => r[0] === 'trial'), 'the preview is shown');
+  assert.equal(vault(), before, 'vault bytes unchanged: no note, no map write');
+  h.question().value = ''; h.question().input();
+  assert.equal(button('Try prompt').disabled, true, 'emptied again: refused');
 });

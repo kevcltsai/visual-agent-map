@@ -80,7 +80,7 @@ test('the summary is pure: it reads no module that can call a provider, and the 
   const imports = [...source.matchAll(/from "([^"]+)"/g)].map(match => match[1]);
   same(imports, ['./map-chat-records']);
   assert.equal(records.RECORD_VERSION, 1);
-  assert.equal(step.MAP_CHAT_ACTION_KINDS.length, 30);
+  assert.equal(step.MAP_CHAT_ACTION_KINDS.length, 31);
 });
 
 test('the session reads every record file of the map and writes nothing (contents unchanged)', async () => {

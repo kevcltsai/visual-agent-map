@@ -199,6 +199,8 @@ export interface ArgumentRun {
   phase: RunPhase;
   status: RunStatus;
   stopReason?: StopReason;
+  /** Why an 'error' pause happened, when it is not an AI failure: the step's note write was discarded (note locked or changed). */
+  errorDetail?: "write_discarded";
   researchCalls: number;
   /** A re-run: the definitions the owner kept. Saved here so a run paused before the facet plan still uses them on resume. */
   presetAssumptions?: AssumptionItem[];
@@ -359,7 +361,8 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
     )
       return "run malformed";
   }
-  if (!optOneOf(QUESTION_TYPES, run.presetQuestionType)) return "unknown run enum";
+  if (!optOneOf(QUESTION_TYPES, run.presetQuestionType) || !optOneOf(["write_discarded"] as const, run.errorDetail))
+    return "unknown run enum";
   if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
     return "unknown run enum";
   const situation = raw.situation;

@@ -10,7 +10,7 @@ import { isAiCard } from "./prompt-run";
 import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
-import type { ReferenceGroup } from "../../ai/reference-materials";
+import { documentsSnapshot, type ReferenceGroup } from "../../ai/reference-materials";
 import {
   steerObserver,
   type ResearchObserver,
@@ -1196,7 +1196,7 @@ export class TopicRuns {
             // The shared AI write gate: changed sources, then Stop pressed while they were re-read; nothing is written.
             const blocked = aiWriteGate({
               owned: !options.signal.aborted,
-              version: { read: options.recordedSources(), now: JSON.stringify(latest.documents) }
+              version: { read: options.recordedSources(), now: documentsSnapshot(latest.documents) }
             });
             if (blocked.includes("stale")) throw changed();
             if (blocked.includes("owner_changed")) throw aborted();
@@ -1222,7 +1222,7 @@ export class TopicRuns {
       if (!options.current()) return;
       if (options.signal.aborted || options.mapChanged()) throw aborted();
       const latest = await options.readSources();
-      if (JSON.stringify(latest.documents) !== options.recordedSources()) throw changed();
+      if (documentsSnapshot(latest.documents) !== options.recordedSources()) throw changed();
       const angles = result.suggestions.slice(0, 2);
       if (!angles.length) options.noDirections();
       else options.found(angles);
@@ -2086,7 +2086,7 @@ export class TopicRuns {
           options: { ...runOptions, signal: undefined, onProgress: undefined },
           mapPath,
           mapId,
-          sourceContent: JSON.stringify(group.documents),
+          sourceContent: documentsSnapshot(group.documents),
           controller,
           state: "running",
           step: isDraft ? "draft" : "directions",

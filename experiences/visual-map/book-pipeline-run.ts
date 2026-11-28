@@ -61,7 +61,7 @@ import {
   swapFigureStamped,
   type FigureSwap
 } from "../../core/book-pipeline/refind-slot";
-import { composeOpenIssuesNote, type BookOpenIssue } from "../../core/book-pipeline/open-issues";
+import { composeOpenIssuesNote, openIssuePictures, type BookOpenIssue } from "../../core/book-pipeline/open-issues";
 import {
   PipelineStore,
   addBudget,
@@ -125,6 +125,7 @@ import {
 import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
+  bookProofUnfinished,
   effectiveOrder,
   BOOK_EXPAND_PASSES,
   mapDifference,
@@ -246,7 +247,7 @@ import {
 } from "../../core/book-pipeline/cover-block";
 import { isBadRequest } from "../../ai/bad-request";
 import type { ReasoningLevel } from "../../ai/types";
-import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
+import { translate, type ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
@@ -593,13 +594,17 @@ export interface BookPipelinePorts {
   editBookStructure?(mapPath: string, work: StructureWork): Promise<StructureResult>;
   /**
    * The book's closing page ("still open") in `folder`: creates it, or rewrites an earlier one of ours; a same-named note that is not ours
-   * is never touched (another name is used). Absent: no page is written and the book is done without it.
+   * is never touched (another name is used). Absent: no page is written and the book is done without it. With `existingOnly` only an
+   * earlier page of ours is rewritten; none: nothing is created and the result is ok with an empty path.
    */
   writeOpenIssues?(
     folder: string,
     language: ContentLanguage,
-    content: string
+    content: string,
+    existingOnly?: boolean
   ): Promise<{ ok: true; path: string } | { ok: false }>;
+  /** The closing page's only items are these chapters (titles), skipped as locked (no new page): production shows a notice. */
+  lockedSkipped?(titles: string[]): void;
   /**
    * Production: `runAiProof(aiCalls, request, run)`: the independent proofread of one chapter (a different model from the author's).
    * The AI proofread runs only when `aiProof`, `aiFix` and `aiBookProof` are all given.
@@ -1265,11 +1270,9 @@ export function replaceBodyImages(content: string, replacements: ReadonlyMap<str
   return rebuildBody(content, href => replacements.get(href));
 }
 
-/** The neighbour's "join not yet checked" line (a rerun and an applied note both write it). */
-function seamText(language: string, at: number, revision: number | string): string {
-  return /^zh/i.test(language)
-    ? `鄰卡企劃或正文已變更，尚未人工核對（第 ${at + 1} 張，版本 ${revision}）`
-    : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`;
+/** The neighbour's "join not yet checked" line (a rerun and an applied note both write it). Shown to the reader, so it follows the map language itself (zh-CN stays Simplified), not the Traditional-only note.* text. */
+function seamText(language: ContentLanguage, at: number, revision: number | string): string {
+  return translate(language, "ui.book_seam_unchecked", at + 1, String(revision));
 }
 
 /** What one apply-notes job did. `edits` carry the before/after of each replaced paragraph (the undo's input). */
@@ -2498,7 +2501,7 @@ export class BookPipelineRuns {
    * Applies the reader's notes of one chapter (one model call, one budget unit). A separate slot: it refuses while a drive holds the
    * map ("drive_running") or another notes job does ("notes_busy"), and a drive entry refuses ("busy") while it runs. It never changes
    * the book's phase or status (a stopped book stays stopped). Order: reservation check, backup (a failed one writes nothing and spends
-   * nothing), the call, a re-check (same run, card still in order, not cancelled), then one writer transform. A late answer after a
+   * nothing), the call, a re-check (same run, card still in order, not ai-locked, not cancelled), then one writer transform. A late answer after a
    * cancel, a dispose or a replaced run is never written.
    */
   async applyNotes(mapPath: string, nodeId: string, options: { signal?: AbortSignal } = {}): Promise<NotesApplyResult> {
@@ -2629,7 +2632,7 @@ export class BookPipelineRuns {
     } finally {
       store.dispose();
     }
-    // Re-check before the commit: same run, the card still in order and on the map, no cancel.
+    // Re-check before the commit: same run, the card still in order and on the map, not locked meanwhile, no cancel.
     refuseIfGone();
     const fresh = await this.ports.readMap(mapPath);
     const again = readBookPipeline(fresh);
@@ -2637,6 +2640,8 @@ export class BookPipelineRuns {
     if (again.kind !== "usable" || again.data.runId !== state.runId || !effectiveOrder(again.data).includes(nodeId))
       throw new BookPipelineRunError("stale");
     if (fresh.nodes.find(item => item.id === nodeId)?.path !== path) throw new BookPipelineRunError("stale");
+    if ((await this.ports.readCard(path).catch(() => undefined))?.aiLocked) throw new BookPipelineRunError("ai_locked");
+    refuseIfGone();
     let outcome: ApplyOutcome | undefined;
     const written = await notes.write(path, text => {
       // The last gate, inside the write: a cancel that came while the writer waited changes nothing.
@@ -2877,7 +2882,7 @@ export class BookPipelineRuns {
     mapPath: string,
     state: BookPipelineData,
     nodeId: string,
-    language: string,
+    language: ContentLanguage,
     map: MapDocument
   ): Promise<void> {
     const stateOrder = effectiveOrder(state);
@@ -4263,9 +4268,17 @@ export class BookPipelineRuns {
           reason: open.reason
         });
       }
-      // Left out because AI-locked: each such chapter is named (it was not checked), not the book as a whole.
-      if (state.bookProof.incomplete)
-        for (const id of state.bookProof.locked?.length ? state.bookProof.locked : [""]) incomplete(id && title(id));
+      // Left out because AI-locked: each such chapter is named as skipped (locked), not as unfinished; `locked` is the only reason then.
+      const locked = state.bookProof.locked ?? [];
+      for (const id of locked)
+        issues.push({
+          source: "ai-proof",
+          chapterId: id,
+          chapterTitle: title(id),
+          problem: "",
+          reason: "proof_locked_skipped"
+        });
+      if (bookProofUnfinished(state.bookProof)) incomplete("");
     }
     for (const id of effectiveOrder(state)) {
       const info = drive.cards.get(id);
@@ -4292,10 +4305,7 @@ export class BookPipelineRuns {
                   : "";
       // What the status line itself says, once none of the six older causes is: the reason a person can act on (the old fallback was one vague sentence).
       const off = splitPictureIssue(issue).off ?? [...issue.matchAll(/image_(\d+)_mismatch/g)].map(m => Number(m[1]));
-      const zh = instructionLanguageOf(drive.config.language) === "zh";
-      const pictures = zh
-        ? `第 ${off.join("、")} 張圖`
-        : `${off.length > 1 ? "Pictures" : "Picture"} ${off.join(", ")}`;
+      const pictures = openIssuePictures(drive.config.language, off);
       const found =
         reason ||
         (/fix interrupted/.test(issue)
@@ -4325,6 +4335,10 @@ export class BookPipelineRuns {
       if (this.dead(drive)) return false;
       try {
         const { checked, issues } = await this.openIssuesOf(drive);
+        // ai-flows AI lock: a page whose only items are chapters skipped as locked is not added (an earlier page of ours is rewritten,
+        // so nothing stale stays); the decision is saved for the bar, and a notice names the chapters.
+        const locked = drive.store.state.bookProof?.locked ?? [];
+        const skipped = !!locked.length && issues.every(issue => issue.reason === "proof_locked_skipped");
         const content = composeOpenIssuesNote({
           bookTitle: root.title,
           language: drive.config.language,
@@ -4332,8 +4346,16 @@ export class BookPipelineRuns {
           issues
         });
         const folder = root.path.includes("/") ? root.path.slice(0, root.path.lastIndexOf("/")) : "";
-        const written = await this.ports.writeOpenIssues(folder, drive.config.language, content);
-        if (written.ok) return true;
+        const written = await this.ports.writeOpenIssues(folder, drive.config.language, content, skipped);
+        if (!written.ok) continue;
+        if (this.dead(drive)) return false;
+        await drive.store.commit(state =>
+          state.closingSkipped === skipped
+            ? { state, accepted: false }
+            : { state: { ...state, closingSkipped: skipped, revision: state.revision + 1 }, accepted: true }
+        );
+        if (skipped) this.ports.lockedSkipped?.(locked.map(id => drive.cards.get(id)?.title ?? ""));
+        return true;
       } catch {
         // retried once
       }

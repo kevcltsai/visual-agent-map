@@ -16,7 +16,8 @@ interface ActiveLease {
 
 /** Progress of one formal run on a map, shared by every view that shows the map. */
 export type LivingRunEvent =
-  | { kind: "start"; total: number }
+  /** `total` counts only the cards to process (`queued`); `excluded` (blocked before the start, locked) settle at once, outside it. */
+  | { kind: "start"; total: number; excluded: readonly string[]; queued: readonly string[] }
   | { kind: "running"; id: string }
   | { kind: "settled"; id: string; result: string }
   | { kind: "failure"; id: string; reason: string }

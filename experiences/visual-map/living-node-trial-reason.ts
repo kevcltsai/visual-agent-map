@@ -1,4 +1,6 @@
+import { isSearchNotPerformed } from "../../ai/search-not-performed";
 import { t, type TranslationKey } from "../../i18n";
+import { isNetworkFailure } from "./living-node-state";
 
 /** A bare error code such as "required-web-unavailable"; anything longer or free-form may carry private text. */
 const CODE = /^[a-z][a-z0-9-]{1,63}$/;
@@ -11,9 +13,12 @@ export function livingTrialReason(error: unknown): { key: TranslationKey; reason
   const message = String((error as { message?: unknown } | null)?.message ?? error);
   const code = CODE.test(message) ? message : "";
   const key = ((): TranslationKey => {
+    // A runtime's own "no search happened" error is a sentence, not a code; it still is a web reason.
+    if (isSearchNotPerformed(error)) return "ui.living_node_trial_reason_web";
     if (/required-web|forbidden-web|web-check|web-excerpt|missing-search-decision/.test(code))
       return "ui.living_node_trial_reason_web";
     if (/too-large/.test(code)) return "ui.living_node_reason_range_too_large";
+    if (code === "source-changed") return "ui.living_node_trial_reason_source_changed";
     if (/^(stale-base|changed-knowledge)$/.test(code)) return "ui.living_node_trial_reason_replaced";
     if (/^(ambiguous-living-node-region|invalid-generation|invalid-receipts|unknown-ownership)$/.test(code))
       return "ui.living_node_reason_markers_damaged";
@@ -21,6 +26,7 @@ export function livingTrialReason(error: unknown): { key: TranslationKey; reason
     if (/^(unauthorized-source|missing-source|invalid-source)$/.test(code))
       return "ui.living_node_reason_missing_source";
     if (code) return "ui.living_node_trial_reason_validation";
+    if (isNetworkFailure(error)) return "ui.living_node_trial_reason_network";
     if (/time.?out|timed out/i.test(message)) return "ui.living_node_trial_reason_timeout";
     return "ui.living_node_trial_reason_provider";
   })();

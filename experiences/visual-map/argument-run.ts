@@ -239,6 +239,8 @@ interface Drive {
   presetQuestionType?: QuestionType;
   /** The single quick call came back as a fact question: the ordinary plan step runs instead (memory only, per drive). */
   quickDeclined?: boolean;
+  /** A note write was discarded in this drive: the next 'error' pause says so instead of blaming the AI. */
+  discardedWrite: { value: boolean };
 }
 /** A guarded note write was refused (stale version or lock): the cause is outside the step, so the step is not retried. */
 class DiscardedWriteError extends Error {
@@ -445,7 +447,8 @@ export class ArgumentRuns {
       stopRequested: false,
       disposed: false,
       done: Promise.resolve(),
-      failures: new Map()
+      failures: new Map(),
+      discardedWrite: { value: false }
     };
     this.drives.set(mapPath, drive);
     return drive;
@@ -498,6 +501,7 @@ export class ArgumentRuns {
     await this.pause(drive, "error", false).catch(() => undefined);
   }
   private async pause(drive: Drive, reason: "user" | "interrupted" | "error", force: boolean): Promise<void> {
+    const detail = reason === "error" && drive.discardedWrite.value ? ("write_discarded" as const) : undefined;
     await this.checkpoint(
       drive,
       async state => {
@@ -506,10 +510,11 @@ export class ArgumentRuns {
           ["concluded", "stopped_mismatch", "stopped_limit"].includes(state.run.phase)
         )
           return null;
-        return { next: applyPause(state, reason) };
+        return { next: applyPause(state, reason, detail) };
       },
       force
     );
+    if (detail) drive.discardedWrite.value = false;
     this.ports.log(`argument-run paused stopReason=${reason}`);
   }
 
@@ -644,6 +649,7 @@ export class ArgumentRuns {
         // Only a refusal the model can correct is passed on, as a short plain line; a provider error says nothing it could fix.
         drive.retryReason = known ? error.message.replace(/\s+/g, " ").trim().slice(0, 200) : undefined;
         this.ports.log(`argument-run step failed attempt=${attempt} kind=${known ? error.name : "other"}`);
+        if (error instanceof DiscardedWriteError) drive.discardedWrite.value = true;
         if (attempt === 2 || error instanceof DiscardedWriteError) {
           // A concurrent text step leaves the pause to the loop, which first waits for the calls still out.
           if (onFinalFailure) onFinalFailure();

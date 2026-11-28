@@ -104,5 +104,9 @@ function makeNotice(log = []) {
   };
 }
 /** Minimal SVG test double used by view geometry tests; no browser or layout engine. */
-const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); }, appendChild(c) { this.children.push(c); } });
+const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); },
+  removeClass(...n) { this.classes = this.classes.filter(c => !n.includes(c)); }, toggleClass(n, on) { if (!on) this.removeClass(n); else if (!this.classes.includes(n)) this.classes.push(n); },
+  // The parent link is not enumerable, so JSON snapshots of a tree stay acyclic.
+  appendChild(c) { if (c && typeof c === 'object') Object.defineProperty(c, '_parent', { value: this, configurable: true, writable: true }); this.children.push(c); },
+  replaceChildren(...next) { this.children = next; }, addEventListener() {}, remove() { if (this._parent) this._parent.children = this._parent.children.filter(c => c !== this); } });
 module.exports = { createSvg, focusedNow, hasCls, element, find, findAll, byLabel, button, buttons, texts, makeModal, tick, createFragment, makeNotice };

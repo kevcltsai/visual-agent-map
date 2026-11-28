@@ -49,7 +49,7 @@ const KINDS = {
   'map-chat': {
     request: (extra = {}) => ({ message: 'What is missing?', context: buildMapChatContext({ mapTitle: 'Steak', outline, selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] }), language: 'en', model: 'claude:sonnet', reasoning: 'low', ...extra }),
     good: JSON.stringify({ reply: 'ok', actions: [] }), bad: 'not json',
-    name: 'map-chat', topic: 'Map chat · What is missing?', step: 'map-chat@34', stopped: 'Map chat stopped',
+    name: 'map-chat', topic: 'Map chat · What is missing?', step: 'map-chat@36', stopped: 'Map chat stopped',
     schema: () => bundle.MAP_CHAT_SCHEMA, stream: true
   },
 };

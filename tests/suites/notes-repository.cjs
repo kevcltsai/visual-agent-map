@@ -434,6 +434,27 @@ integrationTest('map topic sources retain every selected summary and working fin
   assert.match(group.documents[0].content, /Onion adds sweetness/);
   assert.match(group.documents[1].content, /Toast the buns/);
 });
+// V3.3 #05-x: the selected topics an integration or merge reads are reference documents too, so a citation of one keeps the topic's node id and the revision of its file.
+test('source identity (topic sources): a research, integration or merge citing a topic writes its path, node id and file revision', async () => {
+  const { repo, app, contents } = fixture(), first = await topicNote(repo, 'Recipe A', 'a');
+  await repo.updateNote(first.path, { summary: 'Use more onion', detail: 'Caramelize slowly.' });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo });
+  const refs = load('ai/reference-materials.ts', { obsidian });
+  const group = await view.topicReferenceGroup([first]);
+  const file = contents.get(first.path);
+  assert.equal(refs.sourceNodeId(file), first.id);
+  const name = first.path.split('/').pop().replace(/\.md$/, '');
+  assert.equal(refs.resolveDetailReferences('Claim[S1]', [group]), `Claim[^1]\n\n[^1]: [[${first.path}|${name}]]%%vam-src:${first.id}:${refs.sourceRevision(file)}%%\n`);
+});
+// Guard: the map's own sources (a file, a folder) are read whole, so their citation already carried the identity.
+test('source identity (map sources): a file source is cited with its node id and the revision of the file', async () => {
+  const { repo, app } = fixture();
+  const file = '---\nagent-map-node: true\nnode-id: src-1\n---\nSource body\n';
+  await app.vault.create('Src/one.md', file);
+  const { resolveMapSources } = load('experiences/visual-map/map-sources.ts', { obsidian }); const refs = load('ai/reference-materials.ts', { obsidian });
+  const out = await resolveMapSources({ app, readMap: p => repo.readMap(p) }, [{ kind: 'file', path: 'Src/one.md' }], 'Cur/Map.md', new AbortController().signal);
+  assert.equal(refs.resolveDetailReferences('Claim[S1]', out.groups), `Claim[^1]\n\n[^1]: [[Src/one.md|one]]%%vam-src:src-1:${refs.sourceRevision(file)}%%\n`);
+});
 integrationTest('legacy integrated source links resolve from short Obsidian links', async () => {
   const { repo, app } = fixture(), source = await topicNote(repo, 'Recipe A', 'a'), root = await topicNote(repo, 'Integrated Burger', 'a');
   await repo.updateNote(root.path, { detail: '### 整合來源（保存內容）\n\n- [[Recipe A]]' });

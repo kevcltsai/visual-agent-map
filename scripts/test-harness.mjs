@@ -275,21 +275,48 @@ export async function reloadRunningPlugin(vault, connect = connectCdp) {
   return result;
 }
 
+// Test instances run from a background-only copy of Obsidian: `LSBackgroundOnly` (which needs its own bundle id and an ad-hoc
+// re-sign) makes macOS never activate it, so no window ever reaches the front, even before the watcher's policy applies.
+// The copy is an APFS clone kept per Obsidian build; a re-signed copy cannot read the owner's keychain, so it is launched with a mock
+// keychain (otherwise macOS asks the owner for the login keychain password).
+export const testAppBundleId = "md.obsidian.vamtest";
+export function ensureTestApp(source = obsidianApp, directory = join(homedir(), "Library", "Caches", "vam-test-obsidian")) {
+  const build = execFileSync("plutil", ["-extract", "CFBundleVersion", "raw", join(source, "Contents", "Info.plist")], { encoding: "utf8" }).trim();
+  const target = join(directory, `Obsidian-${build}.app`);
+  if (existsSync(target)) return target;
+  mkdirSync(directory, { recursive: true });
+  const staging = mkdtempSync(join(directory, ".staging-"));
+  try {
+    const app = join(staging, "Obsidian.app");
+    execFileSync("cp", ["-cR", source, app]);
+    const plist = join(app, "Contents", "Info.plist");
+    execFileSync("plutil", ["-replace", "CFBundleIdentifier", "-string", testAppBundleId, plist]);
+    execFileSync("plutil", ["-replace", "LSBackgroundOnly", "-bool", "YES", plist]);
+    execFileSync("codesign", ["--force", "--deep", "-s", "-", app], { stdio: "ignore" });
+    // Another harness may have finished the same copy first: its rename wins and this one is dropped.
+    try { renameSync(app, target); } catch (error) { if (!existsSync(target)) throw error; }
+  } finally { rmSync(staging, { recursive: true, force: true }); }
+  return target;
+}
+
+export const launchArgs = (app, appProfile) => ["-g", "-n", "-a", app, "--args", `--user-data-dir=${appProfile}`, "--remote-debugging-port=0", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "--use-mock-keychain", "--password-store=basic"];
+
 function launchObsidian(appProfile) {
   if (!existsSync(obsidianApp)) throw new Error(`Obsidian app bundle not found at ${obsidianApp}.`);
   if (instanceRunning(appProfile)) return;
   rmSync(join(appProfile, "DevToolsActivePort"), { force: true });
   keepProfile(appProfile); // left running on purpose for the owner; the end-of-run check must not stop it
+  const app = ensureTestApp();
   const previous = frontApp();
-  execFileSync("open", ["-g", "-n", "-a", obsidianApp, "--args", `--user-data-dir=${appProfile}`, "--remote-debugging-port=0", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows"]);
-  startFocusWatcher(appProfile, previous);
+  execFileSync("open", launchArgs(app, appProfile));
+  startFocusWatcher(appProfile, previous, app);
 }
 
 // Obsidian activates itself whenever a window opens (Settings etc. since 1.14), even under `open -g`. A detached watcher
 // hands focus back to the owner's app for the instance's whole life; it exits on its own when the instance is gone.
-function startFocusWatcher(appProfile, previous) {
+function startFocusWatcher(appProfile, previous, app) {
   if (process.platform !== "darwin") return;
-  spawn(process.execPath, [fileURLToPath(new URL("./keep-background.mjs", import.meta.url)), appProfile, obsidianApp, String(previous.pid), previous.path ?? ""], { detached: true, stdio: "ignore" }).unref();
+  spawn(process.execPath, [fileURLToPath(new URL("./keep-background.mjs", import.meta.url)), appProfile, app, String(previous.pid), previous.path ?? ""], { detached: true, stdio: "ignore" }).unref();
 }
 
 const instanceRunning = appProfile => spawnSync("pgrep", ["-f", "--", instancePattern(appProfile)], { encoding: "utf8" }).status === 0;

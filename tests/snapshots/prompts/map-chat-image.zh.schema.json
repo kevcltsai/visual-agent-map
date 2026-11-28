@@ -44,7 +44,8 @@
               "edit_book_plan",
               "edit_book_thread",
               "place_image",
-              "configure_ai_card"
+              "configure_ai_card",
+              "move_anchor"
             ]
           },
           "nodeId": {
@@ -409,6 +410,45 @@
       "required": [
         "steps"
       ]
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fromId": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationKind": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "verifies",
+              "derives_from",
+              "related",
+              "prerequisite"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fromId",
+          "toId",
+          "relationKind",
+          "reason",
+          "source"
+        ]
+      }
     }
   },
   "required": [

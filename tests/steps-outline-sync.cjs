@@ -129,11 +129,13 @@ async function viewWithMap() {
   const calls = { mutate: 0, mapChange: 0, saved: 0, active: [] };
   const plugin = { mutate: () => { calls.mutate++; return Promise.resolve(); }, expansionBatches: new Map(), setOutlineActive: path => calls.active.push(path) };
   const view = new VisualAgentMapView({ app: {} }, plugin);
-  view.map = doc; view.viewportEl = { clientWidth: 800, clientHeight: 600 };
+  view.map = doc; view.viewportEl = { clientWidth: 800, clientHeight: 600, toggleClass() {} };
+  view.contentEl = { focus() {} };
   view.render = () => {}; view.transform = () => {}; view.saveViewport = () => { calls.saved++; };
   view.mapChange = async () => { calls.mapChange++; };
   return { view, app, calls, text, ids: { root: root.id, child: child.id, leaf: leaf.id } };
 }
+const fakeCard = (offsetWidth, offsetHeight) => ({ offsetWidth, offsetHeight, toggleClass() {}, addClass() {}, removeClass() {}, setAttr() {}, setAttribute() {}, querySelector: () => null, querySelectorAll: () => [], getBoundingClientRect: () => ({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }), style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false } });
 const read = async app => app.vault.adapter ? app.vault.adapter.read(MAP) : app.vault.read(app.vault.getAbstractFileByPath(MAP));
 
 test('B15: outline click and canvas selection, five times each, leave Map.md unchanged and write nothing', async () => {
@@ -154,10 +156,32 @@ test('B15: outline click and canvas selection, five times each, leave Map.md unc
 test('B15: an outline click on a card inside a collapsed branch selects it and centers on the topic, opened for the view only', async () => {
   const { view, ids } = await viewWithMap();
   const [root, , leaf] = view.map.nodes; leaf.x = 1000; leaf.y = 400; root.x = 200; root.y = 100;
+  view.cardEls = new Map([[leaf.id, fakeCard(280, 79)]]);
   await view.revealPath('leaf.md');
   assert.equal(view.selection.state.selected, ids.leaf);
-  assert.deepEqual({ ...view.map.viewport }, { x: 400 - (1000 + 140), y: 300 - (400 + 80), zoom: 1 }, 'camera is on the topic itself'); // B14: P1.6 reveal only temporarily opens the branch for the view
+  // B15-x: the centre is the card's measured box (280 x 79), not a fixed +80 down from its top.
+  assert.deepEqual({ ...view.map.viewport }, { x: 400 - (1000 + 140), y: 300 - (400 + 39.5), zoom: 1 }, 'camera is on the topic itself'); // B14: P1.6 reveal only temporarily opens the branch for the view
 });
+
+// B15-x: after an outline reveal the card's DOM centre sits at the centre of the canvas minus its insets, at any zoom.
+for (const zoom of [1, 0.25]) for (const [w, h] of [[280, 79], [280, 99], [360, 180]]) {
+  test(`B15-x: outline reveal centres the card's DOM box within 4px of the inset-free canvas centre (zoom ${zoom}, card ${w}x${h})`, async () => {
+    const { view } = await viewWithMap();
+    const [, , leaf] = view.map.nodes; leaf.x = 1000; leaf.y = 400; leaf.width = w;
+    const canvas = { left: 10, top: 20, right: 810, bottom: 620, width: 800, height: 600 };
+    view.viewportEl = { clientWidth: 800, clientHeight: 600, toggleClass() {}, getBoundingClientRect: () => canvas };
+    const rects = { '.vam-map-tools': { left: 100, right: 700, top: 20, bottom: 64 }, '.vam-zoom-controls': { left: 300, right: 500, top: 560, bottom: 610 }, '.vam-map-chat.is-overlay': { left: 10, right: 130, top: 20, bottom: 620 } };
+    view.contentEl = { focus() {}, querySelector: selector => rects[selector] && { getBoundingClientRect: () => rects[selector] } };
+    view.cardEls = new Map([[leaf.id, fakeCard(w, h)]]);
+    view.map.viewport = { x: 0, y: 0, zoom };
+    await view.revealPath('leaf.md');
+    const vp = view.map.viewport, ins = view.canvasInsets();
+    const cx = canvas.left + vp.x + (leaf.x + w / 2) * zoom, cy = canvas.top + vp.y + (leaf.y + h / 2) * zoom;
+    const tx = canvas.left + ins.left + (canvas.width - ins.left - ins.right) / 2, ty = canvas.top + ins.top + (canvas.height - ins.top - ins.bottom) / 2;
+    assert.ok(Math.abs(cx - tx) <= 4, `dx ${cx - tx}`);
+    assert.ok(Math.abs(cy - ty) <= 4, `dy ${cy - ty}`);
+  });
+}
 
 test('C08: outline search also reads summaries and Details; a row matched only by its body says so, a title match does not', () => {
   const OutlineView = loadOutline();
@@ -175,4 +199,63 @@ test('C08: outline search also reads summaries and Details; a row matched only b
   assert.deepEqual(rows(), [['a.md', 0], ['b.md', 0], ['c.md', 1]], 'a title match is not labelled, a body-only one is');
   const hit = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-body-hit'))[0];
   assert.equal(hit.text, 'In text');
+});
+
+// B15-y: the reader opened by an outline click takes width from the map; the card is centred on the width left after it opens.
+async function outlineClick(readerOpen) {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  let width = readerOpen ? 500 : 800; // the canvas: 800px, 500px once the 300px reader is beside it
+  const centred = [];
+  const view = { leaf: {}, hasPath: () => true, revealPath: async () => { centred.push(width / 2); return true; } };
+  const host = {
+    views: () => [view], app: { workspace: { revealLeaf: async () => {} } }, repo: { file: path => ({ path }) },
+    openDetails: async () => { width = 500; }
+  };
+  await Plugin.prototype.revealFromOutline.call(host, 'leaf.md');
+  return { centred, visibleCentre: width / 2 };
+}
+
+test('B15-y: the first outline click with the reader closed centres the card on the canvas left after the reader opens (≤1px)', async () => {
+  const { centred, visibleCentre } = await outlineClick(false);
+  assert.ok(centred.length >= 1);
+  assert.ok(Math.abs(centred.at(-1) - visibleCentre) <= 1, `centred at ${centred.at(-1)}, visible centre ${visibleCentre}`);
+});
+
+test('B15-y: with the reader already open an outline click centres once, as before', async () => {
+  const { centred, visibleCentre } = await outlineClick(true);
+  assert.deepEqual(centred, [visibleCentre]);
+});
+
+test('B15-y: while the reader slides in after an outline reveal, each canvas resize re-centres the card; later resizes leave the camera', async () => {
+  const { view } = await viewWithMap();
+  const leaf = view.map.nodes[2]; leaf.x = 1000; leaf.y = 400;
+  for (const name of ['drawWhenShown', 'syncHeaderNarrow', 'syncReaderToggle', 'syncChatNarrow', 'fitKindShapes']) view[name] = () => {};
+  view.contentEl = { ownerDocument: null, querySelector: () => null }; view.placeMapTools = () => {};
+  await view.revealPath('leaf.md');
+  view.viewportEl.clientWidth = 500; // the reader took 300px
+  view.onResize();
+  const after = { ...view.map.viewport };
+  view.viewportEl.clientWidth = 800;
+  view.map.viewport = { x: 0, y: 0, zoom: 1 };
+  await view.revealPath('leaf.md');
+  view.viewportEl.clientWidth = 500;
+  const expected = { ...view.map.viewport, x: view.map.viewport.x - 150 };
+  assert.ok(Math.abs(after.x - expected.x) <= 1 && Math.abs(after.y - expected.y) <= 1, `after resize ${JSON.stringify(after)} vs ${JSON.stringify(expected)}`);
+  view.revealResize.until = Date.now() - 1; // the reveal is over
+  view.map.viewport = { x: 7, y: 9, zoom: 1 };
+  view.onResize();
+  assert.deepEqual({ ...view.map.viewport }, { x: 7, y: 9, zoom: 1 }, 'a resize after the reveal does not move the camera');
+});
+
+test('B15-y: the status bar growing during an outline reveal (the reader made a note active) re-centres the card on the new bottom inset', async () => {
+  const { view } = await viewWithMap();
+  const leaf = view.map.nodes[2]; leaf.x = 1000; leaf.y = 400;
+  let bottomInset = 0;
+  view.canvasInsets = () => ({ top: 0, right: 0, bottom: bottomInset, left: 0 });
+  view.contentEl = { ownerDocument: null, querySelector: () => null }; view.placeMapTools = () => {};
+  await view.revealPath('leaf.md');
+  const before = view.map.viewport.y;
+  bottomInset = 26; // the zoom bar rose above the taller status bar
+  view.syncStatusBarClearance();
+  assert.ok(Math.abs(view.map.viewport.y - (before - 13)) <= 1, `y ${view.map.viewport.y}, expected ${before - 13}`);
 });

@@ -325,3 +325,60 @@ test('E4a question only: the same one card the user did not ask for waits as a p
   assert.equal(await h.file(), before, 'Map.md byte for byte');
   assert.equal((await h.saved()).nodes.length, 3);
 });
+
+test('E3-x layout (counter-example): two parents previewed at once at 25% zoom: no dashed card crosses another or a card on the canvas, and nothing is written', async () => {
+  const { h } = await planned();
+  // A card already on the canvas where the first parent's dashed column would go, and measured card sizes, as drawn at 25%.
+  const map = h.view.map;
+  map.viewport = { ...map.viewport, zoom: 0.25 };
+  map.nodes.push({ ...map.nodes.find(n => n.id === h.ids.b), id: 'in-the-way', title: 'In the way', parentId: h.ids.root, x: 760, y: 380 });
+  const sized = (w, ht) => Object.assign(dom.element('div'), { offsetWidth: w, offsetHeight: ht });
+  h.view.cardEls = new Map(map.nodes.map(n => [n.id, sized(280, 120)]));
+  let writes = 0;
+  const realApply = h.view.applyMapChatActions.bind(h.view);
+  h.view.applyMapChatActions = (...args) => { writes++; return realApply(...args); };
+  const realSave = h.repo.saveMap.bind(h.repo);
+  h.repo.saveMap = (...args) => { writes++; return realSave(...args); };
+  const file = await h.file();
+  const before = JSON.stringify(map.nodes);
+  h.view.paintPlanGhosts();
+  const px = v => Number(String(v).replace('px', ''));
+  const rect = el => {
+    const l = px(el.style.left), t = px(el.style.top);
+    return { l, t, r: l + px(el.style.width), b: t + px(el.style.height || el.style.minHeight) };
+  };
+  const ghostRects = ghosts(h).map(rect);
+  const cardRects = map.nodes.map(n => ({ l: n.x, t: n.y, r: n.x + 280, b: n.y + 120 }));
+  const cross = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+  assert.equal(ghostRects.length, 12);
+  for (let i = 0; i < ghostRects.length; i++)
+    for (let j = i + 1; j < ghostRects.length; j++)
+      assert.equal(cross(ghostRects[i], ghostRects[j]), false, `ghost ${i} crosses ghost ${j}: ${JSON.stringify([ghostRects[i], ghostRects[j]])}`);
+  for (const [i, g] of ghostRects.entries())
+    for (const [j, c] of cardRects.entries())
+      assert.equal(cross(g, c), false, `ghost ${i} crosses card ${map.nodes[j].id}: ${JSON.stringify([g, c])}`);
+  assert.equal(writes, 0, 'the preview writes nothing');
+  assert.equal(await h.file(), file, 'Map.md unchanged');
+  assert.equal(JSON.stringify(map.nodes), before, 'no card on the map moved');
+});
+
+test('E3-x layout: with a card in the way the dashed cards step past it in any arrangement (radial too); a planned card under a planned card and the lines follow', () => {
+  const N = (id, parentId, x, y) => ({ id, parentId, x, y, width: 280, title: id, path: `${id}.md` });
+  const nodes = [N('p', null, 0, 0), N('w', null, 360, 0)];
+  const boxes = new Map(nodes.map(n => [n.id, { x: n.x, y: n.y, width: 280, height: 100 }]));
+  const specs = [{ parentId: 'p', title: 'P1', ref: 'p1' }, { parentId: 'new:p1', title: 'Under P1' }];
+  const cross = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  for (const direction of ['right', 'radial']) {
+    const layout = preview.planGhostLayout(specs, boxes, () => [], [{ fromId: 'w', toId: 'new:p1' }], {
+      nodes, boxOf: id => (boxes.has(id) ? { dx: 0, dy: 0, w: 280, h: 100 } : undefined), direction, gap: 24
+    });
+    assert.equal(layout.cards.length, 2, direction);
+    for (const card of layout.cards) for (const box of boxes.values()) assert.equal(cross(card, box), false, `${direction}: ${card.title}`);
+    assert.equal(cross(layout.cards[0], layout.cards[1]), false, direction);
+    const [p1] = layout.cards;
+    assert.deepEqual(plain(layout.edges[0].to), { x: p1.x, y: p1.y + p1.height / 2 }, `${direction}: the parent line reaches the moved card`);
+    assert.equal(layout.relations.length, 1);
+    assert.ok([p1.x, p1.x + p1.width].includes(layout.relations[0].to.x), `${direction}: the relation reaches the moved card`);
+  }
+  assert.equal(nodes[1].x, 360, 'no card on the canvas moves');
+});

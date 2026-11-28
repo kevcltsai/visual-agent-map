@@ -614,6 +614,62 @@ test('P8c bar: a finished book shows the chapters, what the AI fixed and the ope
   assert.equal(one(clean, 'vam-book-done-counts').text, '4 章・AI 修了 0 處・仍有問題 0 項');
 });
 
+test('P8c bar: a finished book whose every chapter was locked and nothing checked has no closing page, so no button to it; one chapter open keeps it', () => {
+  setUiLanguage('zh-TW');
+  const done = { done: true };
+  const proof = { a: slot(done), b: slot(done), c: slot(done), d: slot(done) };
+  const draw = data => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, () => undefined), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return bar; };
+  const allLocked = draw(aiData({ phase: 'done', aiProof: proof, bookProof: slot({ done: true, incomplete: true, locked: ['a', 'b', 'c', 'd'] }) }));
+  assert.equal(one(allLocked, 'vam-book-open-issues'), undefined, 'no button to a page that was not written');
+  assert.ok(one(allLocked, 'vam-book-done-counts'), 'the counts line stays');
+  const someOpen = draw(aiData({ phase: 'done', aiProof: proof, bookProof: slot({ done: true, incomplete: true, locked: ['a', 'b', 'c'] }) }));
+  assert.ok(one(someOpen, 'vam-book-open-issues'), 'one chapter not locked: the page is written, the button stays');
+});
+
+test('B33-z bar: the button follows the runner\'s saved decision (closingSkipped), whatever the bar could count itself; older saves keep the B33-x rule', () => {
+  setUiLanguage('zh-TW');
+  const done = { done: true, checked: 2 };
+  const proof = { a: slot(done), b: slot(done), c: slot(done), d: slot(done) };
+  const book = slot({ done: true, checked: 3, incomplete: true, locked: ['b'] });
+  const draw = data => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, () => 'checked'), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return bar; };
+  assert.equal(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book, closingSkipped: true })), 'vam-book-open-issues'), undefined, 'saved as skipped: no button');
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book, closingSkipped: false })), 'vam-book-open-issues'), 'saved as written (say, a cover item): the button');
+  const allLocked = slot({ done: true, incomplete: true, locked: ['a', 'b', 'c', 'd'] });
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: { a: slot({ done: true }), b: slot({ done: true }), c: slot({ done: true }), d: slot({ done: true }) }, bookProof: allLocked, closingSkipped: false })), 'vam-book-open-issues'), 'the saved decision wins over the older rule');
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book })), 'vam-book-open-issues'), 'an older save, partly locked: the button as before');
+});
+test('B33-v bar: a chapter skipped as locked is not counted as still open; only a real failure next to it is', () => {
+  setUiLanguage('en');
+  const done = { done: true, checked: 2 };
+  const proof = { a: slot(done), b: slot(done), c: slot(done), d: slot(done) };
+  const counts = data => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, () => 'checked'), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return one(bar, 'vam-book-done-counts').text; };
+  const partLocked = slot({ done: true, checked: 3, incomplete: true, locked: ['b'] });
+  assert.match(counts(aiData({ phase: 'done', aiProof: proof, bookProof: partLocked, closingSkipped: true })), /· 0 still open$/, 'locked b, the rest solved: nothing open');
+  const oneFailed = { ...proof, c: slot({ done: true, incomplete: true }) };
+  assert.match(counts(aiData({ phase: 'done', aiProof: oneFailed, bookProof: partLocked })), /· 1 still open$/, 'locked b and a failed c: only c');
+  const notLocked = slot({ done: true, checked: 3, incomplete: true });
+  assert.match(counts(aiData({ phase: 'done', aiProof: proof, bookProof: notLocked })), /· 1 still open$/, 'an unfinished whole-book check with nothing locked is still open');
+  setUiLanguage('zh-TW');
+});
+test('B33-v bar: the en done counts are singular for 1 and plural for 2 (chapters, places); zh keeps its sentence', () => {
+  const counts = data => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, () => undefined), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return one(bar, 'vam-book-done-counts').text; };
+  setUiLanguage('en');
+  assert.equal(counts(aiData({ phase: 'done', order: ['a'], accepted: ['a'], aiProof: { a: slot({ done: true, fixed: 1 }) } })), '1 chapter · AI fixed 1 place · 0 still open');
+  assert.equal(counts(aiData({ phase: 'done', order: ['a', 'b'], accepted: ['a', 'b'], aiProof: { a: slot({ done: true, fixed: 2 }) } })), '2 chapters · AI fixed 2 places · 0 still open');
+  setUiLanguage('zh-CN');
+  assert.equal(counts(aiData({ phase: 'done', order: ['a'], accepted: ['a'], aiProof: { a: slot({ done: true, fixed: 1 }) } })), '1 章・AI 修了 1 处・仍有问题 0 项');
+  setUiLanguage('zh-TW');
+  assert.equal(counts(aiData({ phase: 'done', order: ['a', 'b'], accepted: ['a', 'b'], aiProof: { a: slot({ done: true, fixed: 2 }) } })), '2 章・AI 修了 2 處・仍有問題 0 項');
+});
+test('B33-z: the notice for chapters skipped as locked names them, in each UI language', () => {
+  setUiLanguage('zh-TW');
+  assert.equal(bundle.lockedSkippedNotice(['甲', '乙']), 'AI 校對略過了已鎖定的章：甲、乙。其他章都沒有問題。');
+  setUiLanguage('zh-CN');
+  assert.equal(bundle.lockedSkippedNotice(['甲']), 'AI 校对略过了已锁定的章：甲。其他章都没有问题。');
+  setUiLanguage('en');
+  assert.equal(bundle.lockedSkippedNotice(['A', 'B']), 'The AI proofread skipped these locked chapters: A, B. Nothing else is open.');
+  setUiLanguage('zh-TW');
+});
 test('bar: with a book structure the fix line names the card by its place (preface / chapter / section) and counts cards', () => {
   const order = ['p', 'c1', 's1', 'c2'];
   const places = { p: { kind: 'preface' }, c1: { kind: 'chapter', chapter: 1 }, s1: { kind: 'section', chapterId: 'c1', sectionIndex: 1, sectionCount: 1 }, c2: { kind: 'chapter', chapter: 2 } };

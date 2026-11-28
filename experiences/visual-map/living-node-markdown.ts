@@ -1,16 +1,28 @@
 import { createHash } from "node:crypto";
 import { allowedUrl } from "../../core/argument-map/source-proof";
+import { isPlaceholder } from "../../core/note-placeholder";
 import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
+import {
+  CANONICAL_HEADINGS,
+  canonicalHeadings,
+  localizeHeadings,
+  noteHeadingSet,
+  replaceSummarySection,
+  section
+} from "../../core/repository-note-body";
 import { readAiCard, readAiLocked } from "../../note-values";
 import {
   applyLivingChanges,
+  LIVING_LAST_CHANGE_KEY,
   livingEventTombstone,
+  livingLastChangeValue,
   livingDeletedTextHash,
   livingSuppressionV2,
   livingSuppressionV2Entry,
   livingSuppressionV2Forms,
   parseLivingEventTombstone,
   parseLivingSuppressionV2,
+  summarizeLivingChanges,
   type LivingAiLatest,
   type LivingChangeContext,
   type LivingEvidence,
@@ -343,6 +355,10 @@ function readableSource(raw: string, labels: LivingReaderLabels): string | undef
   return labels.source(link, day ? (labels.date?.(retrievedAt, false) ?? retrievedAt.slice(0, 10)) : retrievedAt);
 }
 
+/** An Observation header as written (Ownership is dropped first): the internal fields are not for the reader. */
+const OBSERVATION_HEAD =
+  /^### Observation\r?\n- ID: ".*"\r?\n- Subject: (".*")\r?\n- Scope: ".*"\r?\n- Granularity: ".*"\r?\n- Event time: (".*"|null)\r?\n- Validity: ".*"(?:\r?\n|$)/gm;
+
 /**
  * What the reader shows: the AI latest heading and its generated time in the interface language, and each evidence source
  * as "title (date)" (a link when it is a public web page). The note file itself is not changed. Inside a note only the
@@ -355,6 +371,25 @@ export function localizeLivingReader(markdown: string, labels: LivingReaderLabel
   const [from, to] = whole ? [0, markdown.length] : [start, end];
   const region = relabel(markdown.slice(from, to), labels.aiLatest)
     .replace(/^- Ownership: ".*"\r?\n/gm, "")
+    .replace(OBSERVATION_HEAD, (line, subject: string, eventTime: string) => {
+      try {
+        const name: unknown = JSON.parse(subject);
+        const at: unknown = JSON.parse(eventTime);
+        if (typeof name !== "string" || (at !== null && typeof at !== "string")) return line;
+        return `### ${escapeMarkdown(name)}\n` + (at ? `- ${labels.date?.(at, false) ?? at}\n` : "");
+      } catch {
+        return line;
+      }
+    })
+    .replace(/^- (Time|Reason): (".*")$/gm, (line, name: string, raw: string) => {
+      try {
+        const text: unknown = JSON.parse(raw);
+        if (typeof text !== "string") return line;
+        return "- " + (name === "Time" ? (labels.date?.(text, true) ?? text) : escapeMarkdown(text));
+      } catch {
+        return line;
+      }
+    })
     .replace(/(^|\n)### Suppression\r?\n(?:- (?:ID|Suppression v2): ".*"(?:\r?\n|$))*/g, "$1")
     .replace(/^- Source: (\[.*\])$/gm, (line, raw: string) => "- " + (readableSource(raw, labels) ?? line.slice(2)))
     .replace(/^- Generated: (".*")$/gm, (line, raw: string) => {
@@ -647,6 +682,27 @@ export const livingWithoutFence = (content: string): string =>
 /** Replay-fence generation stored in the note (0 for a note written before the fence existed). */
 export const livingGeneration = (content: string): number => readLivingFence(frontmatter(content)).generation;
 
+/**
+ * The latest summary (frontmatter `summary` and `## Current Summary`) follows the knowledge output of a commit. A summary the
+ * user wrote (neither empty, the placeholder, nor the output this commit replaces) is theirs and stays as it is.
+ */
+function withLatestSummary(content: string, previous: string, latest: string): string {
+  const headings = noteHeadingSet(content) ?? CANONICAL_HEADINGS;
+  const canonical = canonicalHeadings(content, headings);
+  const hasSection = /^## Current Summary[ \t]*\r?$/m.test(canonical);
+  const owned = frontmatter(content).summary;
+  const current = (hasSection ? section(canonical, "Current Summary") : typeof owned === "string" ? owned : "").trim();
+  if (current && !isPlaceholder(current) && current !== previous.trim()) return content;
+  // A note without the section (not written by VAM) is not given one: its body stays as it is, only the frontmatter summary follows.
+  if (!hasSection) return setFrontmatterKeys(content, { summary: latest });
+  // The section helper leaves no blank line before the next heading when the section grew; the note keeps its spacing.
+  const body = replaceSummarySection(canonical, latest).replace(
+    /(\n## Current Summary\r?\n\r?\n[\s\S]*?[^\n])\n(## )/,
+    "$1\n\n$2"
+  );
+  return setFrontmatterKeys(localizeHeadings(body, headings), { summary: latest });
+}
+
 export interface LivingMarkdownPort {
   /** The existing Repository.updateNoteRawGuarded port; its transform runs inside vault.process. */
   updateNoteRawGuarded(
@@ -715,6 +771,7 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   };
   const managed = renderRegion(nextKnowledge);
   const changed = !region || region.text !== managed;
+  const changes = summarizeLivingChanges(stored, nextKnowledge);
   const checked = await request.inspect();
   if (signal.aborted || !request.isCurrent() || !canCommitLivingCandidate(candidate, checked)) return "discarded";
   let committedContent: string | undefined;
@@ -730,7 +787,11 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
           ? content.slice(0, region.start) + managed + content.slice(region.end)
           : content + (content.endsWith("\n") ? "\n" : "\n\n") + managed + "\n"
         : content;
-      committedContent = setFrontmatterKeys(replaced, {
+      const withSummary =
+        next.output.owner === "ai" && next.output.text.trim() && next.output.text !== stored.output.text
+          ? withLatestSummary(replaced, stored.output.text, next.output.text)
+          : replaced;
+      committedContent = setFrontmatterKeys(withSummary, {
         [HASH_KEY]: livingSnapshotRevision(managed),
         [OWNERSHIP_KEY]: ownership(nextKnowledge),
         [COMMIT_KEY]: candidate.executionId,
@@ -745,7 +806,11 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
         "living-node-checked": context.checked?.length
           ? context.checked.map(item => item.at + " " + (item.url ?? "search: " + item.query))
           : null,
-        ...(changed ? { "living-node-last-content-change": context.at } : {})
+        ...(changed ? { "living-node-last-content-change": context.at } : {}),
+        // Record ids and change kinds only, and only when there was a baseline to compare with; unchanged runs leave it alone.
+        ...(changed && !changes.firstRun
+          ? { [LIVING_LAST_CHANGE_KEY]: livingLastChangeValue(changes, context.at) }
+          : {})
       });
       return committedContent;
     },

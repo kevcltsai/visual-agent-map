@@ -65,7 +65,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "edit_book_plan",
   "edit_book_thread",
   "place_image",
-  "configure_ai_card"
+  "configure_ai_card",
+  "move_anchor"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 /** The kinds that change a book plan's structure or text: grouped into `edit_book_structure` (the first four) or dropped while the plan is being re-planned. */
@@ -249,6 +250,19 @@ export type MapChatAction =
       nodeId: string;
       relationKind: TopicRelationKind;
       description?: string;
+    }
+  /**
+   * Suggests moving one existing anchor (`anchorId`) of the selected annotated image to the relative position `x`, `y` (0-1, never
+   * clamped: a value outside 0-1 is refused). Always a plan: it is written only after the user confirms.
+   */
+  | {
+      kind: "move_anchor";
+      imageId: string;
+      anchorId: string;
+      x: number;
+      y: number;
+      /** Set by the parser from the selected picture's file path, never from the reply: a picture replaced before Apply is stale. */
+      imageRef?: string;
     };
 
 export type MapChatRejectCode =
@@ -301,6 +315,18 @@ export interface MapChatResult {
   rejected: MapChatRejection[];
   /** Set by the service: a StructuredOutput call the provider did not take had more actions than this reply (work may be lost). */
   droppedOnRetry?: boolean;
+  /** Relations the model suggests (V3.3 P4.4): never applied with the reply, only one by one when the user adopts it; absent = none. */
+  suggestions?: MapChatRelationSuggestion[];
+}
+/** At most this many relation suggestions are kept from one reply (the first valid ones). */
+export const MAP_CHAT_SUGGESTION_LIMIT = 5;
+/** One suggested relation between two existing cards of this map, with why (`reason`) and where that comes from (`source`). */
+export interface MapChatRelationSuggestion {
+  fromId: string;
+  toId: string;
+  relationKind: TopicRelationKind;
+  reason: string;
+  source: string;
 }
 export class MapChatError extends Error {
   constructor(
@@ -483,6 +509,21 @@ export const MAP_CHAT_SCHEMA = {
         current: { type: "integer" }
       },
       required: ["steps"]
+    },
+    suggestions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          fromId: STRING,
+          toId: STRING,
+          relationKind: { type: "string", enum: [...TOPIC_RELATION_KINDS] },
+          reason: STRING,
+          source: STRING
+        },
+        required: ["fromId", "toId", "relationKind", "reason", "source"]
+      }
     }
   },
   required: ["reply", "actions", "remaining"]
@@ -544,6 +585,8 @@ export function parseMapChat(
     aim?: boolean;
     relations?: readonly MapChatRelation[];
     selectedImage?: MapChatImageScope;
+    /** Ids of this map's knowledge references (V3.3 P4.4): one end of an add_relation or a suggestion, never both. */
+    refIds?: readonly string[];
   }
 ): MapChatResult {
   let value: unknown;
@@ -557,6 +600,7 @@ export function parseMapChat(
   if (typeof body.reply !== "string") throw invalid("reply");
   if (!Array.isArray(body.actions)) throw invalid("actions");
   const known = new Set(context.nodeIds);
+  const referenceIds = new Set((context.refIds ?? []).filter(id => !known.has(id)));
   // Parent links of the supplied cards, plus those of the cards this reply creates, as each kept move leaves them (for the
   // cycle check and the `beforeId` of a move).
   const parents: Record<string, string | null | undefined> = { ...context.parents };
@@ -1006,10 +1050,13 @@ export function parseMapChat(
             const id = text(key);
             if (!id.startsWith(MAP_CHAT_NEW_PREFIX) && !created && !known.has(id) && refs.has(id))
               return `${MAP_CHAT_NEW_PREFIX}${id}`;
+            if (!created && referenceIds.has(id)) return id;
             return resolve(id, true);
           };
           const fromId = end("fromId"),
             toId = end("toId");
+          // A reference of this map may be one end, not both (it is read-only and the relation belongs to this map).
+          if (referenceIds.has(fromId) && referenceIds.has(toId)) throw new Dropped("relation_not_allowed");
           const given = text("relationKind");
           if (!(TOPIC_RELATION_KINDS as readonly string[]).includes(given)) throw new Dropped("bad_value");
           const relationKind = given as TopicRelationKind;
@@ -1067,9 +1114,38 @@ export function parseMapChat(
           });
           break;
         }
+        case "move_anchor": {
+          if (!shown || shown.kind !== "annotated") throw new Dropped("no_image");
+          // An empty imageId means the selected picture; a different one is refused.
+          const imageId = text("imageId", false) || shown.id;
+          if (imageId !== shown.id) throw new Dropped("no_image");
+          if (context.aim) throw new Dropped("no_relations");
+          const anchorId = text("anchorId");
+          if (!shown.anchorIds.includes(anchorId)) throw new Dropped("unknown_node");
+          const [x, y] = ["x", "y"].map(key => {
+            const field = item[key];
+            if (typeof field !== "number" || !Number.isFinite(field) || field < 0 || field > 1)
+              throw new Dropped("bad_value");
+            return field;
+          });
+          actions.push({
+            kind: "move_anchor",
+            imageId,
+            anchorId,
+            x,
+            y,
+            ...(shown.path ? { imageRef: shown.path } : {})
+          });
+          break;
+        }
         case "remove_relation": {
-          const fromId = node("fromId", true),
-            toId = node("toId", true);
+          // An end may be a knowledge reference of this map, as in add_relation (the writer allows it).
+          const end = (key: string): string => {
+            const id = text(key);
+            return !created && referenceIds.has(id) ? id : resolve(id, true);
+          };
+          const fromId = end("fromId"),
+            toId = end("toId");
           if (context.aim) throw new Dropped("no_relations");
           if (!relations.some(link => samePair(link, fromId, toId))) throw new Dropped("unknown_relation");
           relations = relations.filter(link => !samePair(link, fromId, toId));
@@ -1088,14 +1164,64 @@ export function parseMapChat(
   if (thread > firstBrief && firstBrief >= 0) actions.splice(firstBrief, 0, ...actions.splice(thread, 1));
   if (items.length) actions.push({ kind: "edit_book_structure", items });
   const progress = normalizeProgress(body.progress);
+  const suggestions = Array.isArray(body.suggestions)
+    ? relationSuggestions(body.suggestions, known, referenceIds, context.relations ?? [], context.aim === true)
+    : undefined;
   return {
     reply: body.reply,
     actions,
     rejected,
     remaining: normalizeRemaining(body.remaining),
     changeRequested: body.changeRequested === true,
-    ...(progress ? { progress } : {})
+    ...(progress ? { progress } : {}),
+    ...(suggestions ? { suggestions } : {})
   };
+}
+
+/**
+ * The first {@link MAP_CHAT_SUGGESTION_LIMIT} usable suggestions, in reply order. One is left out when it lacks a reason or a source
+ * (or either is longer than one relation description), when an end is not a card or a knowledge reference of this map (or both ends are references), when the map could not hold it
+ * beside its present relations (`relationAllowed`), or when an earlier kept one is on the same pair. None on an AIM map.
+ */
+function relationSuggestions(
+  raw: readonly unknown[],
+  known: ReadonlySet<string>,
+  referenceIds: ReadonlySet<string>,
+  relations: readonly MapChatRelation[],
+  aim: boolean
+): MapChatRelationSuggestion[] {
+  if (aim) return [];
+  const present: TopicRelation[] = relations.map(link => ({ kind: link.kind, from: link.from, to: link.to }));
+  const kept: MapChatRelationSuggestion[] = [];
+  const line = (value: unknown): string => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
+  for (const entry of raw) {
+    if (kept.length >= MAP_CHAT_SUGGESTION_LIMIT) break;
+    if (!entry || typeof entry !== "object") continue;
+    const item = entry as Record<string, unknown>;
+    const fromId = line(item.fromId),
+      toId = line(item.toId),
+      reason = line(item.reason),
+      source = line(item.source);
+    const kind = line(item.relationKind);
+    if (
+      !reason ||
+      !source ||
+      !(known.has(fromId) || referenceIds.has(fromId)) ||
+      !(known.has(toId) || referenceIds.has(toId))
+    )
+      continue;
+    if (referenceIds.has(fromId) && referenceIds.has(toId)) continue;
+    if ([...reason].length > RELATION_DESCRIPTION_MAX_LENGTH || [...source].length > RELATION_DESCRIPTION_MAX_LENGTH)
+      continue;
+    if (!(TOPIC_RELATION_KINDS as readonly string[]).includes(kind)) continue;
+    const relationKind = kind as TopicRelationKind;
+    if (!relationAllowed(present, { kind: relationKind, from: fromId, to: toId })) continue;
+    const pair = (other: MapChatRelationSuggestion): boolean =>
+      (other.fromId === fromId && other.toId === toId) || (other.fromId === toId && other.toId === fromId);
+    if (kept.some(pair)) continue;
+    kept.push({ fromId, toId, relationKind, reason, source });
+  }
+  return kept;
 }
 
 /**
@@ -1109,7 +1235,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 34,
+  version: 36,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

@@ -41,6 +41,8 @@ export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
  *
  * `book_plan_edit`: the reply changes a book plan under review (cards, structure or thread); it writes the author's cards, so it is always a plan, auto-apply or not.
  *
+ * `move_anchor_confirm`: the reply suggests moving an existing anchor; it is always a plan (never in {@link IMAGE_SAFE_KINDS}), auto-apply or not.
+ *
  * `image_preview`: the reply places or links anchors and the user chose to see image changes first. `image_other_actions`: a turn
  * that sent an image also asked for something besides the image-safe actions; the picture is untrusted input, so this is
  * a plan in either mode.
@@ -58,7 +60,8 @@ export type MapChatPlanReason =
   | "call_budget"
   | "auto_apply_confirm"
   | "book_plan_edit"
-  | "living_node_confirm";
+  | "living_node_confirm"
+  | "move_anchor_confirm";
 
 /** "AI changes to an image: show me first" or "apply at once"; the setting `mapChatImageMode`. */
 export type MapChatImageMode = "preview" | "direct";
@@ -391,12 +394,17 @@ export function planFor(
     )
   )
     reasons.push("book_plan_edit");
+  // Moving an anchor changes what the user placed: always a plan, whatever the image mode or auto-apply say (G06a).
+  if (actions.some(action => action.kind === "move_anchor")) reasons.push("move_anchor_confirm");
   if (
     options.imageMode === "preview" &&
     actions.some(action => action.kind === "add_anchor" || action.kind === "link_anchor")
   )
     reasons.push("image_preview");
-  if (options.imageAttached && actions.some(action => !isFindImages(action) && !IMAGE_SAFE_KINDS.has(action.kind)))
+  if (
+    options.imageAttached &&
+    actions.some(action => !isFindImages(action) && action.kind !== "move_anchor" && !IMAGE_SAFE_KINDS.has(action.kind))
+  )
     reasons.push("image_other_actions");
   // Under autoApply the allow-listed actions are not held back by the other-actions rules; anything else is.
   const autoAllowed = (action: MapChatAction): boolean =>

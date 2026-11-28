@@ -6,6 +6,7 @@ const path = require('node:path');
 const { load, obsidian } = require('./support.cjs');
 
 const { TopicRuns } = load('experiences/visual-map/topic-run.ts', { obsidian });
+const { documentsSnapshot } = load('ai/reference-materials.ts', { obsidian });
 const ports = (extra = {}) => ({ running: (set => () => set)(new Set()), pendingSuggestions: (map => () => map)(new Map()), aiTasks: () => ({}), mutate: () => work => work(), progress: () => ({}), repository: () => undefined, ...extra });
 const fresh = extra => new TopicRuns(ports(extra));
 
@@ -886,7 +887,7 @@ const selectionRuns = ({ ask, mutate } = {}) => {
   h.opts = (step, over = {}) => ({
     step, signal: h.ctl.signal, model: async () => ({ model: 'mx', reasoning: 'low' }),
     readSources: async () => ({ id: 'g', name: 'g', location: 'M.md', documents: [{ path: 'a.md', content: h.sourcesNow }] }),
-    begin: group => { h.task = { sourceContent: JSON.stringify(group.documents) }; h.events.push('begin'); },
+    begin: group => { h.task = { sourceContent: documentsSnapshot(group.documents) }; h.events.push('begin'); },
     startProgress: () => ({ end: () => { h.progressEnds++; } }), buildContext: async () => ({ title: 'T', mode: 'synthesize' }),
     accepted: () => h.events.push('accepted'), current: () => h.current, mapChanged: () => h.mapChanged, recordedSources: () => h.task.sourceContent,
     found: items => h.found.push(items), noDirections: () => { h.noDir++; }, closed: () => h.closed,

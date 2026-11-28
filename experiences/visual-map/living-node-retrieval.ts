@@ -46,16 +46,19 @@ function span(value: string): { start: string; end: string } | undefined {
   return { start: day, end: day };
 }
 
+// A day range is `A..B`, `between A and B`, or A and B joined by 到／至／en dash／em dash／~／～ (a bare "and" still names two days).
 const RANGE =
-  /(?<![\w.-])(?:(\d{4}-\d\d-\d\d)\.\.(\d{4}-\d\d-\d\d)|Q([1-4])\s+((?:19|20)\d\d)|(\d{4}-\d\d-\d\d)|((?:19|20)\d\d-\d\d)|((?:19|20)\d\d))(?![\w-]|\.\.)/gi;
+  /(?<![\w.-])(?:between\s+(\d{4}-\d\d-\d\d)\s+and\s+(\d{4}-\d\d-\d\d)|(\d{4}-\d\d-\d\d)(?:\.\.|\s*[到至–—~～]\s*)(\d{4}-\d\d-\d\d)|Q([1-4])\s+((?:19|20)\d\d)|(\d{4}-\d\d-\d\d)|((?:19|20)\d\d-\d\d)|((?:19|20)\d\d))(?![\w-]|\.\.)/gi;
 const QUOTED = /「([^」]+)」|"([^"]+)"|“([^”]+)”/g;
 
 /** The one grammar for what a card prompt may authorise (a bare `YYYY` is only a preference): `YYYY`, `YYYY-MM`, `YYYY-MM-DD`,
- * `YYYY-MM-DD..YYYY-MM-DD`, `Qn YYYY`, record ids already in the card, and quoted heading paths. Anything else is plain text. */
+ * `YYYY-MM-DD..YYYY-MM-DD` (or `between A and B`, `A 到／至／–／—／~ B`), `Qn YYYY`, record ids already in the card, and quoted heading paths. Anything else is plain text. */
 export function parseLivingSelectors(prompt: string, knownIds: Iterable<string> = []): LivingSelectors {
   const ranges: LivingRange[] = [];
   for (const match of prompt.matchAll(RANGE)) {
-    const [text, from, to, quarter, quarterYear] = match;
+    const [text, betweenFrom, betweenTo, joinedFrom, joinedTo, quarter, quarterYear] = match;
+    const from = betweenFrom ?? joinedFrom;
+    const to = betweenTo ?? joinedTo;
     if (from && to) {
       const a = span(from);
       const b = span(to);

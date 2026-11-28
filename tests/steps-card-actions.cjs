@@ -100,8 +100,9 @@ const TABLE = [
   // Card toolbar (paintCardToolbar, from CARD_TOOLBAR since B08): drawn only outside topic selection; a button refused for
   // loading or a picture-book lock is not drawn; every other button runs through whenEditing (presentation, notesLoading).
   ['research', 'toolbar', 'a', 'ok ro ok al pr ms bk ok'], // if (!bookLock.ai); openTopicChat refuses an AI-locked card
-  // B08: Style (hidden under the structure lock; each popover choice also goes through mergeUnlocked).
-  ['style', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'],
+  // B08: Style (each popover choice also goes through mergeUnlocked). B19b-x (decision #62): the structure lock covers parent
+  // and order only, so Style stays under both picture-book locks.
+  ['style', 'toolbar', 'a', 'ok ro ok ok pr ms ok ok'],
   // B08: the AI card's Run (as Run card), Lock and Settings (as Edit AI card).
   ['run-stop', 'toolbar', 'ai', 'ok ro ok al pr ms bk ok'],
   ['ai-lock', 'toolbar', 'ai', 'ok ro ok ok pr ms ok ok'],
@@ -146,6 +147,8 @@ const TABLE = [
   // F01: shown only where references may change and not on a merging card (applies); the card gates otherwise.
   ['knowledge-ref-copy', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: false } }],
   ['knowledge-ref-paste', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: true } }],
+  // F09: read only; only the notes-loading gate (decision #35) greys it.
+  ['impact', 'context', 'a', 'ok ro ok ok ok ok ok ok'],
   ['remove', 'context', 'a', 'ok ro mg ok pr ms ok bk'], // single && !bookLock.structure; removeByKey → confirmRemoveNode refuses a merging branch
   // Keys (card keydown in renderNode, the view scope in installUndoScope, searchKey).
   ['add-child', 'key', 'a', 'ok ro ok ok pr ms ok bk'], // Mod+Enter: presentation/notesLoading/bookLock.structure swallowed, selection mode passed on
@@ -157,6 +160,12 @@ const TABLE = [
   ['search', 'key', null, 'ok ro ok ok pr ok ok ok'], // Mod+F: presentation || notesLoading swallowed
   // Selection bar (renderSelectionBar) and its ⋯ (openSelectionMoreMenu): only in topic selection mode; no presentation or notesLoading check.
   // B19a (P1.9): an AI-locked or merging card in the selection refuses Merge and Move to as a whole, naming the cards.
+  // B19b: Color is a batch write: presentation and loading notes refuse it too (changeSelectionColor rechecks). Parent ruling:
+  // the picture-book structure lock covers parent and order only, so a colour stays available under both book locks.
+  ['batch-color', 'toolbar', ['a', 'd'], 'ok ro lk lk pr ok ok ok'],
+  // B19c: Size gates as Color (changeSelectionSize rechecks); a size changes neither parent, order nor another card's place,
+  // so it stays available under both book locks.
+  ['batch-size', 'toolbar', ['a', 'd'], 'ok ro lk lk pr ok ok ok'],
   ['merge', 'toolbar', ['a', 'd'], 'ok ok lk lk ok ok bk ok'], // if (!bookLock.ai); aria-disabled by mergeCheck (below)
   ['multi-research', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok bk ok'],
   ['move-to', 'toolbar', ['a', 'd'], 'ok ok lk lk ok ok ok bk'], // chooseSelectedParent refuses merging branches
@@ -219,6 +228,28 @@ test('card actions: the table covers every action, and every unavailable answer 
   assert.equal(zhTW[R.aiLock], '這張卡已鎖定，不讓 AI 修改；先在工具列解除鎖定');
 });
 
+// B19c: every greyed-out reason the registry gives, filled with its own reasonArgs, reads in all three languages with no raw {n}
+// (the table's contexts, plus one and two locked cards of a selection and the selection's own reasons).
+test('card actions: every disabled reason exists in en, zh-TW and zh-CN and fills every placeholder', () => {
+  const { translate } = S.load('i18n.ts');
+  const seen = new Map();
+  const add = result => { if (!result.ok) seen.set(JSON.stringify([result.reasonKey, result.reasonArgs ?? []]), result); };
+  for (const [id, surface, target, , extra] of TABLE)
+    for (const state of CONTEXTS) add(availability(id, surface, ctxFor(target, state, extra)));
+  const locked = (...ids) => ctxFor(['a', 'd', 'b'], 'normal', { note: id => (ids.includes(id) ? { prompt: '', aiLocked: true } : { prompt: '' }) });
+  for (const surface of ['toolbar', 'more', 'context'])
+    for (const ctx of [locked('d'), locked('a', 'd'), ctxFor(['a'], 'normal'), ctxFor(['a', 'd'], 'normal', { multiResearchRunning: () => true })])
+      for (const entry of actionsFor(surface, ctx)) add(entry.availability);
+  const keys = [...seen.values()].map(result => result.reasonKey);
+  assert.ok(keys.includes('ui.selection_locked_one_0') && keys.includes('ui.selection_locked_0_1'), keys.join());
+  for (const result of seen.values())
+    for (const [name, dictionary] of [['en', en], ['zh-TW', zhTW], ['zh-CN', zhCN]]) {
+      assert.ok(dictionary[result.reasonKey]?.trim(), `${result.reasonKey} in ${name}`);
+      const text = translate(name, result.reasonKey, ...(result.reasonArgs ?? []));
+      assert.doesNotMatch(text, /\{\d+\}/, `${result.reasonKey} in ${name}: ${text}`);
+    }
+});
+
 test('card actions: selection reasons that come from the selection itself', () => {
   // mergeCheck's own reason is the bar's tooltip; Synthesize is disabled under two topics; Research is disabled while its batch runs.
   eq(availability('merge', 'toolbar', ctxFor(['a', 'd'], 'normal', { mergeBlock: () => 'ui.select_at_least_two_topics' })), { ok: false, reasonKey: 'ui.select_at_least_two_topics' });
@@ -227,9 +258,11 @@ test('card actions: selection reasons that come from the selection itself', () =
   // B19a: one locked card of three names only that card; the lock is said before mergeCheck's reason; a merging card
   // below a selected one (not itself selected) still gives Move to the old merging reason.
   const oneLocked = ctxFor(['a', 'd', 'b'], 'normal', { note: id => (id === 'd' ? { prompt: '', aiLocked: true } : { prompt: '' }), mergeBlock: () => 'ui.merge_ancestor_selected' });
-  const lockOne = { ok: false, reasonKey: 'ui.selection_locked_0_1', reasonArgs: [1, 'D'] };
+  const lockOne = { ok: false, reasonKey: 'ui.selection_locked_one_0', reasonArgs: ['D'] };
   eq(availability('merge', 'toolbar', oneLocked), lockOne);
   eq(availability('move-to', 'toolbar', oneLocked), lockOne);
+  eq(availability('batch-color', 'toolbar', oneLocked), lockOne);
+  eq(availability('batch-size', 'toolbar', oneLocked), lockOne);
   eq(availability('multi-research', 'toolbar', oneLocked), { ok: true }, 'Research is not a batch change');
   eq(availability('merge', 'toolbar', ctxFor(['a', 'b'], 'normal', { mergeBlock: () => 'ui.merge_ancestor_selected' })), { ok: false, reasonKey: 'ui.merge_ancestor_selected' });
   eq(availability('move-to', 'toolbar', ctxFor(['a'], 'normal', { isMerging: id => id === 'b' })), { ok: false, reasonKey: R.merging });
@@ -290,14 +323,15 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, focus this branch (B13), add summary (B08), select subtopics, summary bracket, tidy this branch (A10), note style, run, AI card, book |
   // add subtopic (B08: off the toolbar), add sibling, add another type | fold, remove. An AI card has Style here (not on its toolbar).
   const grouped = (surface, ctx) => actionsFor(surface, ctx).map(entry => `${entry.action.group}:${entry.action.id}`);
-  eq(grouped('more', ctxFor('ai', 'normal')), ['2:style', '3:card-settings', '3:add-summary-field', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '5:remove']);
-  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:focus-branch', '3:add-summary-field', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
+  eq(grouped('more', ctxFor('ai', 'normal')), ['2:style', '3:card-settings', '3:add-summary-field', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '4:impact', '5:remove']);
+  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:focus-branch', '3:add-summary-field', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '4:impact', '5:toggle-collapse', '5:remove']);
   // addCardMenuActions (B07): the toolbar's actions in its order, then the ⋯ list in its order (the view puts a separator between them).
   eq(ids('context', ctxFor('a', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('a', 'normal'))]);
   eq(ids('context', ctxFor('ai', 'normal')), ['research', 'open-note', ...ids('more', ctxFor('ai', 'normal'))]);
   assert.equal(action('add-other').group, 4, 'the ⋯ list puts a separator before Add another type');
-  // renderSelectionBar (B09): Move to, Merge, Research, (⋯) Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove, Selection help.
-  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['move-to', 'merge', 'multi-research', 'finish-selection']);
+  // renderSelectionBar (B09, B19b): Color, Move to, Merge, Research, (⋯) Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove, Selection help.
+  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['batch-color', 'batch-size', 'move-to', 'merge', 'multi-research', 'finish-selection']);
+  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal', { aimMap: true })), ['batch-color', 'move-to', 'merge', 'multi-research', 'finish-selection'], 'B19c: an old AIM map has no card size');
   eq(actionsFor('more', ctxFor(['a', 'd'], 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`), ['1:synthesize', '1:copy-to', '1:add-frame', '1:summary-add-selected', '1:ai-lock-selected', '2:clear-selection', '2:remove-selected', '2:selection-help']);
   // The rules B06/B07 move to: ⋯ = the card's menu actions minus the toolbar set; right-click = toolbar, separator, ⋯.
   for (const kind of ['card', 'ai-card']) {
@@ -398,6 +432,8 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('merge', ['a', 'd'], 'toolbar'), [['merge']]);
   eq(run('multi-research', ['a', 'd'], 'toolbar'), [['multiResearch']]);
   eq(run('move-to', ['a', 'd'], 'toolbar'), [['chooseParent', false]]);
+  eq(run('batch-color', ['a', 'd'], 'toolbar', { opener: 'button' }), [['openBatchColor', 'button']]);
+  eq(run('batch-size', ['a', 'd'], 'toolbar', { opener: 'button' }), [['openBatchSize', 'button']]);
   eq(run('copy-to', ['a', 'd'], 'more'), [['chooseParent', true]]);
   eq(run('synthesize', ['a', 'd'], 'more'), [['synthesize']]);
   eq(run('add-frame', ['a', 'd'], 'more'), [['addFrame']]);
@@ -457,7 +493,7 @@ test('card actions: F01 Copy as reference / Paste reference join the card list (
   for (const surface of ['toolbar', 'command', 'key', 'edge', 'canvas']) eq(refs(ids(surface, ctxFor('a', 'normal', copied))), [], surface);
   // After Add another type, before the fold / remove group.
   const grouped = actionsFor('more', ctxFor('a', 'normal', copied)).map(entry => `${entry.action.group}:${entry.action.id}`);
-  eq(grouped.slice(grouped.indexOf('4:add-other')), ['4:add-other', '4:knowledge-ref-copy', '4:knowledge-ref-paste', '5:toggle-collapse', '5:remove']);
+  eq(grouped.slice(grouped.indexOf('4:add-other')), ['4:add-other', '4:knowledge-ref-copy', '4:knowledge-ref-paste', '4:impact', '5:toggle-collapse', '5:remove']);
   const calls = recorder();
   for (const id of ['knowledge-ref-copy', 'knowledge-ref-paste']) action(id).run({ ...ctxFor('a', 'normal', copied), host: calls.host, surface: 'context' });
   eq(calls.calls.map(([name, node]) => [name, node.id]), [['copyKnowledgeRef', 'a'], ['pasteKnowledgeRef', 'a']]);
@@ -484,7 +520,9 @@ test('card actions: the view builds the context next to mapCommand; the palette,
   assert.equal(count(body('private paintCardToolbar')), 1, 'paintCardToolbar');
   assert.equal(count(body('private repaintRunTool')), 1, 'repaintRunTool');
   assert.equal(count(body('private cardKeyAction')), 1, 'B10: the map keys (cardKeyAction)');
-  assert.equal(count(view), 7, 'B08 toolbar and repaint, B10 key entry; no other entry reads the registry yet');
+  assert.equal(count(body('private async changeSelectionColor')), 1, 'B19b: the batch colour write rechecks the Color gates');
+  assert.equal(count(body('private async changeSelectionSize')), 1, 'B19c: the batch size write rechecks the Size gates');
+  assert.equal(count(view), 9, 'B08 toolbar and repaint, B10 key entry, B19b batch colour write, B19c batch size write; no other entry reads the registry yet');
   assert.equal((view.match(/CARD_ACTIONS/g) ?? []).length, 0);
   assert.match(body('private openCardMoreMenu'), /this\.addCardActions\(menu, "more", node\)/);
   assert.match(body('private addCardMenuActions'), /this\.addCardActions\(menu, "context", node,/);

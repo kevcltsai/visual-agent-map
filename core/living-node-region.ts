@@ -209,6 +209,7 @@ export function resetLivingCopyDiagnostics(metadata: Record<string, unknown>): v
     "living-node-last-attempt",
     "living-node-last-successful-check",
     "living-node-last-content-change",
+    "living-node-last-change",
     "living-node-checked",
     "living-node-outcome",
     "living-node-reason",

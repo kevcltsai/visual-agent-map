@@ -18,6 +18,8 @@ import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import { fixAgainPlan } from "../../core/book-pipeline/machine";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
+  bookProofUnfinished,
+  closingPageSkipped,
   effectiveOrder,
   mapDifference,
   readBookRole,
@@ -76,6 +78,8 @@ export interface BookBarState {
   again?: { done: number; total: number };
   /** A finished book with AI proofread problems a round could fix: what the "fix again" button and its card say (absent: no button). */
   fixAgain?: { chapters: number; items: number; calls: number; stubborn: number; statusItems: number; book: boolean };
+  /** A finished book that has no closing page (every chapter AI-locked, nothing checked): the bar shows no button to it. */
+  noClosingPage?: true;
   /** Gate 1 only: what the editor changed in the book's structure (absent when it changed nothing and refused nothing). */
   structureEdit?: BookStructureEditView;
 }
@@ -237,6 +241,7 @@ export function bookBarState(
     ...(rerunning ? { rerun: true as const } : {}),
     ...(again ? { again: { ...again } } : {}),
     ...(fixAgain?.items ? { fixAgain } : {}),
+    ...(mode === "done" && closingPageSkipped(data) ? { noClosingPage: true as const } : {}),
     ...(progress?.gateWaiting ? { gateWaiting: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
@@ -355,6 +360,9 @@ export function itemText(
   return from === to ? t("ui.book_struct_move_same_0", title) : t("ui.book_struct_move_0_1_2", title, from, to);
 }
 
+/** A count in its singular form for 1 (`…_one`) and plural otherwise (`…_0`); en needs it, zh reads the same either way. */
+const counted = (k: number, one: TranslationKey, many: TranslationKey): string => (k === 1 ? t(one) : t(many, k));
+
 /** The bar's AI numbers; "open" counts the same items the closing page lists (see the runner's `openIssuesOf`). */
 function aiNumbers(data: BookPipelineData, order: readonly string[], needsReview: number): BookBarState["ai"] {
   let fixing = 0;
@@ -368,7 +376,7 @@ function aiNumbers(data: BookPipelineData, order: readonly string[], needsReview
     fixed += slot.fixed;
   }
   if (data.bookProof) {
-    open += data.bookProof.open.length + (data.bookProof.incomplete ? 1 : 0);
+    open += data.bookProof.open.length + (bookProofUnfinished(data.bookProof) ? 1 : 0);
     fixed += data.bookProof.fixed;
   }
   return { fixing, open, fixed };
@@ -526,11 +534,16 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
       cls: "vam-book-bar-counts vam-book-done-counts",
       text: state.again
         ? t("ui.book_bar_fix_again_0_1_2", state.again.done, state.again.total, state.ai.open)
-        : t("ui.book_bar_done_0_1_2", state.structure?.chapters ?? total, state.ai.fixed, state.ai.open)
+        : t(
+            "ui.book_bar_done_0_1_2",
+            counted(state.structure?.chapters ?? total, "ui.book_bar_chapters_one", "ui.book_bar_chapters_0"),
+            counted(state.ai.fixed, "ui.book_bar_places_one", "ui.book_bar_places_0"),
+            state.ai.open
+          )
     });
     if (state.again) makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
     else {
-      if (actions.openIssues)
+      if (actions.openIssues && !state.noClosingPage)
         makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
       if (actions.fixAgain && state.fixAgain) {
         const again = makeButton(buttons, t("ui.book_fix_again"), "vam-book-fix-again", actions.fixAgain.ask);
@@ -901,6 +914,11 @@ export function bookErrorReason(error: unknown): string {
 export function bookRefusalText(error: unknown): string {
   if (error instanceof BookPipelineRunError && error.code in REFUSAL_KEY) return t(REFUSAL_KEY[error.code]);
   return t("ui.book_failed_0", bookErrorReason(error));
+}
+
+/** The notice for a book whose closing page was not written because its only gap is chapters the AI proofread skipped as locked. */
+export function lockedSkippedNotice(titles: readonly string[]): string {
+  return t("ui.book_locked_skipped_0", titles.join(t("ui.list_separator")));
 }
 
 /** Runs one runner entry; a refusal (or any error) is shown through `notify` instead of being thrown. */

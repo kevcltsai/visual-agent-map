@@ -28,6 +28,7 @@ import {
 } from "../../core/map-chat-layout";
 import { MapChatPaintScope } from "./map-chat-paint-scope";
 import type { ResumeItem, ResumeSummary } from "../../core/map-chat-resume";
+import type { ImpactItem, ImpactResult } from "../../core/map-impact";
 
 /**
  * How much of each earlier round's reply a chain keeps in history. A chain has up to {@link MAP_CHAT_CHAIN_MAX_ROUNDS} rounds in one
@@ -205,8 +206,22 @@ export interface MapChatPlanCard {
   previewNote?: string;
   /** Why Apply cannot be pressed now (read when the card is drawn and when Apply is pressed); null or absent = it can. */
   blocked?(): string | null;
+  /** Relations the reply suggests (V3.3 P4.4), each with its own Adopt; none is written by Apply. */
+  suggestions?: MapChatSuggestionRow[];
   apply(): void;
   cancel(): void;
+}
+/** One suggested relation on a plan card: the link as one line, why and from where (untrusted text), and its own Adopt. */
+export interface MapChatSuggestionRow {
+  text: string;
+  reason: string;
+  source: string;
+  state: "pending" | "adopting" | "adopted" | "failed";
+  /** Why a failed adopt wrote nothing. */
+  note?: string;
+  /** Why Adopt cannot be pressed now; null = it can. */
+  blocked(): string | null;
+  adopt(): void;
 }
 /** One card of a plan diff: its title and the fields that change (`label` empty = the card's main line, shown without a name). */
 export interface MapChatPlanDiffCard {
@@ -491,6 +506,8 @@ export interface MapChatHost {
   stateChanged?(): void;
   /** The picture the chat is about now, or null (none chosen). */
   image?(): MapChatImageInfo | null;
+  /** Why the chosen picture cannot go to the AI with the current model (shown under the chip, Send is off), or null. */
+  imageNotice?(): string | null;
   /** Calls `changed` whenever the chosen picture changes; the returned function stops listening. */
   watchImage?(changed: () => void): () => void;
   /** "AI changes to a picture": show a preview first, or apply at once (remembered). */
@@ -694,6 +711,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private resumeSummaryShown: ResumeSummary | null = null;
   /** Counts the presses and resets, so an answer that comes late is not shown after the panel moved on. */
   private resumeSummarySeq = 0;
+  private impactEl: HTMLElement | null = null;
+  /** The impact analysis shown now (F09; rebuilt in place after a language change); null while it is closed. */
+  private impactShown: ImpactResult | null = null;
   private inputEl!: HTMLTextAreaElement;
   private sendEl!: HTMLButtonElement;
   private modelEl!: HTMLSelectElement;
@@ -1848,6 +1868,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   /** Back to an empty conversation (a different map was opened). */
   reset(): void {
     this.closeResume();
+    this.closeImpact();
     this.paintScope.reset();
     this.rows = new WeakMap();
     this.messages = [];
@@ -2128,6 +2149,85 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     }
   }
 
+  // ---- impact analysis (F09): local, read only; never a message, never recorded -------------------------------------------------
+
+  /** Shows the impact of one card in the window (opened if it was folded). Built by the view from this map only. */
+  showImpact(result: ImpactResult): void {
+    this.impactShown = result;
+    this.setOpen(true);
+    this.renderImpact();
+  }
+  private closeImpact(): void {
+    this.impactShown = null;
+    if (this.impactEl) {
+      this.impactEl.empty();
+      this.impactEl.hidden = true;
+    }
+  }
+  private impactRows(box: HTMLElement, heading: string, items: readonly ImpactItem[], hidden: number): void {
+    box.createDiv({ cls: "vam-map-chat-impact-heading", text: `${heading} (${items.length + hidden})` });
+    if (!items.length) {
+      box.createDiv({ cls: "vam-map-chat-resume-empty", text: t("ui.map_chat_impact_none") });
+      return;
+    }
+    const list = box.createEl("ul", { cls: "vam-map-chat-resume-list" });
+    for (const item of items) {
+      const row = list.createEl("li", { cls: `vam-map-chat-resume-item is-${item.section}` });
+      const label = item.refId ? item.title || t("ui.map_chat_impact_reference_card") : item.title;
+      row.createSpan({ cls: "vam-map-chat-resume-text", text: `“${label}”` });
+      if (item.section === "direct")
+        row.createSpan({
+          cls: "vam-map-chat-resume-record",
+          text: item.kinds.map(kind => t(`ui.map_chat_impact_kind_${kind}`)).join(" · ")
+        });
+      else
+        row.createSpan({
+          cls: "vam-map-chat-resume-record",
+          text: t("ui.map_chat_impact_guess_0", item.matched ?? "")
+        });
+      if (this.host.topicTitle(item.nodeId) === null) {
+        row.createSpan({ cls: "vam-map-chat-resume-gone", text: t("ui.map_chat_resume_unlocatable") });
+        continue;
+      }
+      const locate = row.createEl("button", {
+        cls: "vam-map-chat-resume-locate vam-map-chat-impact-locate",
+        text: t("ui.map_chat_resume_locate"),
+        attr: { type: "button" }
+      });
+      locate.addEventListener("click", () => void this.host.locateTopic?.(item.nodeId));
+    }
+    if (hidden)
+      box.createDiv({ cls: "vam-map-chat-resume-note", text: t("ui.map_chat_impact_more_0", String(hidden)) });
+  }
+  private renderImpact(): void {
+    const box = this.impactEl;
+    const result = this.impactShown;
+    if (!box || !result) return;
+    box.empty();
+    box.hidden = false;
+    const title = t("ui.map_chat_impact_title_0", result.targetTitle);
+    box.setAttr("aria-label", title);
+    const head = box.createDiv("vam-map-chat-resume-head");
+    head.createSpan({ cls: "vam-map-chat-resume-title", text: title });
+    const close = head.createEl("button", {
+      cls: "vam-map-chat-resume-close clickable-icon",
+      attr: { type: "button", "aria-label": t("ui.map_chat_impact_close") }
+    });
+    setIcon(close, "x");
+    close.addEventListener("click", () => this.closeImpact());
+    if (result.state === "missing") {
+      box.createDiv({ cls: "vam-map-chat-resume-empty", text: t("ui.map_chat_impact_missing") });
+      return;
+    }
+    box.createDiv({ cls: "vam-map-chat-resume-note", text: t("ui.map_chat_impact_note") });
+    if (result.state === "empty") {
+      box.createDiv({ cls: "vam-map-chat-resume-empty", text: t("ui.map_chat_impact_empty") });
+      return;
+    }
+    this.impactRows(box, t("ui.map_chat_impact_direct"), result.direct, result.hidden.direct);
+    this.impactRows(box, t("ui.map_chat_impact_speculative"), result.speculative, result.hidden.speculative);
+  }
+
   private startNewConversation(): void {
     if (this.working) return;
     this.reset();
@@ -2280,6 +2380,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
     const form = this.bodyEl.createDiv("vam-map-chat-form");
+    this.impactEl = form.createDiv({ cls: "vam-map-chat-impact", attr: { role: "region" } });
+    this.impactEl.hidden = true;
     if (this.host.resumeSummary) {
       this.resumeEl = form.createDiv({ cls: "vam-map-chat-resume", attr: { role: "region" } });
       this.resumeEl.hidden = true;
@@ -2445,6 +2547,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
     this.renderResumeButton();
     this.renderResume();
+    this.renderImpact();
     this.renderPlaceholder();
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
@@ -2462,7 +2565,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       this.startResearch();
       return;
     }
+    if (this.imageNotice()) return;
     this.handOffFocus(() => this.host.send());
+  }
+  /** The explanation for a chosen picture the model cannot read; Send stays off while it shows. Only an annotated picture is sent. */
+  private imageNotice(): string | null {
+    return this.host.image?.()?.kind === "annotated" ? (this.host.imageNotice?.() ?? null) : null;
   }
   /** Runs `start` (which begins a turn); if the keyboard was in the window and fell out of it, Stop (the one control of a waiting turn) takes it. */
   private handOffFocus(start: () => void): void {
@@ -2604,6 +2712,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       if (this.draft.trim()) this.host.steer?.();
       return;
     }
+    if (this.imageNotice()) return;
     this.host.send();
   }
 
@@ -2898,6 +3007,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.modelEl.value = this.host.model();
     const shown = choices.find(choice => choice.value === this.modelEl.value)?.label;
     this.modelEl.setAttr("title", shown ? `${t("ui.map_chat_model_label")}\n${shown}` : t("ui.map_chat_model_label"));
+    // The model decides whether a chosen picture can go along.
+    this.renderChips();
   }
 
   private chipLabel(chip: MapChatChip): string {
@@ -3152,7 +3263,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
           clip(picture.kind === "annotated" ? name : picture.name)
         )
       });
+      // Only an annotated picture goes along; an ordinary one is never sent, nor one the model cannot read (the notice says so).
+      if (picture.kind === "annotated" && !this.imageNotice())
+        chip.createSpan({ cls: "vam-map-chat-chip-sent", text: t("ui.map_chat_image_sent") });
     }
+    const unreadable = this.imageNotice();
+    if (unreadable)
+      this.chipsEl.createEl("p", { cls: "vam-map-chat-image-notice", text: unreadable, attr: { role: "status" } });
+    this.sendEl.disabled = !!unreadable;
+    this.sendEl.toggleClass("is-disabled", !!unreadable);
     for (const id of this.host.selectedIds()) {
       if (dragged.has(id)) continue;
       const title = this.host.topicTitle(id);
@@ -3265,6 +3384,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         : "",
       // Whether Apply is greyed (and why) is part of the row, so redrawing after a presentation or a map switch follows it.
       message.plan?.state === "pending" && !message.plan.noApply ? `blocked:${message.plan.blocked?.() ?? ""}` : "",
+      message.plan?.state === "pending"
+        ? (message.plan.suggestions ?? []).map(row => `${row.state}:${row.blocked() ?? ""}`).join("|")
+        : "",
       message.choices
         ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map(o => o.label).join("|")}`
         : "",
@@ -3724,6 +3846,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     };
     // A picture plan lists what it will do first, then asks; other plans put the buttons first and fold the detail after them.
     if (diff) this.buildPlanDiff(card, diff);
+    if (plan.suggestions?.length) this.buildSuggestions(card, plan.suggestions);
     if (!folds) addDetail();
     // One gate for every plan: when the plan's map is not the open one or is read-only here, Apply is greyed and says why.
     const blocked = plan.noApply ? null : (plan.blocked?.() ?? null);
@@ -3760,6 +3883,46 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       plan.cancel();
       this.focusInput();
     });
+  }
+  /**
+   * The suggested relations of a waiting plan (P4.4): a heading, then per row the link, "Reason: … Source: …" and its own Adopt,
+   * greyed with the reason while it cannot be adopted. Every text from the model goes in as text.
+   */
+  private buildSuggestions(parent: HTMLElement, rows: MapChatSuggestionRow[]): void {
+    const box = parent.createDiv("vam-map-chat-suggestions");
+    box.createDiv({ cls: "vam-map-chat-plan-title", text: t("ui.map_chat_relation_suggest_heading") });
+    const list = box.createEl("ol", { cls: "vam-map-chat-plan-items" });
+    for (const row of rows) {
+      const item = list.createEl("li", { cls: `vam-map-chat-suggestion is-${row.state}` });
+      item.createDiv({ text: row.text });
+      item.createDiv({
+        cls: "vam-map-chat-plan-note",
+        text: t("ui.map_chat_relation_suggest_reason_0_1", row.reason, row.source)
+      });
+      if (row.state === "adopted" || row.state === "failed") {
+        item.createDiv({
+          cls: "vam-map-chat-plan-state",
+          text:
+            row.state === "adopted"
+              ? t("ui.map_chat_relation_suggest_adopted")
+              : (row.note ?? t("ui.map_chat_relation_suggest_failed"))
+        });
+        continue;
+      }
+      const blocked = row.blocked();
+      if (blocked !== null) item.createDiv({ cls: "vam-map-chat-plan-blocked", text: blocked });
+      const adopt = item.createEl("button", {
+        cls: "vam-map-chat-suggestion-adopt",
+        text: t("ui.map_chat_relation_suggest_adopt"),
+        attr: { type: "button" }
+      });
+      adopt.disabled = blocked !== null || row.state === "adopting";
+      adopt.addEventListener("click", () => {
+        if (row.state !== "pending") return;
+        adopt.disabled = true;
+        row.adopt();
+      });
+    }
   }
   /**
    * The cards of a plan diff: the first {@link PLAN_DIFF_OPEN} open, the rest folded under "N more cards". Before is struck through and

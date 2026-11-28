@@ -56,6 +56,8 @@ export class LivingTrial {
   private adoptionLease?: LivingLease;
   /** The error code of the last failed run, for the setup window's reason line. */
   failureCode?: string;
+  /** The failed run's error identity (name + message), so the reason can tell a "did not search" error from a provider one. */
+  failure?: { name: string; message: string };
 
   constructor(private readonly coordinator: LivingCoordinator) {}
 
@@ -97,6 +99,7 @@ export class LivingTrial {
     this.lease = lease;
     this.candidate = undefined;
     this.failureCode = undefined;
+    this.failure = undefined;
     this.status = "running";
     const current = (): boolean => lease.current() && !this.closed && this.generation === generation;
     try {
@@ -125,7 +128,10 @@ export class LivingTrial {
       if (base.revision === "empty" && !next.records.length && !next.output.text)
         throw new Error("missing-formal-result");
       if (!(await request.stillCurrent()) || !current()) {
-        if (current()) this.status = "invalid";
+        if (current()) {
+          this.status = "invalid";
+          this.failureCode = "source-changed";
+        }
         return false;
       }
       this.preview = {
@@ -142,6 +148,7 @@ export class LivingTrial {
       if (current()) {
         this.status = "error";
         this.failureCode = error instanceof Error ? error.message : String(error);
+        this.failure = { name: error instanceof Error ? error.name : "", message: this.failureCode };
       }
       return false;
     } finally {

@@ -31,6 +31,54 @@ S.integrationTest('Living Node: first commit uses real Repository guard and pres
   assert.equal((actual.match(/vam-living-node:begin/g) ?? []).length, 1);
 });
 
+S.integrationTest('Living Node: a note without a Current Summary section syncs only its frontmatter summary, body bytes unchanged, and the right pane reads it (D1-x9)', async () => {
+  for (const [fm, expected] of [['', 'Current findings'], ['summary: ""\n', 'Current findings'], ['summary: 尚未形成結論\n', 'Current findings'], ['summary: Mine\n', 'Mine']]) {
+    const f = S.fixture();
+    await f.app.vault.create(path, initial.replace('ai-card: true\n', 'ai-card: true\n' + fm));
+    const body = f.contents.get(path).replace(/^---[\s\S]*?\n---\n/, '');
+    assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+    const after = f.contents.get(path);
+    assert.ok(!after.includes('## Current Summary'));
+    assert.ok(after.includes('# Existing title\n\n## Detail\n\nManual notes, never replace.\n'));
+    assert.ok(after.includes(body.trimEnd()), 'body bytes are unchanged');
+    assert.equal((await f.repo.readNote(path)).summary, expected);
+    assert.equal((after.match(/^summary:/gm) ?? []).length, 1);
+  }
+  // The previous AI output counts as the AI's own summary: the next commit replaces it.
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const old = f.contents.get(path);
+  const base = readLivingMarkdown(old);
+  const next = request(f, { base, baseGeneration: livingGeneration(old), proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text: 'Newer findings', evidence: ['e1'] }] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  assert.equal(await commitLivingMarkdown(f.repo, next), 'written');
+  assert.equal((await f.repo.readNote(path)).summary, 'Newer findings');
+});
+
+S.integrationTest('Living Node demo 3: a newly created AI card gets frontmatter summary and Current Summary on run and on adopt (D1-x9)', async () => {
+  const f = S.fixture('en');
+  const mapPath = await f.repo.createMap('Demo map');
+  const map = await f.repo.readMap(mapPath);
+  const card = await f.repo.createNote('Demo card', 'model-a', map, mapPath, 'workspace');
+  map.nodes.push(card);
+  await f.repo.saveMap(mapPath, map);
+  await f.repo.writeAiCard(card.path, true);
+  assert.ok(f.contents.get(card.path).includes('## Current Summary'));
+  let n = 0;
+  for (const text of ['Run summary', 'Adopted summary']) {
+    n++;
+    const expectedContent = f.contents.get(card.path);
+    const base = readLivingMarkdown(expectedContent);
+    const candidate = { executionId: 'demo' + n, cardId: card.id, mapId: map.id, baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i' + n, viewSession: 'v' };
+    const r = request(f, { path: card.path, expectedContent, candidate, base, baseGeneration: livingGeneration(expectedContent),
+      proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text, evidence: ['e1'] }] } });
+    assert.equal(await commitLivingMarkdown(f.repo, r), 'written');
+    const after = f.contents.get(card.path);
+    assert.ok(new RegExp('^summary: "?' + text + '"?$', 'm').test(after), 'frontmatter summary');
+    assert.ok(new RegExp('## Current Summary\\n\\n' + text + '\\n').test(after), 'Current Summary section');
+    assert.equal((await f.repo.readNote(card.path)).summary, text);
+  }
+});
+
 S.integrationTest('Living Node write boundary: unsupported AI writers cannot overwrite even flag-only cards; manual and formal writes remain possible', async () => {
   const f = await setup();
   const before = f.contents.get(path);
@@ -290,6 +338,14 @@ S.integrationTest('Living Node trial: stale source, lock or draft invalidation c
   assert.equal(f.contents.get(path), initial);
 });
 
+S.integrationTest('Living Node trial: a source that changed during the run fails with the source-changed code, not a provider error', async () => {
+  const f = await setup();
+  const trial = new LivingTrial(new LivingCoordinator());
+  assert.equal(await trial.run(trialRequest(f, async () => proposal, { stillCurrent: async () => false })), false);
+  assert.equal(trial.state, 'invalid');
+  assert.equal(trial.failureCode, 'source-changed');
+});
+
 S.integrationTest('Living Node trial: late provider result cannot revive a closed editor', async () => {
   const f = await setup();
   const trial = new LivingTrial(new LivingCoordinator());
@@ -524,6 +580,7 @@ function livingReaderFixture() {
     constructor() { this.containerEl = { isShown: () => true }; }
     owns(owner) { return this.owner === owner; }
     async show(file, preview, owner) { this.file = file; this.preview = preview; this.owner = owner; }
+    async showOfficial(file, owner) { this.file = file; this.owner = owner; this.official = true; }
     markInvalid(owner) { if (this.owns(owner)) this.invalid = true; }
   }
   const { NodeDetailsSidebar } = S.load('experiences/visual-map/node-details-sidebar.ts',
@@ -541,8 +598,9 @@ function livingReaderFixture() {
     rightSplit: split, getLeavesOfType: () => leaf.view instanceof MarkdownView ? [leaf] : [],
     getRightLeaf: () => leaf, async revealLeaf() {}, trigger() {}, getActiveViewOfType: () => null
   };
-  const app = { workspace, metadataCache: { getFileCache: () => ({ frontmatter: { 'agent-map-node': true } }) } };
-  return { sidebar: new NodeDetailsSidebar(() => app, () => {}), leaf, calls, Reader, MarkdownView };
+  const aiCards = new Set();
+  const app = { workspace, metadataCache: { getFileCache: file => ({ frontmatter: { 'agent-map-node': true, ...(aiCards.has(file?.path) ? { 'ai-card': true } : {}) } }) } };
+  return { aiCards, sidebar: new NodeDetailsSidebar(() => app, () => {}), leaf, calls, Reader, MarkdownView };
 }
 
 S.integrationTest('Living Node reader: a late preview and close from an older editor cannot replace a newer selection', async () => {
@@ -562,6 +620,73 @@ S.integrationTest('Living Node reader: a late preview and close from an older ed
   await sidebar.restoreLivingOfficial(a, 'editor-a', true);
   sidebar.invalidateLivingTrial('editor-a');
   assert.equal(leaf.view.file.path, 'b.md');
+});
+
+S.integrationTest('D1-x11: the right pane shows an AI card through the reader (official tab), a plain card natively', async () => {
+  const { sidebar, leaf, aiCards, Reader, MarkdownView } = livingReaderFixture();
+  const ai = new S.TFile('ai.md'), plain = new S.TFile('plain.md');
+  aiCards.add('ai.md');
+  await sidebar.openDetails(ai);
+  assert.ok(leaf.view instanceof Reader);
+  assert.equal(leaf.view.official, true);
+  assert.equal(leaf.view.file.path, 'ai.md');
+  await sidebar.openDetails(plain);
+  assert.ok(leaf.view instanceof MarkdownView);
+  assert.equal(leaf.view.file.path, 'plain.md');
+  await sidebar.openDetails(ai);
+  assert.ok(leaf.view instanceof Reader);
+});
+
+S.integrationTest('D1-x11b: adopt refreshes the reader even when the metadata cache is stale; it never opens a native leaf', async () => {
+  const { sidebar, leaf, calls, aiCards, Reader } = livingReaderFixture();
+  const ai = new S.TFile('ai.md');
+  aiCards.add('ai.md');
+  await sidebar.openDetails(ai, 'editor');
+  const reader = leaf.view;
+  reader.official = false;
+  aiCards.delete('ai.md'); // metadataCache has not caught up with the adopted write yet
+  await sidebar.restoreLivingOfficial(ai, 'editor');
+  assert.equal(leaf.view, reader, 'the same reader stays');
+  assert.ok(leaf.view instanceof Reader);
+  assert.equal(leaf.view.official, true, 'its content is refreshed');
+  assert.equal(calls.some(call => call[0] === 'official'), false, 'no native leaf was opened');
+});
+
+S.integrationTest('D1-x11b: adopt leaves a native editor the user opened untouched', async () => {
+  const { sidebar, leaf, calls, aiCards, MarkdownView } = livingReaderFixture();
+  const ai = new S.TFile('ai.md');
+  aiCards.add('ai.md');
+  await sidebar.openDetails(ai, 'editor');
+  await leaf.openFile(ai); // the 「在編輯器開啟」 button
+  const editor = leaf.view;
+  const before = calls.length;
+  await sidebar.restoreLivingOfficial(ai, 'editor');
+  assert.equal(leaf.view, editor);
+  assert.ok(leaf.view instanceof MarkdownView);
+  assert.equal(calls.length, before, 'nothing was opened or replaced');
+});
+
+S.integrationTest('D1-x11b: re-selecting the same AI card keeps its open native editor; another card still switches; a closed editor returns to the reader', async () => {
+  const { sidebar, leaf, calls, aiCards, Reader, MarkdownView } = livingReaderFixture();
+  const ai = new S.TFile('ai.md'), other = new S.TFile('other.md'), plain = new S.TFile('plain.md');
+  aiCards.add('ai.md'); aiCards.add('other.md');
+  await sidebar.openDetails(ai);
+  await leaf.openFile(ai);
+  const editor = leaf.view;
+  const before = calls.length;
+  await sidebar.openDetails(ai);
+  assert.equal(leaf.view, editor, 'same card: the editor is kept');
+  assert.equal(calls.length, before);
+  await sidebar.openDetails(other);
+  assert.ok(leaf.view instanceof Reader, 'a different AI card reads in the reader');
+  await leaf.openFile(ai);
+  await sidebar.openDetails(plain);
+  assert.ok(leaf.view instanceof MarkdownView);
+  assert.equal(leaf.view.file.path, 'plain.md', 'an ordinary card opens natively');
+  await leaf.openFile(ai);
+  leaf.view = new MarkdownView(null); // the editor shows no file / was closed
+  await sidebar.openDetails(ai);
+  assert.ok(leaf.view instanceof Reader, 'once the editor is gone the next selection reads again');
 });
 
 S.integrationTest('Living Node reader: stopping during reader creation restores official content and does not poison another trial', async () => {
@@ -1339,7 +1464,9 @@ S.integrationTest('Living Node A28: a failed storage write leaves the note byte-
   assert.equal(await commitLivingMarkdown(restarted, request(f, { expectedContent: committed, candidate: { baseRevision: livingSnapshotRevision(committed) }, base: readLivingMarkdown(committed) })), 'discarded');
   assert.equal(f.contents.get(path), committed);
   assert.equal((committed.match(/vam-living-node:begin/g) ?? []).length, 1);
-  assert.equal((committed.match(/Current findings/g) ?? []).length, 1);
+  assert.equal((committed.match(/^> Current findings$/gm) ?? []).length, 1);
+  assert.equal((committed.match(/^summary: "?Current findings"?$/gm) ?? []).length, 1);
+  assert.equal((committed.match(/Current findings/g) ?? []).length, 2);
   // Derived data is rebuilt from the note bytes alone.
   const note = await restarted.readNote(path);
   assert.equal(note.livingNode.knowledgeRevision, readLivingMarkdown(committed).revision);
@@ -2503,4 +2630,86 @@ S.integrationTest('Living Node rebuild: a Living card whose derived fields reall
   const after = f.contents.get(node.path);
   assert.match(after, /Child topics: .*\[\[.*Child\]\]/);
   assert.equal(readLivingMarkdown(after).output.text, 'Result');
+});
+
+// ---- D2-8: living-node-last-change (ids + kinds only, diagnostic, only on a changed commit that has a baseline) ----
+const LAST_CHANGE = 'living-node-last-change';
+const SECRET = 'SECRET-CLAIM-TEXT-9f3';
+const appendOp = (id, claim = SECRET) => ({ kind: 'append', id, subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-27', claim, evidence: ['e1'] });
+const lastChange = content => {
+  const raw = S.obsidian.parseYaml(content.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1])[LAST_CHANGE];
+  return raw === undefined ? undefined : JSON.parse(raw);
+};
+async function committedTwice() {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const first = f.contents.get(path);
+  const base = readLivingMarkdown(first);
+  const second = request(f, { base, baseGeneration: livingGeneration(first), proposal: { baseRevision: base.revision, operations: [appendOp('r1')] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  assert.equal(await commitLivingMarkdown(f.repo, second), 'written');
+  return { f, first, second: f.contents.get(path) };
+}
+
+S.integrationTest('Living Node last change: written only for a changed commit with a baseline; ids and kinds only, never body text', async () => {
+  const { f, first, second } = await committedTwice();
+  assert.equal(first.includes(LAST_CHANGE), false, 'the first commit has no baseline, so no key');
+  assert.deepEqual(lastChange(second), { at: 't2', added: ['r1'], supplemented: [], corrected: [], disputed: [], invalidated: [], output: false });
+  const line = second.split('\n').find(l => l.startsWith(LAST_CHANGE));
+  assert.equal(line.includes(SECRET) || line.includes('Current findings'), false, 'no claim, output or evidence text in the key');
+  // A no-change commit writes nothing new into the key.
+  const base = readLivingMarkdown(second);
+  const third = request(f, { base, baseGeneration: livingGeneration(second), proposal: { baseRevision: base.revision, operations: [] }, candidate: { executionId: 'e3' }, context: { ...context, at: 't3' } });
+  assert.equal(await commitLivingMarkdown(f.repo, third), 'written');
+  assert.equal(f.contents.get(path).split('\n').find(l => l.startsWith(LAST_CHANGE)), line);
+  assert.ok(f.contents.get(path).includes('living-node-last-successful-check: "t3"'));
+});
+
+S.integrationTest('Living Node last change: failed, blocked, discarded and stale commits leave the note without the key', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const before = f.contents.get(path);
+  const base = readLivingMarkdown(before);
+  const make = extra => request(f, { base, baseGeneration: livingGeneration(before), proposal: { baseRevision: base.revision, operations: [appendOp('r1')] }, candidate: { executionId: 'e9' }, ...extra });
+  const aborted = new AbortController(); aborted.abort();
+  assert.equal(await commitLivingMarkdown(f.repo, make({ signal: aborted.signal })), 'discarded');
+  assert.equal(await commitLivingMarkdown(f.repo, make({ isCurrent: () => false })), 'discarded');
+  await assert.rejects(() => commitLivingMarkdown(f.repo, make({ proposal: { baseRevision: base.revision, operations: [appendOp('r1', '  ')] } })));
+  assert.equal(f.contents.get(path), before);
+  assert.equal(before.includes(LAST_CHANGE), false);
+});
+
+S.integrationTest('Living Node last change: the key does not change the knowledge revision or the region', async () => {
+  const { second } = await committedTwice();
+  const stripped = second.split('\n').filter(l => !l.startsWith(LAST_CHANGE)).join('\n');
+  assert.notEqual(stripped, second);
+  assert.equal(readLivingMarkdown(second).revision, readLivingMarkdown(stripped).revision);
+  assert.equal(second.match(/living-node-success-knowledge: .+/)[0], stripped.match(/living-node-success-knowledge: .+/)[0]);
+  const region = text => text.slice(text.indexOf('<!-- vam-living-node:begin'), text.indexOf('<!-- vam-living-node:end'));
+  assert.equal(region(second), region(stripped));
+});
+
+S.integrationTest('Living Node last change: a copy drops the key; share text and share scan treat it as internal', async () => {
+  const { f, second } = await committedTwice();
+  assert.ok(lastChange(second));
+  const map = { id: 'map', title: 'Map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  const copy = await f.repo.duplicateNote(path, map, 'Agent Workspace/Topics/map/Map.md', { keepTitle: true });
+  assert.equal(f.contents.get(copy.path).includes(LAST_CHANGE), false);
+  assert.equal(readLivingMarkdown(f.contents.get(copy.path)).revision, readLivingMarkdown(second).revision);
+  const shared = S.load('experiences/sharing/living-node-redaction.ts').redactLivingShareText(second);
+  assert.equal(shared.includes(LAST_CHANGE) || shared.includes('"added"'), false);
+  assert.ok(S.load('experiences/sharing/share-leak-scan.ts').INTERNAL_FIELD_NAMES.includes(LAST_CHANGE));
+});
+
+S.integrationTest('Living Node last change: an old card without the key round-trips byte-identical and reads as no baseline', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const old = f.contents.get(path);
+  assert.equal(lastChange(old), undefined);
+  const { readLivingLastChange } = S.load('experiences/visual-map/living-node-changes.ts');
+  assert.equal(readLivingLastChange(old, S.obsidian.parseYaml), undefined);
+  const base = readLivingMarkdown(old);
+  const again = request(f, { base, baseGeneration: livingGeneration(old), proposal: { baseRevision: base.revision, operations: [] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  assert.equal(await commitLivingMarkdown(f.repo, again), 'written');
+  assert.equal(f.contents.get(path).includes(LAST_CHANGE), false);
+  assert.equal(readLivingMarkdown(f.contents.get(path)).revision, base.revision);
 });

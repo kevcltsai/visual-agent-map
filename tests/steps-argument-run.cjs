@@ -9,6 +9,8 @@ const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/ru
 const model = S.load('core/argument-map/model.ts');
 const machine = S.load('core/argument-map/machine.ts');
 const { translate } = S.load('i18n.ts');
+const { describeArgumentProgress } = S.load('experiences/visual-map/argument-progress.ts');
+const { describeArgumentCard } = S.load('experiences/visual-map/argument-card.ts');
 
 const QUOTE = 'Youth unemployment rose to 9.2 percent in March';
 const URL_OK = 'https://stats.example.org/report';
@@ -2160,6 +2162,37 @@ test('D1-x3: a discarded note write does not retry the step: one model call for 
   assert.ok(r.stat.steps.includes('verdict'));
   assert.equal(r.stat.logs.filter(l => l.includes('step failed attempt=2')).length, 0, `a discarded write was retried: ${r.stat.logs.join(' | ')}`);
   assert.equal(r.stat.steps.filter(n => n === 'verdict').length, 1, r.stat.steps.join(','));
+});
+// ---- D1-x6: a discarded write says the note changed, not that the AI failed ----
+const GENERIC_AI_FAIL = { en: 'The AI reply could not be used', zh: 'AI 回覆無法使用' };
+test('D1-x6: a discarded note write pauses with its own reason on the bar and the card, not the AI-failure text', async () => {
+  let r;
+  let discard = true;
+  r = await rig({ script: { step: steps() }, ports: { updateNote: async (path, patch) => (discard && r.stat.steps.includes('verdict') ? 'discarded' : r.repo.updateNote(path, patch)) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.equal(state.run.stopReason, 'error');
+  const t = r.ports.t;
+  const bar = describeArgumentProgress(state, true, t);
+  assert.equal(bar.detail, t('ui.argument_paused_reason_write_discarded'));
+  assert.ok(!bar.detail.includes(GENERIC_AI_FAIL.zh), bar.detail);
+  const lines = describeArgumentCard(state, state.roles.conclusion, t).lines.concat(describeArgumentCard(state, state.roles.situation, t).lines).join('|');
+  assert.ok(lines.includes(t('ui.argument_paused_reason_write_discarded')), lines);
+  assert.ok(!lines.includes(t('ui.argument_paused_reason_error')), lines);
+  discard = false;
+  await r.runs.resume(r.mapPath);
+  const after = await r.state();
+  assert.equal(after.run.errorDetail, undefined, 'the detail does not outlive the pause');
+  assert.equal(after.run.phase, 'concluded');
+});
+test('D1-x6: an ordinary step error still shows the generic AI-failure text (regression)', async () => {
+  const r = await rig({ script: { step: steps({ add_needs: () => { throw new Error('provider down'); } }) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.equal(state.run.stopReason, 'error');
+  const t = r.ports.t;
+  assert.equal(describeArgumentProgress(state, true, t).detail, t('ui.argument_bar_error'));
+  assert.ok(t('ui.argument_bar_error').includes(GENERIC_AI_FAIL.zh));
 });
 test('D1-x3: a transient step error still retries once', async () => {
   const r = await rig({ script: { step: steps({ add_needs: (request, n) => { if (n === 1) throw new Error('provider hiccup'); return { needs: [{ text: 'need one' }, { text: 'need two' }] }; } }) } });

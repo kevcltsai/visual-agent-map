@@ -36,9 +36,12 @@ integrationTest('B viewport debounce: a viewport write started before unload lan
   let ready;
   const started = new Promise(resolve => { ready = resolve; });
   const process = app.vault.process;
+  let derived;
   app.vault.process = async (file, change) => {
     if (++entered === 2) ready();
     await bothHeld;
+    // Work set off from inside the viewport write (like a modify handler) after dispose must not ride on its exemption.
+    if (file.path === mapPath && !derived) derived = assert.rejects(repo.updateNote(n.path, { summary: 'set off by the viewport write' }));
     return process(file, change);
   };
   const viewport = repo.updateViewport(mapPath, { x: 11, y: 22, zoom: 1.75 });
@@ -48,7 +51,9 @@ integrationTest('B viewport debounce: a viewport write started before unload lan
   release();
   await viewport;
   await note;
-  assert.equal(contents.get(n.path), original, 'the other write is refused after dispose');
+  assert.ok(derived, 'the viewport write set off a second write');
+  await derived;
+  assert.equal(contents.get(n.path), original, 'the other writes are refused after dispose');
   const saved = (await repo.readMap(mapPath)).viewport;
   assert.deepEqual({ ...saved }, { x: 11, y: 22, zoom: 1.75 }, 'the last viewport is not lost');
   await assert.rejects(repo.updateViewport(mapPath, { x: 0, y: 0, zoom: 1 }), 'a viewport write started after dispose is refused');

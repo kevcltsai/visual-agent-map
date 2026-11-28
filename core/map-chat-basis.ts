@@ -20,6 +20,21 @@ export interface MapChatBasisIndex {
   read: { id?: string; path: string; title: string }[];
 }
 
+/**
+ * What one reply was given to read, for the line under the answer: how many notes were shown whole (cards' notes and the files of
+ * the round, research notes not counted) and whether a research note was. Decided from the round's {@link MapChatBasisIndex}
+ * only; what the model says it read never counts. Nothing read = both empty, the answer is inference.
+ */
+export interface ReplyBasis {
+  notes: number;
+  research: boolean;
+}
+export function replyBasisOf(index: MapChatBasisIndex): ReplyBasis {
+  const research = new Set(Object.keys(index.cards).filter(id => index.cards[id].research));
+  const notes = new Set(index.read.filter(entry => !(entry.id && research.has(entry.id))).map(entry => entry.path));
+  return { notes: notes.size, research: research.size > 0 };
+}
+
 /** The card ids above a card, nearest first: its parent, the parent's parent, and so on (a `new:<ref>` parent is looked up in `created`). */
 function ancestors(
   parentId: string | null,

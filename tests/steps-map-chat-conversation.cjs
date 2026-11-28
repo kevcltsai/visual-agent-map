@@ -388,7 +388,7 @@ const tick = ms => {
 };
 const Turn = load('experiences/visual-map/map-chat-conversation.ts', { obsidian: S.obsidian }, { window: fakeWindow });
 const settle = async () => { for (let i = 0; i < 8; i++) await flush(); };
-const REQUEST = () => ({ model: 'haiku', message: 'q', context: { selectedCount: 0, research: { sent: ['n1'], deferred: [] } } });
+const REQUEST = () => ({ model: 'haiku', message: 'q', context: { selectedCount: 0, research: { sent: ['n1'], deferred: [] }, basis: { cards: {}, read: [] } } });
 
 function turnRig(options = {}) {
   timers.list = [];
@@ -418,6 +418,7 @@ function turnRig(options = {}) {
     finish(reply, lines) { log.push(['finish', reply]); panel.isBusy = false; return lines; },
     fail(...args) { log.push(['fail', ...args]); panel.isBusy = false; },
     setUnreadNotes: (turn, notes) => log.push(['unread', notes]),
+    setReplyBasis: (turn, basis) => { panel.replyBasis = basis; },
     addSteer(text, mode) { log.push(['addSteer', text, mode]); if (state.noRow) return null; const row = { text, mode }; panel.steerRows.push(row); return row; },
     setSteerState: (row, mode, ...rest) => log.push(['setSteerState', row.text, mode, ...rest]),
     takeQueued() { const out = panel.queued; panel.queued = []; return out; },
@@ -1033,11 +1034,27 @@ test('releaseChatTask: no key means no unregister; a key is unregistered once an
 });
 
 test('unread research notes are told under the result; a note read in an earlier round is not', async () => {
-  const r = turnRig({ build: () => Promise.resolve({ ...REQUEST(), context: { selectedCount: 0, research: { sent: [], deferred: [{ title: 'A', oversize: true }, { title: 'B', sentBefore: true }] } } }) });
+  const r = turnRig({ build: () => Promise.resolve({ ...REQUEST(), context: { selectedCount: 0, research: { sent: [], deferred: [{ title: 'A', oversize: true }, { title: 'B', sentBefore: true }] }, basis: { cards: {}, read: [] } } }) });
   await start(r);
   r.state.requests[0].resolve(REPLY());
   await r.sending;
   assert.deepEqual(plain(first(r, 'unread')[1]), [{ title: 'A', oversize: true }]);
+});
+
+test('E4b: the line under the answer is what the request read (cards, files, research), never what the reply claims', async () => {
+  const read = { cards: { c1: { title: 'A', research: false }, r1: { title: 'R', research: true } }, read: [{ id: 'c1', path: 'A.md', title: 'A' }, { path: 'Drop.md', title: 'Drop' }, { id: 'r1', path: 'R.md', title: 'R' }] };
+  const r = turnRig({ build: () => Promise.resolve({ ...REQUEST(), context: { ...REQUEST().context, basis: read } }) });
+  await start(r); r.state.requests[0].resolve(REPLY()); await r.sending;
+  assert.deepEqual(plain(r.panel.replyBasis), { notes: 2, research: true });
+  // The reply says it read the research sources; the request carried no note at all: it is inference.
+  const n = turnRig();
+  await start(n); n.state.requests[0].resolve(REPLY([], { reply: 'I read your research sources and 3 card notes.' })); await n.sending;
+  assert.deepEqual(plain(n.panel.replyBasis), { notes: 0, research: false });
+  // A question whose reply wants a change waits on a plan card: its answer gets the line too.
+  const p = turnRig({ build: () => Promise.resolve({ ...REQUEST(), context: { ...REQUEST().context, basis: read } }) });
+  await start(p); p.state.requests[0].resolve(REPLY([act.child], { changeRequested: false })); await p.sending;
+  assert.ok(names(p.log).includes('showPlan'), names(p.log).join());
+  assert.deepEqual(plain(p.panel.replyBasis), { notes: 2, research: true });
 });
 
 test('the plan apply ends through the instance flushSteers (a replaced one is called), after the settle', async () => {

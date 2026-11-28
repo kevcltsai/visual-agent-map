@@ -8012,6 +8012,58 @@ test('P4 unread research: a note that did not fit is told as read next round, on
   eq(basisOf(z.parts.log()), ['「瀏覽器工具」這輪放不下，下一輪讀。', '「完整手冊」太長，沒有讀。']); z.setLanguage('en');
 });
 
+test('E4b basis: the reply line counts what the context builder actually sent whole: card notes and files, research separately; a Detail left out or a cut file is not read', () => {
+  const { replyBasisOf } = load('core/map-chat-basis.ts');
+  const ref = (id, detail) => ({ id, title: id, summary: '', detail, path: `${id}.md` });
+  const outline = ['a', 'b', 'c', 'd', 'r'].map(id => ({ id, title: id, summary: '', parentId: null, depth: 0 }));
+  const base = { mapTitle: 'm', outline, snippets: [], files: [], history: [] };
+  // a and c are sent whole; b is past the Detail budget; d has an empty Detail (nothing to read).
+  const two = buildMapChatContext({ ...base, selected: [ref('a', 'x'.repeat(60)), ref('b', 'y'.repeat(60))], references: [ref('c', 'z'.repeat(10)), ref('d', '')], detailBudget: 80 });
+  eq(replyBasisOf(two.basis), { notes: 2, research: false });
+  const files = buildMapChatContext({ ...base, selected: [], references: [], files: [{ path: 'Notes/A.md', content: 'short' }, { path: 'Notes/Big.md', content: 'w'.repeat(300_000) }] });
+  eq(replyBasisOf(files.basis), { notes: 1, research: false }, 'a file cut to its beginning was not read whole');
+  const research = buildMapChatContext({ ...base, selected: [], references: [], researchNotes: [{ id: 'r', title: 'R', path: 'r.md', detail: 'web text' }] });
+  eq(replyBasisOf(research.basis), { notes: 0, research: true });
+  const none = buildMapChatContext({ ...base, selected: [ref('a', 'x')], references: [], detailBudget: 0 });
+  eq(replyBasisOf(none.basis), { notes: 0, research: false }, 'the outline alone is no note: the answer is inference');
+});
+
+test('E4b basis: the line under the answer shows the notes read, the research read, then inference; nothing read is inference alone; three languages', () => {
+  const tags = root => classTexts(root, 'vam-map-chat-reply-basis-tag');
+  const f = panelFixture(); f.panel.setOpen(true); const turn = f.panel.begin('q'); f.panel.finish('Answer.', []);
+  eq(tags(f.parts.log()), [], 'no basis given (a restored or failed reply): no line');
+  f.panel.setReplyBasis(turn, { notes: 2, research: true });
+  eq(tags(f.parts.log()), ['Read 2 notes', 'Read research sources', 'Inference']);
+  eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), [], 'the result-line basis block is a different thing and stays empty');
+  f.panel.setReplyBasis(turn, { notes: 1, research: false }); eq(tags(f.parts.log()), ['Read 1 note', 'Inference']);
+  f.panel.setReplyBasis(turn, { notes: 0, research: false }); eq(tags(f.parts.log()), ['Inference']);
+  eq(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-reply-basis')).length, 1, 'exactly one line under the reply');
+  for (const [language, want] of [['zh-TW', ['讀到 2 份筆記', '讀到研究來源', '推論']], ['zh-CN', ['读到 2 份笔记', '读到研究来源', '推论']]]) {
+    const z = panelFixture(); z.setLanguage(language); z.panel.setOpen(true); const zt = z.panel.begin('q'); z.panel.finish('好', []);
+    z.panel.setReplyBasis(zt, { notes: 2, research: true }); eq(tags(z.parts.log()), want, language);
+    z.panel.setReplyBasis(zt, { notes: 0, research: false }); eq(tags(z.parts.log()), [want[2]], language);
+    z.setLanguage('en');
+  }
+});
+
+integrationTest('E4b view: the line under the answer follows the notes the request carried, not the reply; a reply that claims to have read sources with nothing read is inference', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const tags = () => classTexts(chat.logEl, 'vam-map-chat-reply-basis-tag');
+  chainReplies(h, say('I read your research sources and every card note.', [], '', false));
+  h.type('what contradicts what?'); await h.view.sendMapChat();
+  const blind = contextOf(h.control.requests[0]);
+  assert.ok(![...blind.selected, ...blind.references].some(item => item.detail), 'this request carried no note');
+  eq(tags(), ['Inference'], 'the model said it read; the program read nothing');
+  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-reply-basis')).length, 1);
+  await h.repo.updateNote(h.node('a').path, { detail: 'Body A' }); await h.repo.updateNote(h.node('c').path, { detail: 'Body C' }); await h.view.hydrate();
+  chat.addTopicReference(h.ids.c); h.view.selection.setSelected(h.ids.a);
+  chainReplies(h, say('They disagree on timing.', [], '', false));
+  h.type('and now?'); await h.view.sendMapChat();
+  const sent = contextOf(h.control.requests[1]); const read = [...sent.selected, ...sent.references].filter(item => item.detail).length;
+  assert.equal(read, 2, 'both notes went out whole');
+  eq(tags().slice(-2), [`Read ${read} notes`, 'Inference']);
+});
+
 // ---- ticket 06: an automatic chain is one history turn ----------------------------------------------------------------
 
 /** One user turn answered, then `rounds` automatic rounds (2..rounds+1) with replies `reply(round)`. */

@@ -34,7 +34,11 @@ export class LivingReaderView extends ItemView {
   private generation = 0;
   private rendered?: Component;
 
-  constructor(leaf: WorkspaceLeaf) {
+  constructor(
+    leaf: WorkspaceLeaf,
+    /** 「在編輯器開啟」: through the right pane, so it knows the native editor is the user's. */
+    private readonly openInEditor?: (file: TFile) => Promise<void>
+  ) {
     super(leaf);
   }
 
@@ -219,7 +223,10 @@ export class LivingReaderView extends ItemView {
     if (!this.draft) {
       // Hand edits happen in the native editor; this is the visible, keyboard-reachable way there.
       const edit = host.createEl("button", { text: t("ui.living_node_open_in_editor"), attr: { type: "button" } });
-      edit.addEventListener("click", () => void this.leaf.openFile(file));
+      edit.addEventListener(
+        "click",
+        () => void (this.openInEditor ? this.openInEditor(file) : this.leaf.openFile(file))
+      );
     }
     if (this.tab === "trial") {
       host.createDiv({

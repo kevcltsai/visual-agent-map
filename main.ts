@@ -9,7 +9,8 @@ import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/merma
 import { KnowledgeIndex } from "./experiences/visual-map/knowledge-retrieval";
 import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
 import { CARD_COMMANDS, commandTitleKey } from "./experiences/visual-map/card-actions";
-import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
+import { NodeDetailsSidebar, type PaneIntent } from "./experiences/visual-map/node-details-sidebar";
+import type { SidePanelRoom } from "./experiences/visual-map/living-editor-room";
 import { LIVING_READER_VIEW, LivingReaderView } from "./experiences/visual-map/living-node-reader";
 import type { LivingChangeSummary } from "./experiences/visual-map/living-node-changes";
 import { livingCoordinator } from "./experiences/visual-map/living-node-runtime";
@@ -1111,9 +1112,12 @@ export default class VisualAgentMapPlugin extends Plugin {
   );
   private outlineSourceView: VisualAgentMapView | null = null;
   private settingTab!: VisualAgentMapSettingTab;
+  /** The side-panel room of the open AI editor: the right pane unfolds the right panel for a trial through it. */
+  private sidePanelRoom: SidePanelRoom | null = null;
   private readonly nodeDetailsSidebar = new NodeDetailsSidebar(
     () => this.app,
-    leaf => this.styleNodeLeaf(leaf)
+    leaf => this.styleNodeLeaf(leaf),
+    () => this.sidePanelRoom
   );
   private ribbonIcon: HTMLElement | null = null;
   private localizedCommands: { command: Command; key: TranslationKey }[] = [];
@@ -1474,8 +1478,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     this.ready = initialize;
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
-    this.registerView(LIVING_READER_VIEW, leaf => new LivingReaderView(leaf));
+    this.registerView(LIVING_READER_VIEW, leaf => this.nodeDetailsSidebar.createReader(leaf));
     this.app.workspace.onLayoutReady(() => this.nodeDetailsSidebar.closeEmptyReaders());
+    // A pane tab the user closed (Cmd+W, detach) is noticed when it goes.
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.nodeDetailsSidebar.layoutChanged()));
     this.registerView(
       OUTLINE_VIEW_TYPE,
       leaf =>
@@ -2842,13 +2848,9 @@ export default class VisualAgentMapPlugin extends Plugin {
       }).catch(error => console.error("Visual Agent Map external rename reconciliation", error));
     }, 500);
   }
-  /** Called after the node-details pane revealed its leaf; returns the unsubscribe. */
-  onDetailsReveal(listener: () => void): () => void {
-    return this.nodeDetailsSidebar.onReveal(listener);
-  }
-  /** True while the node-details pane is revealing its leaf. */
-  detailsRevealing(): boolean {
-    return this.nodeDetailsSidebar.revealing();
+  /** The open AI editor's side-panel room (null: closed; a room passed with null is cleared only if it is still the one). */
+  useSidePanelRoom(room: SidePanelRoom | null, closing?: SidePanelRoom): void {
+    if (room || !closing || this.sidePanelRoom === closing) this.sidePanelRoom = room;
   }
   /** The node-details sidebar counts as open only while its pane is actually visible. */
   detailsShown(): boolean {
@@ -2868,8 +2870,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   invalidateLivingTrial(owner: string): void {
     this.nodeDetailsSidebar.invalidateLivingTrial(owner);
   }
-  restoreLivingOfficial(file: TFile | undefined, owner: string, release = false): Promise<void> {
-    return this.nodeDetailsSidebar.restoreLivingOfficial(file, owner, release);
+  restoreLivingOfficial(file: TFile | undefined, owner: string, release = false, aiCard?: boolean): Promise<void> {
+    return this.nodeDetailsSidebar.restoreLivingOfficial(file, owner, release, aiCard);
   }
   /** An outline row click: moves the map to the topic and opens its note beside it. */
   async revealFromOutline(path: string): Promise<void> {
@@ -2893,8 +2895,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     if (failed) new Notice(failed);
   }
-  openDetails(file: TFile, owner?: string): Promise<void> {
-    return this.nodeDetailsSidebar.openDetails(file, owner);
+  openDetails(file: TFile, owner?: string, intent?: PaneIntent, aiCard?: boolean): Promise<void> {
+    return this.nodeDetailsSidebar.openDetails(file, owner, intent, aiCard);
   } /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
   isNoteTaskBusy(path: string): boolean {
     if (this.running.has(path) || this.activeTasks.has(path) || this.quickExpandPending.has(path)) return true;

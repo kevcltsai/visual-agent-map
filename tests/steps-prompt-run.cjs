@@ -973,9 +973,64 @@ test('popover room (D1-x10c): a pane squeezed to 0px by both side panels still f
   assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'a 0px pane is squeezed, not unmeasured');
 });
 
+// The plugin's real right pane (NodeDetailsSidebar, its Living reader made through createReader as main.ts registers it)
+// on the harness's right dock: Obsidian's revealLeaf unfolds a folded split and switches to the tab, then the layout
+// resizes. The shell entries forward to it as main.ts does.
+let paneModule;
+async function realPane(h, right, resize) {
+  class ItemView {
+    constructor(leaf) { this.leaf = leaf; this.app = leaf.app; this.containerEl = { isShown: () => leaf.shown(), toggleClass() {}, getBoundingClientRect: () => ({ top: 0 }) }; this.contentEl = element('div'); }
+    registerEvent() {}
+    getState() { return {}; }
+    async setState() {}
+  }
+  class MarkdownView {
+    constructor(leaf) { this.leaf = leaf; this.app = leaf.app; this.file = null; this.containerEl = { isShown: () => leaf.shown(), toggleClass() {}, getBoundingClientRect: () => ({ top: 0 }) }; }
+    getViewType() { return 'markdown'; }
+    async setState(state) { this.file = h.app.vault.getAbstractFileByPath(state?.file) || null; }
+  }
+  paneModule ??= S.load('experiences/visual-map/node-details-sidebar.ts',
+    { obsidian: { ...obsidian, ItemView, MarkdownView, View: class {}, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, markdown, el) => { el.rendered = markdown; } } } },
+    { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: dom.createSvg, createEl: (tag, value) => element(tag, value), createSpan: value => element('span', typeof value === 'string' ? { cls: value } : value) });
+  Object.assign(right, { children: [], active: null });
+  let room = null;
+  const sidebar = new paneModule.NodeDetailsSidebar(() => h.app, () => {}, () => room);
+  class Leaf {
+    constructor() { this.app = h.app; this.view = { getViewType: () => 'empty', containerEl: { isShown: () => false, getBoundingClientRect: () => ({ top: 0 }) } }; }
+    getRoot() { return right; }
+    shown() { return !right.collapsed && right.active === this; }
+    async setViewState({ type, state = {} }) {
+      if (this.view.getViewType() !== type) { this.view = type === 'markdown' ? new MarkdownView(this) : sidebar.createReader(this); await this.view.onOpen?.(); }
+      await this.view.setState(state, { history: false });
+    }
+    async openFile(file) { await this.setViewState({ type: 'markdown', state: { file: file.path } }); }
+    getViewState() { return { type: this.view.getViewType(), state: this.view.getState() }; }
+    detach() { right.children = right.children.filter(leaf => leaf !== this); if (right.active === this) right.active = right.children.at(-1) ?? null; }
+  }
+  if (!h.app.vault.on) Object.assign(h.app.vault, { on: () => ({}), offref() {} });
+  Object.assign(h.app.workspace, {
+    getLeavesOfType: type => right.children.filter(leaf => leaf.view.getViewType() === type),
+    iterateAllLeaves: callback => right.children.forEach(callback),
+    getRightLeaf: () => { const leaf = new Leaf(); right.children.push(leaf); right.active ??= leaf; return leaf; },
+    async revealLeaf(leaf) {
+      if (!right.children.includes(leaf)) return;
+      if (right.collapsed) right.expand();
+      right.active = leaf;
+      await null;
+      resize();
+    },
+    trigger() {}, getActiveViewOfType: () => null
+  });
+  const plugin = h.view.plugin;
+  plugin.useSidePanelRoom = (next, closing) => { if (next || !closing || room === closing) room = next; };
+  for (const name of ['detailsShown', 'openDetails', 'showLivingTrial', 'invalidateLivingTrial', 'restoreLivingOfficial'])
+    plugin[name] = (...args) => sidebar[name](...args);
+  return sidebar;
+}
+
 // D1-x10d: every combination of how the side panels start, the window width and what the user does while the editor is
-// open. A small layout model: each expanded panel takes 300px, the central pane gets the rest; the reader reveals the right
-// panel (as Obsidian's revealLeaf does) after the editor opened, reporting it through the reveal hook.
+// open. A small layout model: each expanded panel takes 300px, the central pane gets the rest; the real right pane shows
+// the card in its reader before the editor opens, takes it on opening and gets the official note back on closing (D1-x10e).
 for (const leftFolded of [false, true])
   for (const rightFolded of [false, true])
     for (const width of [600, 650, 700])
@@ -987,19 +1042,11 @@ for (const leftFolded of [false, true])
           h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
           const centre = () => Math.max(0, width - (left.collapsed ? 0 : 300) - (right.collapsed ? 0 : 300));
           Object.defineProperty(h.overlay, 'clientWidth', { get: centre, configurable: true });
-          let listener = null, revealing = false;
-          h.view.plugin.onDetailsReveal = fn => { listener = fn; return () => { listener = null; }; };
-          h.view.plugin.detailsRevealing = () => revealing;
-          const reveal = async () => {
-            await null;
-            revealing = true;
-            right.expand();
-            h.view.makeRoomForAiCard(); // the resize the reveal causes
-            revealing = false;
-            listener?.();
-          };
-          h.view.plugin.openDetails = reveal;
-          h.view.plugin.restoreLivingOfficial = reveal; // closing puts the official note back in the reader, revealing it
+          // The card is in the reader of an open right panel; a folded one the user folded before the editor opened.
+          const sidebar = await realPane(h, right, () => h.view.makeRoomForAiCard());
+          right.collapsed = false;
+          await sidebar.openDetails(h.app.vault.getAbstractFileByPath(h.node('A').path), undefined, 'user', true);
+          right.collapsed = rightFolded;
           h.view.openAiCardPopover(h.node('A'));
           await new Promise(resolve => setTimeout(resolve, 0));
           h.view.makeRoomForAiCard();

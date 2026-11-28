@@ -267,7 +267,7 @@ import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
-import { EditorRoom, type SideDock } from "./living-editor-room";
+import { SidePanelRoom, type SideDock } from "./living-editor-room";
 import { livingSaveReason, livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
@@ -1773,9 +1773,7 @@ export class VisualAgentMapView extends ItemView {
     viewSession: string;
     adoption?: LivingAdoptionCheck;
     /** The room this editor makes among the side panels, given back when it closes. */
-    room: EditorRoom;
-    /** Ends the subscription to the reader's reveals. */
-    stopReveal?: () => void;
+    room: SidePanelRoom;
   } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
@@ -13482,9 +13480,10 @@ export class VisualAgentMapView extends ItemView {
     this.history.push({ label, undo: () => restore(newValues, oldValues), redo: () => restore(oldValues, newValues) });
     this.updateHistoryButtons();
   }
-  private openDetails(node: MapNode): void {
+  /** Shows the card in the right pane: the user's request, or (`follow`) a selection the pane follows when it is shown. */
+  private openDetails(node: MapNode, intent: "user" | "follow" = "user"): void {
     void this.plugin
-      .openDetails(this.plugin.repo.file(node.path))
+      .openDetails(this.plugin.repo.file(node.path), undefined, intent, this.notes.get(node.id)?.aiCard)
       .catch(error => new Notice(error instanceof Error ? error.message : String(error)));
   }
   private async travel(redo: boolean): Promise<void> {
@@ -16951,7 +16950,7 @@ export class VisualAgentMapView extends ItemView {
     // A click selects; an already open details sidebar follows the selection, a closed one stays closed.
     const wasSelected = this.selection.state.selected === node.id;
     this.selectMapNode(node);
-    if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
+    if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node, "follow");
     // A click that moved the open topic chat to this card is done; the card text editor would take the input focus from it.
     if (!this.switchTopicChat(node, event.target)) this.openCardTextEditor(event, card, node, wasSelected);
   }
@@ -17269,14 +17268,10 @@ export class VisualAgentMapView extends ItemView {
       trial,
       controller,
       viewSession,
-      room: new EditorRoom(this.sideDocks())
+      room: new SidePanelRoom(this.sideDocks())
     };
-    // The reader revealing its leaf can unfold the right panel: that is VAM's doing, not the user's, and it takes width.
-    const room = this.aiCardOpen.room;
-    this.aiCardOpen.stopReveal = this.plugin.onDetailsReveal?.(() => {
-      room.accept(this.sideDock("right"));
-      if (this.aiCardOpen?.room === room) this.makeRoomForAiCard();
-    });
+    // While the editor is open its room is the only part of VAM that folds or unfolds a side panel (the trial preview too).
+    this.plugin.useSidePanelRoom?.(this.aiCardOpen.room);
     win.mount(overlay);
     this.makeRoomForAiCard();
     if (node)
@@ -17287,7 +17282,7 @@ export class VisualAgentMapView extends ItemView {
         .catch(() => undefined);
     if (node) {
       void this.plugin
-        .openDetails(this.plugin.repo.file(node.path), viewSession)
+        .openDetails(this.plugin.repo.file(node.path), viewSession, "editor", note?.aiCard)
         .then(() => {
           // The reader took width in the right panel: the room is measured again.
           if (current() && this.aiCardOpen) this.makeRoomForAiCard();
@@ -17310,14 +17305,15 @@ export class VisualAgentMapView extends ItemView {
       node && !this.closed && !this.plugin.repo.isDisposed()
         ? this.app.vault.getAbstractFileByPath(node.path)
         : undefined;
-    // Putting the official note back can reveal the right panel again: the side panels go back only after that.
+    const aiCard = node ? this.notes.get(node.id)?.aiCard : undefined;
+    // The pane is given back first (it never unfolds a side panel), then the side panels.
     void Promise.resolve(
-      this.plugin.restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true)
+      this.plugin.restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true, aiCard)
     )
       .catch(() => {})
       .finally(() => {
-        open.stopReveal?.();
         open.room.restore();
+        this.plugin.useSidePanelRoom?.(null, open.room);
       });
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
@@ -17458,8 +17454,6 @@ export class VisualAgentMapView extends ItemView {
     const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
     if (!overlay) return;
     const width = overlay.clientWidth ?? 0;
-    // A resize while the reader is revealing its leaf comes from VAM unfolding the right panel, not from the user.
-    if (this.plugin.detailsRevealing?.()) this.aiCardOpen.room.accept(this.sideDock("right"));
     this.aiCardOpen.room.fit(width);
   }
   private sideDock(side: "left" | "right"): SideDock | undefined {
@@ -28318,7 +28312,7 @@ export class VisualAgentMapView extends ItemView {
         } else {
           this.applySelectionChange(this.selection.click(node.id));
           if (this.notesLoading()) return;
-          if (this.plugin.detailsShown()) this.openDetails(node);
+          if (this.plugin.detailsShown()) this.openDetails(node, "follow");
           // A press that never moved is a click: on the title or summary text it opens that text for typing.
           onPlainClick?.(e, wasSelected);
         }

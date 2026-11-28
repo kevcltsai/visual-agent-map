@@ -13,10 +13,10 @@ export interface SideDock {
  * Obsidian's side panels can squeeze the central pane to nothing, which hides the editor's buttons. While the editor is
  * open, a pane under the minimum folds one expanded panel at a time (the left one first; the right one holds the reader),
  * each at most once. When it closes, every panel returns to how it was when the editor opened, except a panel the user
- * opened or folded meanwhile: the user's last action wins. A panel VAM itself changed (the reader revealing the right
- * panel) is reported through `accept`, so it is not mistaken for the user's action.
+ * opened or folded meanwhile: the user's last action wins. While the editor is open this room is the only part of VAM that
+ * folds or unfolds a side panel (`fit`, and `unfold` for the trial preview), so any other change is the user's.
  */
-export class EditorRoom {
+export class SidePanelRoom {
   private readonly before = new Map<SideDock, boolean>();
   private readonly expected = new Map<SideDock, boolean>();
   /** Panels the user opened or folded while the editor was open, with the user's last choice (true: folded). */
@@ -31,13 +31,21 @@ export class EditorRoom {
   }
 
   /**
-   * VAM changed this panel itself (the reader revealed it): its state now is expected, not the user's choice. A panel the
-   * editor had folded that VAM unfolded again may be folded again.
+   * VAM unfolds this panel for the editor (the trial preview in a hidden right pane, living-node.md L180): VAM's change,
+   * not the user's, so it is folded back on close; it is not folded again for width meanwhile.
    */
-  accept(dock: SideDock | null | undefined): void {
-    if (!dock || !this.expected.has(dock)) return;
-    this.expected.set(dock, dock.collapsed);
-    if (!dock.collapsed) this.folded.delete(dock);
+  unfold(dock: SideDock): void {
+    if (!this.expected.has(dock)) return;
+    this.notice();
+    if (!dock.collapsed) return;
+    dock.expand();
+    this.expected.set(dock, false);
+    this.folded.add(dock);
+  }
+
+  /** Whether this panel is folded because the editor folded it for width (not by the user). */
+  folds(dock: SideDock): boolean {
+    return dock.collapsed && this.folded.has(dock) && !this.byUser.has(dock);
   }
 
   /** Folds one panel when the pane is under the minimum (0 counts: both panels can squeeze it shut); true when it did. */
@@ -56,7 +64,6 @@ export class EditorRoom {
   restore(): void {
     this.notice();
     for (const dock of this.docks) {
-      // VAM may have changed a panel the user set (the reader revealing the right one on close): the user's choice wins.
       const was = this.byUser.has(dock) ? this.byUser.get(dock) : this.before.get(dock);
       if (was === undefined || dock.collapsed === was) continue;
       if (was) dock.collapse();

@@ -486,6 +486,45 @@ test('B32-x: Esc folds an outline reveal back, and a click on a card off the ope
   assert.equal(g.card('deep'), undefined);
 });
 
+test('B32-y: a real pointerdown, pointerup, click on a card off the opened path folds an outline reveal; a card on it keeps it', async () => {
+  const reveal = async h => { h.view.viewportEl.toggleClass = () => {}; h.doc.querySelector = () => null; const path = h.view.map.nodes.find(n => n.id === h.ids.deep).path; await h.view.revealPath(path); await h.settle(); };
+  const realClick = async (h, key) => {
+    const card = h.card(key); const target = { closest: () => null };
+    card.handlers.get('pointerdown')({ target, button: 0, clientX: 5, clientY: 5, pointerId: 1, metaKey: false, ctrlKey: false });
+    card.handlers.get('pointerup')({ type: 'pointerup', target, button: 0, clientX: 5, clientY: 5, pointerId: 1, metaKey: false, ctrlKey: false });
+    h.view.suppressClickUntil = Date.now() + 250; // what a finished press sets, so the click that follows is held back
+    card.handlers.get('click')?.({ target, metaKey: false, ctrlKey: false });
+    await h.settle();
+  };
+  const h = await harness();
+  h.doc.addEventListener = () => {}; h.doc.removeEventListener = () => {};
+  await reveal(h);
+  await realClick(h, 'deep');
+  assert.ok(h.view.searchOpen, 'a real click inside the opened branch keeps it');
+  await realClick(h, 'alpha');
+  assert.equal(h.view.searchOpen, null, 'a real click elsewhere folded it back');
+  assert.equal(h.card('deep'), undefined);
+});
+
+test('B32-y: after a reveal focus is back on the map so Esc folds it; Esc in the chat input does not', async () => {
+  const reveal = async h => { h.view.viewportEl.toggleClass = () => {}; h.doc.querySelector = () => null; const path = h.view.map.nodes.find(n => n.id === h.ids.deep).path; await h.view.revealPath(path); await h.settle(); };
+  const esc = (h, target) => { const e = { key: 'Escape', target, defaultPrevented: false, prevented: false, preventDefault() { this.prevented = true; }, stopPropagation() {} }; h.view.onMapKeydown(e); return e; };
+  const el = (match) => ({ closest: selector => (selector.split(',').some(s => match.includes(s.trim())) ? el(match) : null), classList: { contains: () => false } });
+  const h = await harness();
+  const chatButton = el(['.vam-map-chat', 'button']);
+  h.doc.activeElement = chatButton;
+  await reveal(h);
+  assert.equal(h.doc.activeElement, h.view.contentEl, 'the reveal gave focus back to the map content');
+  assert.ok(h.view.searchOpen, 'the reveal is open');
+  assert.equal(esc(h, el(['.vam-map-chat', 'textarea'])).prevented, false, 'Esc in the chat input is the chat\'s');
+  assert.equal(esc(h, chatButton).prevented, false, 'Esc on a chat control is still the chat\'s');
+  assert.ok(h.view.searchOpen, 'still open after Esc inside the chat window');
+  assert.equal(h.doc.activeElement, h.view.contentEl, 'focus still on the map content');
+  assert.equal(esc(h, el([])).prevented, true, 'Esc on the map content is taken');
+  await h.settle();
+  assert.equal(h.view.searchOpen, null, 'folded back');
+});
+
 test('B14: a hit that is already on screen jumps without repainting', async () => {
   const h = await harness({ collapse: false });
   h.press(h.card('alpha')); h.type('plan');

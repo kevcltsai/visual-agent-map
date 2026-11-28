@@ -535,6 +535,13 @@ export function effectiveOrder(data: Pick<BookPipelineData, "order" | "removed">
   return gone?.length ? data.order.filter(id => !gone.includes(id)) : data.order;
 }
 /**
+ * Whether the whole-book proofread counts as one unfinished item. Chapters it left out as locked are named one by one instead (each
+ * "skipped (locked)", not open), so with any of them the unfinished flag adds no item. The bar's count and the closing page both use it.
+ */
+export function bookProofUnfinished(proof: Pick<AiProofState, "incomplete" | "locked">): boolean {
+  return !!proof.incomplete && !proof.locked?.length;
+}
+/**
  * ai-flows AI lock: whether the book has no closing page (and the bar no button to it). The runner decides it from the page's own items
  * and saves it (`closingSkipped`); a save from before that field falls back to the older rule: every card left out as locked and
  * nothing checked or open.

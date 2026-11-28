@@ -125,6 +125,7 @@ import {
 import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
+  bookProofUnfinished,
   effectiveOrder,
   BOOK_EXPAND_PASSES,
   mapDifference,
@@ -4277,7 +4278,7 @@ export class BookPipelineRuns {
           problem: "",
           reason: "proof_locked_skipped"
         });
-      if (state.bookProof.incomplete && !locked.length) incomplete("");
+      if (bookProofUnfinished(state.bookProof)) incomplete("");
     }
     for (const id of effectiveOrder(state)) {
       const info = drive.cards.get(id);

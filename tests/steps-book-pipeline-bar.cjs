@@ -638,6 +638,19 @@ test('B33-z bar: the button follows the runner\'s saved decision (closingSkipped
   assert.ok(one(draw(aiData({ phase: 'done', aiProof: { a: slot({ done: true }), b: slot({ done: true }), c: slot({ done: true }), d: slot({ done: true }) }, bookProof: allLocked, closingSkipped: false })), 'vam-book-open-issues'), 'the saved decision wins over the older rule');
   assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book })), 'vam-book-open-issues'), 'an older save, partly locked: the button as before');
 });
+test('B33-v bar: a chapter skipped as locked is not counted as still open; only a real failure next to it is', () => {
+  setUiLanguage('en');
+  const done = { done: true, checked: 2 };
+  const proof = { a: slot(done), b: slot(done), c: slot(done), d: slot(done) };
+  const counts = data => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, () => 'checked'), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return one(bar, 'vam-book-done-counts').text; };
+  const partLocked = slot({ done: true, checked: 3, incomplete: true, locked: ['b'] });
+  assert.match(counts(aiData({ phase: 'done', aiProof: proof, bookProof: partLocked, closingSkipped: true })), /· 0 still open$/, 'locked b, the rest solved: nothing open');
+  const oneFailed = { ...proof, c: slot({ done: true, incomplete: true }) };
+  assert.match(counts(aiData({ phase: 'done', aiProof: oneFailed, bookProof: partLocked })), /· 1 still open$/, 'locked b and a failed c: only c');
+  const notLocked = slot({ done: true, checked: 3, incomplete: true });
+  assert.match(counts(aiData({ phase: 'done', aiProof: proof, bookProof: notLocked })), /· 1 still open$/, 'an unfinished whole-book check with nothing locked is still open');
+  setUiLanguage('zh-TW');
+});
 test('B33-z: the notice for chapters skipped as locked names them, in each UI language', () => {
   setUiLanguage('zh-TW');
   assert.equal(bundle.lockedSkippedNotice(['甲', '乙']), 'AI 校對略過了已鎖定的章：甲、乙。其他章都沒有問題。');

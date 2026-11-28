@@ -18,6 +18,7 @@ import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import { fixAgainPlan } from "../../core/book-pipeline/machine";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
+  bookProofUnfinished,
   closingPageSkipped,
   effectiveOrder,
   mapDifference,
@@ -372,7 +373,7 @@ function aiNumbers(data: BookPipelineData, order: readonly string[], needsReview
     fixed += slot.fixed;
   }
   if (data.bookProof) {
-    open += data.bookProof.open.length + (data.bookProof.incomplete ? 1 : 0);
+    open += data.bookProof.open.length + (bookProofUnfinished(data.bookProof) ? 1 : 0);
     fixed += data.bookProof.fixed;
   }
   return { fixing, open, fixed };

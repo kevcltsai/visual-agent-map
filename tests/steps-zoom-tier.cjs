@@ -141,7 +141,7 @@ test('a tier change redraws the edges once but a height change it causes is neve
     v.map.id = 'm';
     v.zoomTier = tier;
     v.cardHeightOf = id => heights[id];
-    v.cardEls = new Map(Object.keys(heights).map(id => [id, { get offsetHeight() { return heights[id]; } }]));
+    v.cardEls = new Map(Object.keys(heights).map(id => [id, { get offsetHeight() { return heights[id]; }, dataset: {}, style: { height: '' } }]));
     v.hiddenTab = () => false; v.noteLoad = null; v.renderHold = 0; v.history = {}; v.dragging = false;
     v.ringTidyNeeded = () => false;
     v.heightsSeen = new Map(); v.heightsSeenMap = null; v.settling = false;
@@ -224,4 +224,47 @@ test('B12 share: ringHeights in detail equal the normal ones, and none are writt
   assert.equal(JSON.stringify([...normal]), JSON.stringify([['a', 120], ['b', 100]]), 'control: normal reads the drawn heights');
   assert.equal(JSON.stringify([...ringOf('detail')]), JSON.stringify([['a', 120], ['b', 100]]));
   assert.equal(JSON.stringify([...ringOf('overview')]), JSON.stringify([['a', 120], ['b', 100]]));
+});
+
+// ---- B12-x: the detail tier keeps each card's own frame ----
+function fakeCard(height) {
+  const card = {
+    natural: height, tall: false, style: { height: '', removeProperty(k) { this[k] = ''; } }, dataset: {}, classes: new Set(),
+    get offsetHeight() { return this.style.height !== '' ? parseFloat(this.style.height) : (this.tall ? this.natural * 2 : this.natural); },
+    get scrollHeight() { return this.tall ? this.natural * 2 : this.natural; },
+    get clientHeight() { return this.offsetHeight; },
+    toggleClass(name, on) { on ? this.classes.add(name) : this.classes.delete(name); },
+    querySelector() { return {}; }
+  };
+  return card;
+}
+function detailView(heights) {
+  const { view } = makeView(1);
+  const cards = Object.fromEntries(Object.entries(heights).map(([id, h]) => [id, fakeCard(h)]));
+  view.cardEls = new Map(Object.entries(cards));
+  view.ensureClipParts = () => {};
+  view.mapNodeById = () => ({});
+  view.viewportEl.toggleClass = (name, on) => { if (name === 'is-zoom-detail') for (const c of Object.values(cards)) c.tall = on; };
+  return { view, cards };
+}
+
+test('B12-x: at 150% each card keeps its normal frame height (nothing grows, so nothing overlaps); back at normal it is released', () => {
+  const { view, cards } = detailView({ a: 119, b: 140 });
+  view.map.viewport.zoom = 1.5; view.transform();
+  assert.equal(view.zoomTier, 'detail');
+  assert.deepEqual([cards.a.offsetHeight, cards.b.offsetHeight], [119, 140], 'frames are the normal heights');
+  assert.ok(cards.a.classes.has('is-clipped'), 'the extra lines are cut inside the frame, with the fade');
+  view.map.viewport.zoom = 1; view.transform();
+  assert.equal(view.zoomTier, 'normal');
+  assert.equal(cards.a.style.height, '', 'normal zoom: the hold is gone');
+  assert.ok(!cards.a.classes.has('is-clipped'));
+});
+
+test('B12-x: a card painted inside the detail tier is held at its last normal height', () => {
+  const { view, cards } = detailView({ a: 119 });
+  view.map.id = 'm'; view.heightsSeen = new Map([['a', 119]]); view.heightsSeenMap = 'm';
+  view.zoomTier = 'detail'; cards.a.tall = true;
+  view.hiddenTab = () => false; view.noteLoad = null;
+  view.settleCardHeights();
+  assert.equal(cards.a.offsetHeight, 119);
 });

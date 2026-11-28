@@ -42,6 +42,8 @@ export interface ExportSceneSource {
   map(): MapDocument | null;
   noteTitle(id: string): string | undefined;
   cards(): Iterable<[string, HTMLElement]>;
+  /** A card's layout (normal-zoom) height; the export box uses it so the zoom tier at export time never changes the card. */
+  layoutHeight?(id: string): number | undefined;
   texts(): Iterable<HTMLElement>;
   edges(): readonly Element[];
   styleRoot(): Element;
@@ -66,11 +68,11 @@ export interface MapExportPorts extends ExportSceneSource {
   notice(text: string): void;
 }
 
-const boxOf = (card: HTMLElement): { x: number; y: number; width: number; height: number } => ({
+const boxOf = (card: HTMLElement, layoutHeight?: number): { x: number; y: number; width: number; height: number } => ({
   x: card.offsetLeft,
   y: card.offsetTop,
   width: card.offsetWidth,
-  height: card.offsetHeight
+  height: layoutHeight || card.offsetHeight
 });
 /**
  * The lines of an exported text block. The block's real horizontal padding + border is 14, and the exporter's width guess runs wider than
@@ -155,7 +157,7 @@ export async function collectExportScene(
   for (const [id, card] of source.cards()) {
     const node = map.nodes.find(item => item.id === id);
     if (!node) continue;
-    const box = boxOf(card);
+    const box = boxOf(card, source.layoutHeight?.(id));
     grow(box.x, box.y, box.width, box.height);
     const style = savedLook(card);
     const titleEl = card.querySelector<HTMLElement>(".vam-card-title");

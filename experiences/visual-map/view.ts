@@ -13695,6 +13695,7 @@ export class VisualAgentMapView extends ItemView {
       map: () => this.map,
       noteTitle: id => this.notes.get(id)?.title,
       cards: () => this.cardEls,
+      layoutHeight: id => this.layoutCardHeightOf(id),
       texts: () => this.textEls.values(),
       edges: () => Array.from(this.edgesEl?.children ?? []),
       styleRoot: () => this.viewportEl ?? this.contentEl,
@@ -15935,6 +15936,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     // Notes are still being read: cards are not at their final size, so nothing is recorded or tidied. The final paint is this map's first look.
     if (this.noteLoad) return;
+    // B12-x: cards painted while in the detail tier get the normal height they had (a no-op when none is new).
+    if (this.zoomTier === "detail") this.holdDetailHeights(false);
     // A zoom tier (overview / detail) changes card heights on purpose: that is never a reason to push a neighbour. Looked at again at normal zoom.
     if (this.zoomTier === "overview" || this.zoomTier === "detail") return;
     // A chat reply or an active drag has not finished placing its cards. Preserve the previous heights until it is done.
@@ -23050,10 +23053,49 @@ export class VisualAgentMapView extends ItemView {
     // The zoom tier (overview / normal / detail) is a class on the viewport: toggled only when the tier changes or the viewport element is new.
     const tier = nextZoomTier(this.zoomTier, zoom);
     if (tier !== this.zoomTier || this.zoomTierEl !== this.viewportEl) {
+      const was = this.zoomTier;
       this.zoomTier = tier;
       this.zoomTierEl = this.viewportEl ?? null;
+      // Entering detail: the cards are still at their normal height, so it is read before the class makes them taller.
+      if (tier === "detail" && was !== "detail") this.holdDetailHeights(true);
       this.viewportEl?.toggleClass("is-zoom-overview", tier === "overview");
       this.viewportEl?.toggleClass("is-zoom-detail", tier === "detail");
+      if (tier === "detail" && was !== "detail") this.remeasureDetailClips();
+      if (tier !== "detail" && was === "detail") this.releaseDetailHeights();
+    }
+  }
+  /**
+   * B12-x: the detail tier shows more of a card inside its own frame; the frame keeps its normal height (nothing is pushed,
+   * export and share read the same box). The card is held at that height and cuts the rest by the existing .is-clipped layout (fade and ellipsis).
+   * `live`: read the heights from the DOM (entering the tier); otherwise from the last normal-zoom heights (cards painted inside the tier).
+   */
+  private holdDetailHeights(live: boolean): void {
+    if (!this.cardEls) return;
+    for (const [id, card] of this.cardEls) {
+      if (card.dataset.detailHold || card.style.height !== "") continue;
+      const height = live
+        ? card.offsetHeight
+        : this.heightsSeenMap === this.map?.id
+          ? this.heightsSeen.get(id)
+          : undefined;
+      if (!height) continue;
+      card.style.height = `${height}px`;
+      card.dataset.detailHold = "1";
+      this.ensureClipParts(card);
+      if (!live) this.measureClipped(card);
+    }
+  }
+  /** Cards with a set height changed their content lines too: their clipped state is looked at again after the class is on. */
+  private remeasureDetailClips(): void {
+    for (const card of this.cardEls?.values() ?? []) if (card.style.height !== "") this.measureClipped(card);
+  }
+  private releaseDetailHeights(): void {
+    for (const card of this.cardEls?.values() ?? []) {
+      if (card.dataset.detailHold) {
+        card.style.removeProperty("height");
+        delete card.dataset.detailHold;
+        card.toggleClass("is-clipped", false);
+      } else if (card.style.height !== "") this.measureClipped(card);
     }
   }
   /** The zoom tier the viewport classes show now, and the viewport element they were put on. */

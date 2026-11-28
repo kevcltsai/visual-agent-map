@@ -407,3 +407,12 @@ test('map export run: frames and summary brackets: missing geometry is skipped, 
   const textOnly = await run.collectExportScene(source({ cards: new Map(), texts: () => [card()] }), () => true);
   assert.ok(textOnly.scene);
 });
+
+test('B12-x: the export box takes the layout height, so a detail-tier card (taller offsetHeight) exports at its normal height', async () => {
+  reset();
+  const tall = card({ h: 238 });
+  const got = await run.collectExportScene(source({ cards: new Map([['a', tall]]), layoutHeight: () => 119 }), () => true);
+  assert.equal(got.scene.cards[0].h, 119);
+  const plainGot = await run.collectExportScene(source({ cards: new Map([['a', card({ h: 119 })]]) }), () => true);
+  assert.equal(plainGot.scene.cards[0].h, 119, 'without the port the DOM height is used');
+});

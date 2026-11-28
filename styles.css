@@ -46,6 +46,9 @@
 .is-focus-mode .vam-toolbar > :not(.vam-book-bar), .is-focus-mode .vam-canvas-controls, .is-focus-mode .vam-map-chat-toggle { display: none; }
 .is-focus-mode .vam-toolbar.is-focus-empty { display: none; }
 .vam-exit-focus { position: absolute; z-index: 5; top: 12px; right: 12px; border: 1px solid var(--background-modifier-border); background: var(--background-primary); box-shadow: var(--shadow-s); }
+.vam-branch-focus { position: absolute; z-index: 5; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); }
+.vam-branch-focus-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-branch-focus-key { color: var(--text-faint); }
 .vam-icon-button:disabled { opacity: 0.4; cursor: default; }
 .vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .vam-canvas-overlay > * { pointer-events: auto; }
@@ -2181,3 +2184,17 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-canvas.has-selection-bar.has-selection-why .vam-zoom-controls, .vam-canvas.has-selection-bar.has-selection-why .vam-canvas-hint { margin-bottom: 68px; }
 .menu-item.vam-menu-item-has-why { flex-wrap: wrap; }
 .vam-menu-item-why { flex-basis: 100%; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: normal; }
+/* Knowledge references (P4.3): a dashed read-only card that shows a card of another map; it is not a card of this map. */
+.vam-view .vam-knowledge-refs { position: absolute; left: 0; top: 0; width: 1px; height: 1px; }
+.vam-view .vam-knowledge-ref { position: absolute; box-sizing: border-box; width: max-content; min-width: 140px; max-width: 260px; padding: 6px 10px; border: 1px dashed var(--text-muted); border-radius: 8px; background: var(--background-secondary); color: var(--text-normal); font-size: var(--font-ui-small); line-height: 1.4; cursor: pointer; user-select: none; touch-action: none; }
+.vam-view .vam-knowledge-ref:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-view .vam-knowledge-ref-source { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-view .vam-knowledge-ref-source:empty { display: none; }
+.vam-view .vam-knowledge-ref-title { font-weight: var(--font-semibold); overflow-wrap: anywhere; }
+.vam-view .vam-knowledge-ref.is-loading { opacity: 0.7; cursor: progress; }
+.vam-view .vam-knowledge-ref.is-unavailable { cursor: default; border-color: var(--text-error); }
+.vam-view .vam-knowledge-ref.is-unavailable .vam-knowledge-ref-title { color: var(--text-error); font-weight: normal; }
+.vam-view .vam-knowledge-ref-remove { margin-top: 4px; font-size: var(--font-ui-smaller); }
+.vam-knowledge-ref-modal .vam-knowledge-ref-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-knowledge-ref-modal .vam-knowledge-ref-detail { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow-y: auto; }
+@media (max-width: 480px) { .vam-view .vam-knowledge-ref { max-width: 200px; } }

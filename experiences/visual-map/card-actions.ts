@@ -21,6 +21,8 @@ export type CardActionId =
   | "add-sibling"
   | "research"
   | "toggle-collapse"
+  | "focus-branch"
+  | "leave-focus"
   | "open-note"
   | "rename"
   | "add-summary-field"
@@ -32,6 +34,8 @@ export type CardActionId =
   | "tidy-branch"
   | "note-style"
   | "add-other"
+  | "knowledge-ref-copy"
+  | "knowledge-ref-paste"
   | "book"
   | "remove"
   | "reorder-sibling"
@@ -98,6 +102,12 @@ export interface CardActionHost {
   toggleCollapse(node: MapNode, byKey: boolean): void;
   reorderSibling(node: MapNode, offset: -1 | 1): void;
   remove(node: MapNode): void;
+  /** B13: shows the card's branch alone (enterBranchFocus); leaves it (exitBranchFocus). */
+  enterBranchFocus(node: MapNode): void;
+  exitBranchFocus(): void;
+  /** Copy as reference (copyAsKnowledgeRef) / Paste reference under the card (pasteKnowledgeRef). */
+  copyKnowledgeRef(node: MapNode): void;
+  pasteKnowledgeRef(node: MapNode): void;
   zoomFit(): void;
   zoomReset(): void;
   search(): void;
@@ -134,6 +144,10 @@ export interface CardActionContext {
   managedMap: boolean;
   /** The empty canvas offers its buttons: the map has no topics and the map chat is not building, planning or asking. */
   emptyCanvas: boolean;
+  /** One branch is shown alone (B13's branch focus). */
+  branchFocused: boolean;
+  /** This map's references may change here (canEditKnowledgeRefs) and the card is not merging; a card was copied as a reference. */
+  knowledgeRefs: { editable: boolean; copied: boolean };
   note(id: string): PromptNoteRef | undefined;
   isMerging(id: string): boolean;
   isArgumentCard(id: string): boolean;
@@ -348,7 +362,32 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     available: ctx => gate(ctx, [...CARD, "bookStructure"]),
     run: ctx => ctx.host.cardSettings(card(ctx))
   },
-  // B13's "focus on this branch" goes here (order 65, group 3), after Card settings as the ⋯ list has it.
+  {
+    id: "focus-branch",
+    titleKey: "ui.focus_branch",
+    icon: "focus",
+    scope: ["card", "ai-card"],
+    surfaces: ["more", "context", "command"],
+    order: 65,
+    group: 3,
+    // A card with subtopics; while one branch is focused the map's "Leave focus" is offered instead. enterBranchFocus refuses
+    // while presenting; selection mode has no card entries.
+    applies: ctx => hasChildren(ctx) && !ctx.branchFocused,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.enterBranchFocus(card(ctx))
+  },
+  {
+    id: "leave-focus",
+    titleKey: "ui.exit_branch_focus",
+    icon: "minimize-2",
+    scope: ["map"],
+    surfaces: ["command"],
+    order: 66,
+    group: 3,
+    applies: ctx => ctx.branchFocused,
+    available: () => OK,
+    run: ctx => ctx.host.exitBranchFocus()
+  },
   {
     id: "add-summary-field",
     titleKey: "ui.card_tool_add_summary",
@@ -491,6 +530,31 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     run: (ctx, options) => {
       if (options?.menu) ctx.host.fillAddMenu(options.menu, card(ctx));
     }
+  },
+  {
+    id: "knowledge-ref-copy",
+    titleKey: "ui.knowledge_ref_copy",
+    icon: "link",
+    scope: ["card", "ai-card"],
+    surfaces: ["context"],
+    order: 163,
+    group: 4,
+    // Only where the map's references may change (not AIM, not picking, not loading) and not on a merging card.
+    applies: ctx => ctx.knowledgeRefs.editable,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.copyKnowledgeRef(card(ctx))
+  },
+  {
+    id: "knowledge-ref-paste",
+    titleKey: "ui.knowledge_ref_paste",
+    icon: "clipboard-paste",
+    scope: ["card", "ai-card"],
+    surfaces: ["context"],
+    order: 166,
+    group: 4,
+    applies: ctx => ctx.knowledgeRefs.editable && ctx.knowledgeRefs.copied,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.pasteKnowledgeRef(card(ctx))
   },
   {
     id: "toggle-collapse",

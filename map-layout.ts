@@ -86,7 +86,7 @@ export function layoutOf(map: { layout?: MapLayout; aim?: unknown } | null | und
 }
 
 /** Direction, column distance and card gap an arrange call works with; a bare direction string means standard spacing. */
-function resolveLayout(layout: LayoutKind | MapLayout): { direction: LayoutKind; column: number; gap: number } {
+export function resolveLayout(layout: LayoutKind | MapLayout): { direction: LayoutKind; column: number; gap: number } {
   const direction = typeof layout === "string" ? layout : layout.direction;
   const spacing = typeof layout === "string" ? undefined : layout.spacing;
   return { direction, ...SPACING[isStoredLayoutSpacing(spacing) ? spacing : "standard"] };

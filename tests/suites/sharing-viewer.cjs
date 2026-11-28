@@ -531,6 +531,34 @@ test('sharing viewer fit: the first view and Show all include a free text block 
   }
 });
 
+test('P4.3: a shared reference draws its title as plain text with the mark, and one without a title says unavailable (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-refs-'));
+  try {
+    const data = payload();
+    const water = data.nodes.find(node => node.id === 'water');
+    data.refs = [
+      { id: 'ref-a', parentId: 'water', x: water.x + 300, y: water.y + 10, title: 'Original <b>card</b>' },
+      { id: 'ref-b', parentId: 'water', x: water.x + 300, y: water.y + 120 }
+    ];
+    const source = path.join(directory, 'payload.json');
+    fs.writeFileSync(source, JSON.stringify(data));
+    const out = path.join(directory, 'refs.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => (await send('Runtime.evaluate', { expression: `(() => ({ refs: [...document.querySelectorAll('.vam-ref-node')].map(e => ({ text: e.textContent, unavailable: e.classList.contains('is-unavailable'), markup: e.querySelector('b') !== null })), cards: document.querySelectorAll('.vam-node').length }))()`, returnByValue: true })).result.value);
+    assert.equal(report.refs.length, 2, 'both references are drawn');
+    assert.equal(report.refs[0].unavailable, false);
+    assert.match(report.refs[0].text, /Original <b>card<\/b>/, 'the title is text, not markup');
+    assert.equal(report.refs[0].markup, false);
+    assert.equal(report.refs[1].unavailable, true);
+    assert.match(report.refs[1].text, /Unavailable reference/);
+    assert.equal(report.cards, data.nodes.length, 'references are not topics');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
 test('P1.10a/P1.10b: a file exported by an older version, with a top-level goal, node tier and manual and removed markers, opens with every card, no goal chip, no tier and only status markers (headless Chrome)', async t => {
   const chrome = findChrome();
   if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');

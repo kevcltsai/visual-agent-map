@@ -64,6 +64,22 @@ import {
 } from "./canvas-items";
 import { AnchorModal, ImageNoteModal, type AnchorTarget } from "./annotated-image-modals";
 import {
+  appendKnowledgeRef,
+  checkAddKnowledgeRef,
+  knowledgeRefsUnder,
+  moveKnowledgeRef,
+  readKnowledgeRefs,
+  refreshPathHints,
+  removeKnowledgeRef,
+  referenceOutline,
+  referenceTitle,
+  resolveKnowledgeRefs,
+  visibleKnowledgeRefs,
+  type KnowledgeRef,
+  type RefResolution,
+  type ReferenceOutline
+} from "./knowledge-refs";
+import {
   avoidBracketObstacles,
   bracketGeometry,
   summaryTextBox,
@@ -108,7 +124,7 @@ import {
   type ChatWriteBaseline,
   type ChatRun
 } from "./chat-action-writer";
-import { TopicSelection, type SelectionChange } from "./topic-selection";
+import { TopicSelection, type SelectionChange, type SelectionSnapshot } from "./topic-selection";
 import {
   anchorLineKey,
   RELATION_NAME_KEY,
@@ -212,6 +228,7 @@ import {
   saveLivingConfig,
   validateLivingStructure,
   livingRemovalConsumers,
+  livingNoteCandidates,
   livingReplacedSources,
   livingCrossCut,
   type LivingConfigSave
@@ -288,6 +305,7 @@ import {
   arrangeNewTree,
   cardsChangedHeight,
   cardsOverlapAny,
+  resolveLayout,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
   layoutOf,
@@ -300,10 +318,11 @@ import {
   type LayoutSpacing,
   type PushHints
 } from "../../map-layout";
-import type { PushBox, PushDecoration } from "../../layouts/push";
+import { pushAffected, type PushBox, type PushDecoration } from "../../layouts/push";
 import {
   arrangeMapWithRings,
   arrangeNewBranchWithRings,
+  ringTreeIds,
   arrangeNewTreeWithText,
   directionWithRings,
   ringImagesInTheWay,
@@ -1769,6 +1788,12 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
   private textEls = new Map<string, HTMLElement>();
+  /** What the references on this map resolved to the last time they were read (memory only; never saved). */
+  private refResolved = new Map<string, RefResolution>();
+  private refLayerEl: HTMLElement | null = null;
+  private refResolveSeq = 0;
+  private shareRefTitles = new Map<string, string | null>();
+  private refResolveTimer: number | null = null;
   /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
   private focusTextResizeId: string | null = null;
   /** Image element per image id, rebuilt on every render (the place mode finds its image here). */
@@ -1839,6 +1864,25 @@ export class VisualAgentMapView extends ItemView {
     if (!map.canvasItems?.some(item => item.kind === "summary")) return;
     map.canvasItems = pruneSummaries(map.canvasItems, map.nodes);
     if (!map.canvasItems.length) delete map.canvasItems;
+  }
+  /** Pushes apart what the cards `moving` (grown or just unfolded, at their stored places) cover, with the siblings after it; every other card keeps its x and y. */
+  private pushFrom(map: MapDocument, moving: ReadonlySet<string>): void {
+    const items = map.canvasItems ?? [];
+    const hints = pushHintsFor(map, this.cardEls, this.summaryEls);
+    map.nodes = pushAffected(map.nodes, moving, {
+      fixed: new Set([...(hints.fixed ?? []), ...ringTreeIds(map.nodes, items)]),
+      boxOf: hints.boxOf,
+      heightOf: this.cardHeightOf,
+      decorations: hints.decorations ?? [],
+      layout: { direction: layoutOf(map).direction, gap: resolveLayout(layoutOf(map)).gap },
+      settleMoving: true
+    }).nodes;
+  }
+  /** True when new, unfolded or grown cards are placed locally (right, left, balanced, down, up); radial, timeline, fishbone and argument maps lay the whole map out (decision #18). */
+  private placesLocally(map: MapDocument): boolean {
+    if (readArgumentMap(map).kind === "usable") return false;
+    const kind = layoutOf(map).direction;
+    return kind !== "radial" && kind !== "timeline" && kind !== "fishbone";
   }
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
@@ -2043,6 +2087,13 @@ export class VisualAgentMapView extends ItemView {
   private presentation: PresentationState | null = null;
   /** Focus mode: the header and the canvas controls are hidden, one exit button stays; Esc or that button ends it. */
   private focusMode = false;
+  /** One branch shown alone (view-only): what to put back on leaving. Never written to Map.md. */
+  private branchFocus: {
+    id: string;
+    viewport: { x: number; y: number; zoom: number };
+    selection: SelectionSnapshot;
+    scroll: { left: number; top: number };
+  } | null = null;
   private presentationBarEl: HTMLElement | null = null;
   /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
   private coverObserver: IntersectionObserver | null = null;
@@ -2346,8 +2397,16 @@ export class VisualAgentMapView extends ItemView {
     if (typeof vault?.on === "function") {
       this.registerEvent(vault.on("delete", () => this.mapSourcesControl?.refreshMapSourcesUi()));
       this.registerEvent(vault.on("rename", () => this.mapSourcesControl?.refreshMapSourcesUi()));
+      // A reference shows what its original is now: any rename or delete, or a save of a file it was read from, reads it again.
+      this.registerEvent(vault.on("delete", () => this.invalidateKnowledgeRefs()));
+      this.registerEvent(vault.on("rename", () => this.invalidateKnowledgeRefs()));
       // A chapter note of the open picture book was saved: a review box in it may have been ticked.
-      this.registerEvent(vault.on("modify", file => this.onBookNoteModified(file.path)));
+      this.registerEvent(
+        vault.on("modify", file => {
+          this.invalidateKnowledgeRefs(file.path);
+          this.onBookNoteModified(file.path);
+        })
+      );
     }
     // A note whose image or `topic-cover` just changed redraws only its own cover.
     const cache = this.app.metadataCache;
@@ -2447,6 +2506,12 @@ export class VisualAgentMapView extends ItemView {
       // Still claimed: unhandled, Obsidian would activate a sidebar note with this same Esc and focus its editor.
       event.preventDefault();
       event.stopPropagation();
+      return;
+    }
+    if (event.key === "Escape" && this.branchFocus) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.exitBranchFocus();
       return;
     }
     if (event.key === "Escape" && this.focusMode) {
@@ -3042,6 +3107,56 @@ export class VisualAgentMapView extends ItemView {
     area.setCssProps({ "--vam-summary-height": "auto" });
     area.setCssProps({ "--vam-summary-height": `${area.scrollHeight}px` });
   }
+  /** Shows only `id` and its branch (by its own collapsed flags). Viewport, selection and scroll come back on leaving; nothing is written. */
+  enterBranchFocus(id: string): boolean {
+    if (!this.map || this.closed || this.presentation || !this.map.nodes.some(node => node.id === id)) return false;
+    const branch = new Set([id, ...descendants(this.map.nodes, id)]);
+    const saved = this.branchFocus;
+    this.branchFocus = {
+      id,
+      viewport: saved?.viewport ?? { ...this.map.viewport },
+      selection: saved?.selection ?? this.selection.stash(),
+      scroll: saved?.scroll ?? { left: this.viewportEl?.scrollLeft ?? 0, top: this.viewportEl?.scrollTop ?? 0 }
+    };
+    this.selection.restore(this.branchFocus.selection, branch);
+    this.render();
+    this.fitCards(branch);
+    return true;
+  }
+  exitBranchFocus(): boolean {
+    const saved = this.branchFocus;
+    if (!saved || !this.map) return false;
+    this.branchFocus = null;
+    this.map.viewport = { ...saved.viewport };
+    this.selection.restore(saved.selection, new Set(this.map.nodes.map(node => node.id)));
+    this.render();
+    this.viewportEl?.scrollTo?.(saved.scroll.left, saved.scroll.top);
+    return true;
+  }
+  /** The bar over the canvas while one branch is shown alone. */
+  private renderBranchFocusBar(parent: HTMLElement): void {
+    const focus = this.branchFocus;
+    if (!focus) return;
+    const node = this.mapNodeById(focus.id);
+    if (!node) {
+      this.branchFocus = null;
+      return;
+    }
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (
+      let item: MapNode | undefined = node;
+      item && !seen.has(item.id);
+      item = this.mapNodeById(item.parentId ?? "")
+    ) {
+      seen.add(item.id);
+      names.unshift(this.notes.get(item.id)?.title ?? item.id);
+    }
+    const bar = parent.createDiv("vam-branch-focus");
+    bar.createSpan({ cls: "vam-branch-focus-label", text: t("ui.branch_focus_label", names.join(" › ")) });
+    this.button(bar, t("ui.exit_branch_focus"), () => this.exitBranchFocus());
+    bar.createSpan({ cls: "vam-branch-focus-key", text: "Esc" });
+  }
   private setFocusMode(on: boolean): void {
     if (this.focusMode === on) return;
     this.focusMode = on;
@@ -3286,6 +3401,7 @@ export class VisualAgentMapView extends ItemView {
     else this.topicChatRecords?.close();
     this.closeMapSearch(false);
     this.exitPresentation(false);
+    this.branchFocus = null;
     // A run-all batch stops with its view: nothing it has in flight is written afterwards.
     this.promptBatch?.leave?.();
     this.dropCanvasInteractionModes();
@@ -3622,7 +3738,10 @@ export class VisualAgentMapView extends ItemView {
     })().catch(error => errorNotice(error));
   }
   private async persist(): Promise<void> {
-    if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
+    if (!this.map || !this.path) return;
+    // One branch shown alone is view-only: Map.md keeps the camera from before the focus.
+    const map = this.branchFocus ? { ...this.map, viewport: { ...this.branchFocus.viewport } } : this.map;
+    await this.plugin.repo.saveMap(this.path, map);
   }
   private captureViewSession(): () => boolean {
     const path = this.path;
@@ -3752,6 +3871,7 @@ export class VisualAgentMapView extends ItemView {
       if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
       this.closeMapSearch(false);
       this.exitPresentation(false);
+      this.branchFocus = null;
     }
     if (this.viewportTimer !== null) {
       await this.flushPendingViewport();
@@ -4698,7 +4818,10 @@ export class VisualAgentMapView extends ItemView {
     const members = ringMemberIds(map.nodes, items);
     const plain = members.size ? new Set([...resized].filter(id => !members.has(id))) : resized;
     if (plain.size && cardsOverlapAny(map.nodes, plain, this.cardHeightOf)) {
-      this.arrangeAll(map);
+      // Where cards are placed locally, only what a grown card covers (and the siblings after it) is pushed.
+      if (this.placesLocally(map)) this.pushFrom(map, plain);
+      // A card that still covers another (a card under its own parent, a push that found no sibling to move) falls back to the whole layout.
+      if (!this.placesLocally(map) || cardsOverlapAny(map.nodes, plain, this.cardHeightOf)) this.arrangeAll(map);
       return true;
     }
     if (!members.size) return false;
@@ -5189,8 +5312,10 @@ export class VisualAgentMapView extends ItemView {
     this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
     this.tidyKeys = event => {
       const target = event.target as HTMLElement | null;
-      const inField = !!target?.closest?.("button, input, textarea, [contenteditable]");
-      if (event.key === "Escape" && !event.isComposing && !inField) {
+      // Esc is left to text fields only; the focused Apply button still cancels. Enter on a button presses that button.
+      const inText = !!target?.closest?.("input, textarea, [contenteditable]");
+      const inField = inText || !!target?.closest?.("button");
+      if (event.key === "Escape" && !event.isComposing && !inText) {
         event.preventDefault();
         event.stopPropagation();
         this.clearTidy();
@@ -5366,7 +5491,27 @@ export class VisualAgentMapView extends ItemView {
   private exportExchange(format: "opml" | "freemind"): void {
     const map = this.map;
     if (!map || !this.path) return;
-    void exportMapWithNotice(this.app.vault, { mapPath: this.path, map, notes: this.notes, format });
+    const mapPath = this.path;
+    void this.referenceOutlineOf(map).then(references =>
+      exportMapWithNotice(this.app.vault, { mapPath, map, notes: this.notes, format, references })
+    );
+  }
+  /** The reference lines an outline export adds, titles read now; nothing is written back to the map. */
+  private async referenceOutlineOf(map: MapDocument): Promise<ReferenceOutline> {
+    const refs = visibleKnowledgeRefs(map);
+    const titles = new Map<string, string | null>();
+    if (refs.length) {
+      try {
+        const found = await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO());
+        for (const ref of refs) titles.set(ref.id, referenceTitle(found.get(ref.id)));
+      } catch {
+        // Unreadable: every reference is written as unavailable.
+      }
+    }
+    return referenceOutline(map, titles, {
+      prefix: t("ui.knowledge_ref_export_prefix"),
+      unavailable: t("ui.knowledge_ref_export_unavailable")
+    });
   }
   /** Whether the open map can take an imported outline, and the selected topic for "under the selected topic". */
   private outlineImportTarget(): OutlineImportTarget {
@@ -7167,6 +7312,318 @@ export class VisualAgentMapView extends ItemView {
       ],
       hooks.dismissed
     ).open();
+  }
+  /** True when this map's references may be changed here: the branch-edit gate (not AIM, not picking, not loading). */
+  private canEditKnowledgeRefs(): boolean {
+    if (!this.plugin?.settings) return false;
+    return !this.presentation && !this.map?.aim && !this.clipboardReadOnly();
+  }
+  /**
+   * A change in the vault: what the references resolved to is dropped (only the ones read from `path`, when it is given) and read
+   * again once. Nothing is written; the next paint shows the original as it is now.
+   */
+  private invalidateKnowledgeRefs(path?: string): void {
+    if (this.closed || !this.map || !this.refResolved.size) return;
+    if (path !== undefined) {
+      const used = [...this.refResolved.values()].some(
+        item => item.ok && (item.mapPath === path || item.notePath === path)
+      );
+      if (!used) return;
+    }
+    this.refResolved = new Map();
+    this.scheduleKnowledgeRefResolve();
+  }
+  private scheduleKnowledgeRefResolve(): void {
+    if (this.refResolveTimer !== null) return;
+    this.refResolveTimer = window.setTimeout(() => {
+      this.refResolveTimer = null;
+      void this.resolveKnowledgeRefsNow();
+    }, 0);
+  }
+  /** Reads every visible reference of the open map against the vault now; repaints the reference layer when it is done. */
+  private async resolveKnowledgeRefsNow(): Promise<void> {
+    const map = this.map;
+    if (!map || this.closed) return;
+    const refs = visibleKnowledgeRefs(map);
+    const seq = ++this.refResolveSeq;
+    if (!refs.length) {
+      this.refResolved = new Map();
+      return;
+    }
+    let found: Map<string, RefResolution>;
+    try {
+      found = await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO());
+    } catch {
+      found = new Map(refs.map(ref => [ref.id, { ok: false, reason: "missing" }]));
+    }
+    if (this.closed || seq !== this.refResolveSeq || this.map?.id !== map.id) return;
+    this.refResolved = found;
+    this.paintKnowledgeRefs();
+  }
+  /**
+   * Draws the references of the open map in a layer after the cards. They are not cards of the map: they live in
+   * `map.knowledgeRefs`, hang at an offset from their parent card, and show what the original says only while it is usable.
+   */
+  private paintKnowledgeRefs(): void {
+    this.refLayerEl?.remove();
+    this.refLayerEl = null;
+    const stage = this.stageEl,
+      map = this.map;
+    if (!stage || !map) return;
+    const refs = visibleKnowledgeRefs(map);
+    if (!refs.length) return;
+    const shown = new Map(this.canvasNodes().map(node => [node.id, node]));
+    const layer = stage.createDiv("vam-knowledge-refs");
+    layer.setAttr("role", "group");
+    layer.setAttr("aria-label", t("ui.knowledge_ref_group"));
+    this.refLayerEl = layer;
+    const editable = this.canEditKnowledgeRefs();
+    let missing = false;
+    for (const ref of refs) {
+      const parent = shown.get(ref.parentId);
+      if (!parent) continue;
+      const found = this.refResolved.get(ref.id);
+      if (!found) missing = true;
+      const el = layer.createDiv("vam-knowledge-ref");
+      el.dataset.refId = ref.id;
+      el.setAttr("role", "note");
+      el.tabIndex = 0;
+      el.style.left = `${parent.x + ref.x}px`;
+      el.style.top = `${parent.y + ref.y}px`;
+      if (!found) el.addClass("is-loading");
+      else if (!found.ok) el.addClass("is-unavailable");
+      // The title and the map name come from other files: they only ever go in through setText and setAttr.
+      el.createDiv({
+        cls: "vam-knowledge-ref-source",
+        text: found?.ok ? t("ui.knowledge_ref_from_0", found.mapTitle) : ""
+      });
+      const body = el.createDiv("vam-knowledge-ref-title");
+      if (!found) body.setText(t("ui.knowledge_ref_loading"));
+      else if (found.ok) body.setText(found.title);
+      else body.setText(t("ui.knowledge_ref_unavailable"));
+      el.setAttr(
+        "aria-label",
+        found?.ok ? t("ui.knowledge_ref_aria_0", found.title) : t("ui.knowledge_ref_aria_unavailable")
+      );
+      if (found?.ok) {
+        el.addEventListener("click", () => void this.openKnowledgeRef(ref));
+      } else if (found && editable) {
+        const remove = el.createEl("button", {
+          cls: "vam-knowledge-ref-remove",
+          text: t("ui.knowledge_ref_remove"),
+          attr: { type: "button" }
+        });
+        remove.addEventListener("click", event => {
+          event.stopPropagation();
+          this.enqueue(() => this.removeKnowledgeRefById(ref.id));
+        });
+      }
+      el.addEventListener("keydown", event => {
+        if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.key === "Enter" && found?.ok) {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.openKnowledgeRef(ref);
+          return;
+        }
+        if (!editable) return;
+        if (event.key === "Delete" || event.key === "Backspace") {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeKnowledgeRefById(ref.id));
+          return;
+        }
+        const step = event.shiftKey ? 50 : 10,
+          arrow = (
+            { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] } as Record<
+              string,
+              [number, number]
+            >
+          )[event.key];
+        if (!arrow) return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.enqueue(() => this.moveKnowledgeRefBy(ref.id, arrow[0], arrow[1]));
+      });
+      if (editable) this.enableKnowledgeRefDrag(el, ref);
+    }
+    if (missing) this.scheduleKnowledgeRefResolve();
+  }
+  /** A drag of a reference: the offset from its parent card is written as one undo step. A press that does not move opens it. */
+  private enableKnowledgeRefDrag(el: HTMLElement, ref: KnowledgeRef): void {
+    el.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || !this.map || (event.target as Element).closest("button")) return;
+      const start = { x: event.clientX, y: event.clientY },
+        zoom = this.map.viewport.zoom || 1,
+        from = { left: el.style.left, top: el.style.top };
+      const origin = { x: parseFloat(from.left), y: parseFloat(from.top) };
+      let dx = 0,
+        dy = 0,
+        done = false;
+      el.setPointerCapture?.(event.pointerId);
+      const move = (e: PointerEvent): void => {
+        dx = (e.clientX - start.x) / zoom;
+        dy = (e.clientY - start.y) / zoom;
+        el.style.left = `${origin.x + dx}px`;
+        el.style.top = `${origin.y + dy}px`;
+      };
+      const settle = (): void => {
+        done = true;
+        el.removeEventListener("pointermove", move);
+        el.removeEventListener("pointerup", up);
+        el.removeEventListener("pointercancel", cancel);
+        el.removeEventListener("lostpointercapture", cancel);
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        if (Math.hypot(dx, dy) < 1) return;
+        event.stopPropagation();
+        el.addClass("is-dragged"); // the click that follows a drag must not open it
+        window.setTimeout(() => el.removeClass("is-dragged"), 0);
+        this.enqueue(() => this.moveKnowledgeRefBy(ref.id, Math.round(dx), Math.round(dy)));
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        el.style.left = from.left;
+        el.style.top = from.top;
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", cancel);
+      el.addEventListener("lostpointercapture", cancel);
+    });
+    el.addEventListener(
+      "click",
+      event => {
+        if (el.hasClass("is-dragged")) event.stopImmediatePropagation();
+      },
+      true
+    );
+  }
+  /** Moves a reference by an offset: one undo step, written through the map transaction; refused while cards are locked. */
+  private async moveKnowledgeRefBy(id: string, dx: number, dy: number): Promise<void> {
+    const map = this.map;
+    const ref = map ? readKnowledgeRefs(map).find(item => item.id === id) : undefined;
+    if (!map || !ref || !this.canEditKnowledgeRefs() || !this.mergeUnlocked([ref.parentId])) return;
+    await this.mapChange(change => {
+      const current = readKnowledgeRefs(change).find(item => item.id === id);
+      if (current) moveKnowledgeRef(change, id, current.x + dx, current.y + dy);
+    }, false);
+  }
+  /** The paths each resolved reference was read from, in memory only: written to a map file only inside a reference transaction. */
+  private knownRefPaths(): Map<string, string> {
+    return new Map(
+      [...this.refResolved].flatMap(([id, item]) => (item.ok ? [[id, item.mapPath] as [string, string]] : []))
+    );
+  }
+  private async removeKnowledgeRefById(id: string): Promise<void> {
+    const map = this.map;
+    const ref = map ? readKnowledgeRefs(map).find(item => item.id === id) : undefined;
+    if (!map || !ref || !this.canEditKnowledgeRefs() || !this.mergeUnlocked([ref.parentId])) return;
+    const paths = this.knownRefPaths();
+    await this.mapChange(change => {
+      if (removeKnowledgeRef(change, id)) refreshPathHints(change, paths);
+    }, false);
+  }
+  /** Re-reads the original now (with its text) and shows it in a read-only window; says why when it cannot be used. */
+  private async openKnowledgeRef(ref: KnowledgeRef): Promise<void> {
+    const result = (await resolveKnowledgeRefs([ref], this.plugin.repo.knowledgeRefIO(), { withBody: true })).get(
+      ref.id
+    );
+    if (this.closed) return;
+    if (!result?.ok) {
+      new Notice(t(result?.reason === "ambiguous" ? "ui.knowledge_ref_ambiguous" : "ui.knowledge_ref_unusable"));
+      this.invalidateKnowledgeRefs();
+      return;
+    }
+    new (class extends Modal {
+      onOpen(): void {
+        this.modalEl.addClass("vam-topic-modal", "vam-knowledge-ref-modal");
+        this.contentEl.createEl("h3", { text: result.title });
+        this.contentEl.createDiv({
+          cls: "vam-knowledge-ref-source",
+          text: t("ui.knowledge_ref_from_0", result.mapTitle)
+        });
+        this.contentEl.createEl("p", { cls: "vam-knowledge-ref-hint", text: t("ui.knowledge_ref_modal_hint") });
+        if (result.summary) this.contentEl.createEl("p", { cls: "vam-knowledge-ref-summary", text: result.summary });
+        if (result.detail) this.contentEl.createDiv({ cls: "vam-knowledge-ref-detail", text: result.detail });
+      }
+    })(this.app).open();
+  }
+  /** "Copy as reference": only the identity of this card is remembered (in memory); the clipboard text is not used. */
+  private copyAsKnowledgeRef(node: MapNode): void {
+    const map = this.map;
+    if (!map) return;
+    sessionFor(this.plugin).recordReference({ mapId: map.id, nodeId: node.id, mapPath: this.path });
+    new Notice(t("ui.knowledge_ref_copied"));
+  }
+  /** The one entry for adding a reference under `parentId` (the menu paste today; the cross-map search later). */
+  private async addKnowledgeRef(
+    target: { mapId: string; nodeId: string; mapPath: string },
+    parentId: string
+  ): Promise<void> {
+    const map = this.map;
+    if (!map) return;
+    if (this.clipboardReadOnly()) {
+      new Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    if (!this.canEditKnowledgeRefs()) return;
+    if (!this.mergeUnlocked([parentId])) return;
+    const check = checkAddKnowledgeRef(map, { mapId: target.mapId, nodeId: target.nodeId, parentId });
+    if (check === "self") {
+      new Notice(t("ui.knowledge_ref_self"));
+      return;
+    }
+    if (check === "duplicate") {
+      new Notice(t("ui.knowledge_ref_duplicate"));
+      return;
+    }
+    if (check !== "ok") return;
+    // The remembered card is read again now: a card that cannot be used is not referenced.
+    const probe = (
+      await resolveKnowledgeRefs(
+        [{ id: "probe", mapId: target.mapId, nodeId: target.nodeId, pathHint: target.mapPath }],
+        this.plugin.repo.knowledgeRefIO()
+      )
+    ).get("probe");
+    if (this.closed || !this.map || this.map.id !== map.id) return;
+    if (!probe?.ok) {
+      new Notice(t(probe?.reason === "ambiguous" ? "ui.knowledge_ref_ambiguous" : "ui.knowledge_ref_unusable"));
+      return;
+    }
+    const parent = this.canvasNodes().find(node => node.id === parentId);
+    const siblings = visibleKnowledgeRefs(map).filter(ref => ref.parentId === parentId).length;
+    const ref: KnowledgeRef = {
+      id: `ref-${crypto.randomUUID()}`,
+      mapId: target.mapId,
+      nodeId: target.nodeId,
+      parentId,
+      x: (parent?.width ?? CARD_WIDTH) + 40,
+      y: siblings * 90,
+      pathHint: probe.mapPath
+    };
+    const paths = this.knownRefPaths();
+    paths.set(ref.id, probe.mapPath);
+    await this.mapChange(change => {
+      if (checkAddKnowledgeRef(change, { mapId: ref.mapId, nodeId: ref.nodeId, parentId }) !== "ok") return;
+      appendKnowledgeRef(change, ref);
+      refreshPathHints(change, paths);
+    }, false);
+    this.refResolved.set(ref.id, probe);
+    this.paintKnowledgeRefs();
+  }
+  /** "Paste reference" under a card: uses only what "Copy as reference" remembered. */
+  private pasteKnowledgeRef(parentId: string | null): void {
+    const target = sessionFor(this.plugin).getReference();
+    if (!target) return;
+    if (!parentId) {
+      new Notice(t("ui.knowledge_ref_need_card"));
+      return;
+    }
+    this.enqueue(() => this.addKnowledgeRef(target, parentId));
   }
   /** Free images only change on a map the user may edit: not AIM, not while picking topics. */
   private canEditCanvasItems(): boolean {
@@ -10198,7 +10655,24 @@ export class VisualAgentMapView extends ItemView {
         const n = map.nodes.find(item => item.id === node.id);
         if (!n) return;
         n.collapsed = !n.collapsed;
-        this.arrangeAll(map);
+        // Folding moves nothing; unfolding keeps the revealed cards where they were stored and pushes only what they cover.
+        if (!this.placesLocally(map)) this.arrangeAll(map);
+        else if (!n.collapsed) {
+          const revealed = new Set<string>();
+          const reveal = (id: string): void => {
+            for (const child of map.nodes) {
+              if (child.parentId !== id || revealed.has(child.id)) continue;
+              revealed.add(child.id);
+              if (!child.collapsed) reveal(child.id);
+            }
+          };
+          reveal(n.id);
+          if (revealed.size) {
+            this.pushFrom(map, revealed);
+            // A card still covered after the push (a revealed card over its own neighbour) falls back to the whole layout.
+            if (cardsOverlapAny(map.nodes, revealed, this.cardHeightOf)) this.arrangeAll(map);
+          }
+        }
       })
     );
   }
@@ -10236,6 +10710,32 @@ export class VisualAgentMapView extends ItemView {
   }
   private onCanvasContextMenu(event: MouseEvent): void {
     const hit = event.target as Element | null;
+    const refEl = hit?.closest?.<HTMLElement>(".vam-knowledge-ref");
+    if (refEl) {
+      const refId = refEl.dataset.refId,
+        ref = this.map ? readKnowledgeRefs(this.map).find(item => item.id === refId) : undefined;
+      if (!ref) return;
+      event.preventDefault();
+      const menu = this.newMenu();
+      const found = this.refResolved.get(ref.id);
+      if (found?.ok)
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.knowledge_ref_open"))
+            .setIcon("external-link")
+            .onClick(() => void this.openKnowledgeRef(ref))
+        );
+      if (this.canEditKnowledgeRefs())
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.knowledge_ref_remove"))
+            .setIcon("trash-2")
+            .setWarning(true)
+            .onClick(() => this.enqueue(() => this.removeKnowledgeRefById(ref.id)))
+        );
+      menu.showAtMouseEvent(event);
+      return;
+    }
     const card = hit?.closest?.<HTMLElement>(".vam-node");
     if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && this.canEditSummary()) {
       const cardId = [...this.cardEls].find(([, el]) => el === card)?.[0];
@@ -10292,6 +10792,7 @@ export class VisualAgentMapView extends ItemView {
       target.closest(".vam-summary-text") ||
       target.closest(".vam-canvas-image") ||
       target.closest(".vam-text-node") ||
+      target.closest(".vam-knowledge-ref") ||
       target.closest(".vam-boundary-label") ||
       target.closest(INTERACTIVE_SELECTOR)
     )
@@ -10312,6 +10813,13 @@ export class VisualAgentMapView extends ItemView {
           .setTitle(t("ui.text_node_add_here"))
           .setIcon("sticky-note")
           .onClick(() => this.enqueue(() => this.addFreeText(point)))
+      );
+    if (sessionFor(this.plugin).getReference() && this.canEditKnowledgeRefs())
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.knowledge_ref_paste"))
+          .setIcon("clipboard-paste")
+          .onClick(() => this.pasteKnowledgeRef(this.selection.state.selected ?? null))
       );
     menu.showAtMouseEvent(event);
   }
@@ -10825,6 +11333,9 @@ export class VisualAgentMapView extends ItemView {
       notePaths: visited.map(id => map.nodes.find(node => node.id === id)?.path ?? "")
     });
     this.refreshCutMarks();
+    // References hang on cards of this map only: a branch copy leaves them behind, and says so only when some were left.
+    const skipped = knowledgeRefsUnder(map, visited);
+    if (skipped) new Notice(t("ui.knowledge_ref_skipped_0", skipped));
   }
   private pasteFromClipboard(event: ClipboardEvent): void {
     const { vam, text } = readClipboardData(event.clipboardData);
@@ -11907,6 +12418,7 @@ export class VisualAgentMapView extends ItemView {
       path: () => this.path,
       fence: () => this.captureMapSession(),
       outlineNodes: map => this.onScreenSiblingOrder(map),
+      referenceOutline: map => this.referenceOutlineOf(map),
       outlineSummary: id => {
         const summary = this.notes.get(id)?.summary ?? "";
         return isPlaceholder(summary) ? "" : summary;
@@ -11968,6 +12480,10 @@ export class VisualAgentMapView extends ItemView {
       toggleCollapse: (card, byKey) => (byKey ? this.collapseByKey(card) : this.toggleCollapsed(card)),
       reorderSibling: (card, offset) => this.enqueue(() => this.shiftSiblingByKey(card, offset)),
       remove: card => this.removeByKey(card),
+      enterBranchFocus: card => void this.enterBranchFocus(card.id),
+      exitBranchFocus: () => void this.exitBranchFocus(),
+      copyKnowledgeRef: card => this.copyAsKnowledgeRef(card),
+      pasteKnowledgeRef: card => this.pasteKnowledgeRef(card.id),
       zoomFit: () => this.fit(),
       zoomReset: () => {
         if (this.map) this.zoomBy(1 / this.map.viewport.zoom);
@@ -11998,6 +12514,11 @@ export class VisualAgentMapView extends ItemView {
       hasViewport: !!this.viewportEl,
       managedMap: !!this.plugin.settings && isManagedMapPath(this.plugin.settings, this.path),
       emptyCanvas: !!this.map && !this.map.nodes.length && this.emptyCanvasState() === "idle",
+      branchFocused: !!this.branchFocus,
+      knowledgeRefs: {
+        editable: this.canEditKnowledgeRefs() && !(node && this.isMerging(node.id)),
+        copied: !!sessionFor(this.plugin).getReference()
+      },
       note: id => this.notes.get(id),
       isMerging: id => this.isMerging(id),
       isArgumentCard: id => this.isArgumentCard(id),
@@ -12128,7 +12649,9 @@ export class VisualAgentMapView extends ItemView {
       }
       this.followedFrom = null;
       this.map = clone(map);
-      await this.plugin.repo.saveMap(this.path, this.map);
+      // One branch shown alone is view-only: Map.md keeps the camera from before the focus.
+      const written = this.branchFocus ? { ...this.map, viewport: { ...this.branchFocus.viewport } } : this.map;
+      await this.plugin.repo.saveMap(this.path, written);
       await this.plugin.rebuildDerivedData();
       this.render();
     };
@@ -12528,6 +13051,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map.nodes.length) {
       this.selection.exitMultiSelect("emptyMap");
     }
+    this.renderBranchFocusBar(this.contentEl);
     const tools = createDiv("vam-map-tools");
     if (this.map?.aim) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
@@ -12631,6 +13155,7 @@ export class VisualAgentMapView extends ItemView {
     for (const fit of fits) fit();
     this.renderCanvasItems();
     this.renderTidyPreview(canvas);
+    this.paintKnowledgeRefs();
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
@@ -13569,7 +14094,7 @@ export class VisualAgentMapView extends ItemView {
   private canvasNodes(): MapNode[] {
     if (!this.map) return [];
     const superseded = supersededAimNodeIds(this.map);
-    const shown = visibleNodes(this.map.nodes);
+    const shown = visibleNodes(this.map.nodes, this.branchFocus ? { rootId: this.branchFocus.id } : undefined);
     // Topics hidden by a clicked anchor (and their branches) are left out; the other cards keep their places.
     const byAnchor = this.hiddenAnchors?.size
       ? anchorHiddenTopicIds(this.map.canvasItems ?? [], this.map.nodes, this.hiddenAnchors)
@@ -14376,6 +14901,17 @@ export class VisualAgentMapView extends ItemView {
    */
   async prepareShare(timeoutMs = 3000): Promise<void> {
     if (!this.map || this.notesLoading()) return;
+    // The titles of the references are read now (share time) and only the titles; nothing is written back to the map.
+    this.shareRefTitles = new Map();
+    const shareRefs = visibleKnowledgeRefs(this.map);
+    if (shareRefs.length) {
+      try {
+        const found = await resolveKnowledgeRefs(shareRefs, this.plugin.repo.knowledgeRefIO());
+        for (const ref of shareRefs) this.shareRefTitles.set(ref.id, referenceTitle(found.get(ref.id)));
+      } catch {
+        for (const ref of shareRefs) this.shareRefTitles.set(ref.id, null);
+      }
+    }
     const waits: Promise<void>[] = [];
     const finish: Array<() => void> = [];
     for (const id of ringMemberIds(this.map.nodes, this.map.canvasItems ?? [])) {
@@ -14429,6 +14965,7 @@ export class VisualAgentMapView extends ItemView {
         covers: Map<string, string>;
         coverLooks: Map<string, { frame: CoverFrame | null; size: number; position: CoverPosition }>;
         ringHeights?: Map<string, number>;
+        refTitles?: Map<string, string | null>;
         mapPath: string;
       }
     | "none"
@@ -14468,6 +15005,7 @@ export class VisualAgentMapView extends ItemView {
       covers,
       coverLooks,
       ...(ringHeights.size ? { ringHeights } : {}),
+      ...(this.shareRefTitles?.size ? { refTitles: new Map(this.shareRefTitles) } : {}),
       mapPath: this.path
     };
   }
@@ -15287,7 +15825,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
-    const files = this.app.vault.getMarkdownFiles();
+    const files = livingNoteCandidates(this.app, this.app.vault.getMarkdownFiles());
     const modal = new AiCardNotePicker(
       this.app,
       files,
@@ -20842,6 +21380,8 @@ export class VisualAgentMapView extends ItemView {
     const now = this.map?.viewport;
     if (this.notesLoading() && frame && now && (now.x !== frame.x || now.y !== frame.y || now.zoom !== frame.zoom))
       this.toolbarClearedFor = this.path;
+    // One branch shown alone is a view-only state: its pan and zoom are not the map's saved view.
+    if (this.branchFocus) return;
     // A hidden pane measures 0: nothing is requested from it (a camera move asked meanwhile is replayed when the tab is shown).
     // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
     if (this.hiddenTab()) return;
@@ -20878,7 +21418,7 @@ export class VisualAgentMapView extends ItemView {
   private async persistViewport(): Promise<void> {
     if (!this.map || !this.path) return;
     const path = this.path;
-    const viewport = { ...this.map.viewport };
+    const viewport = { ...(this.branchFocus?.viewport ?? this.map.viewport) };
     const written = await this.plugin.repo.updateMap(path, map => {
       map.viewport = viewport;
     });
@@ -23111,6 +23651,8 @@ export class VisualAgentMapView extends ItemView {
         run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW &&
         !noNewMap &&
         same() &&
+        // Where cards are placed locally the batch is placed like a few cards: every other branch stays where it is.
+        !(this.map && this.placesLocally(this.map)) &&
         // A reply that made a ring places the ring and the other new cards below, never the whole map again.
         !run.ringImages?.size &&
         !result.actions.some(action => action.kind === "auto_layout")
@@ -23160,8 +23702,17 @@ export class VisualAgentMapView extends ItemView {
       // Only those cards are placed, each branch beside its parent; nothing else moves, and no other action of the reply runs.
       // A reply that made a ring did not lay the whole map out either, so its other new cards are placed the same way.
       const ringed = run.ringImages?.size ? new Set(run.ringImages) : null;
+      const local =
+        batched &&
+        !arranged &&
+        !!this.map &&
+        this.placesLocally(this.map) &&
+        run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW &&
+        !noNewMap;
       const rough =
-        batched && !arranged && (stopped || layoutDone || !!ringed || !!scope) ? run.created.slice(laidOutCount) : [];
+        batched && !arranged && (stopped || layoutDone || !!ringed || !!scope || local)
+          ? run.created.slice(laidOutCount)
+          : [];
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
           await this.plugin.mutate(() =>
@@ -23206,6 +23757,9 @@ export class VisualAgentMapView extends ItemView {
                 }
                 this.fitCards(members);
               }
+              // Show all, as after a whole layout, when only the batch was placed.
+              if (local && !stopped && !ringed && !result.actions.some(action => action.kind === "focus_topic"))
+                this.fit();
             })
           );
         } catch {

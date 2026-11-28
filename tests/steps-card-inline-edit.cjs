@@ -467,9 +467,9 @@ test('More lists card settings, the summary bracket, note style and the other to
   const more = key => menuTitles(h, m => { h.view.newMenu = () => m; h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 0, bottom: 0 }) }, node(key)); });
   const leaf = more('leaf');
   // B06 (mockup §4): settings, summary bracket, note style, AI card | the new topics not on the toolbar | remove.
-  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add sibling topic', 'Add another type', '—', 'Remove from map']);
+  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add sibling topic', 'Add another type', 'Copy as reference', '—', 'Remove from map']);
   assert.ok(leaf.find(i => i.title === 'Add another type').sub.list.length >= 6, 'the topic types are in the submenu');
-  assert.deepEqual(more('branch').map(i => i.title).slice(0, 3), ['Card settings…', 'Select subtopics', 'Add summary bracket']);
+  assert.deepEqual(more('branch').map(i => i.title).slice(0, 4), ['Card settings…', 'Focus on this branch', 'Select subtopics', 'Add summary bracket']);
 });
 test('right-click on one card: the toolbar actions, then the ⋯ list in its order, Remove last; Collapse only with subtopics; no picture-book entry on a map without a book', async () => {
   const h = await harness();
@@ -480,8 +480,8 @@ test('right-click on one card: the toolbar actions, then the ⋯ list in its ord
     h.view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, preventDefault() {}, clientX: 5, clientY: 5 });
   }).map(i => i.title);
   const leaf = contextMenu('leaf');
-  // B07: the toolbar's actions (AI explore, Add subtopic, Open note, Add summary), a separator, then the ⋯ list as it is.
-  assert.deepEqual(leaf, ['AI explore', 'Add subtopic', 'Open note', 'Add summary', '—', 'Card settings…', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add sibling topic', 'Add another type', '—', 'Remove from map']);
+  // B07: the toolbar's actions (AI explore, Add subtopic, Open note, Add summary), a separator, then the ⋯ list as it is (Copy as reference: F01).
+  assert.deepEqual(leaf, ['AI explore', 'Add subtopic', 'Open note', 'Add summary', '—', 'Card settings…', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add sibling topic', 'Add another type', 'Copy as reference', '—', 'Remove from map']);
   for (const gone of ['Research this card', 'This card', 'Select subtopics', 'Picture book', 'Collapse subtopics']) assert.ok(!leaf.includes(gone), `${gone} is not in a leaf card's menu`);
   assert.ok(contextMenu('branch').includes('Collapse subtopics'), 'a card with subtopics offers Collapse');
   node('branch').collapsed = true;

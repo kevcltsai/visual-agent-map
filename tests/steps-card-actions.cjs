@@ -52,6 +52,8 @@ function ctxFor(target, state, extra = {}) {
     hasViewport: true,
     managedMap: true,
     emptyCanvas: false,
+    branchFocused: false,
+    knowledgeRefs: { editable: false, copied: false },
     note: id => notes[id],
     isMerging: () => state === 'merging',
     isArgumentCard: () => false,
@@ -84,6 +86,8 @@ const TABLE = [
   ['rename', 'command', 'a', 'ok ro ok ok pr ms ok ok'],
   ['open-note', 'command', 'a', 'ok ok ok ok ok ok ok ok'], // open-details: run(!!selected)
   ['toggle-collapse', 'command', 'a', 'ok ro ok ok pr ms ok ok'],
+  ['focus-branch', 'context', 'a', 'ok ro ok ok pr ms ok ok'], // enterBranchFocus refuses presenting; B13 (loading too: #35, as the menus' whenEditing)
+  ['leave-focus', 'command', null, 'ok ok ok ok ok ok ok ok', { branchFocused: true }],
   ['zoom-fit', 'command', null, 'ok ok ok ok ok ok ok ok'], // run(!!this.viewportEl)
   ['zoom-reset', 'command', null, 'ok ok ok ok ok ok ok ok'],
   ['search', 'command', null, 'ok ok ok ok pr ok ok ok'], // run(!this.presentation)
@@ -124,6 +128,9 @@ const TABLE = [
   ['run-card', 'context', 'ai', 'ok ro ok al pr ms bk ok'],
   ['ai-card', 'context', 'a', 'ok ro ok ok pr ms bk ok'],
   ['book', 'context', 'a', 'ok ro ok ok pr ms ok ok'], // addBookMenu (its rows keep their own reasons)
+  // F01: shown only where references may change and not on a merging card (applies); the card gates otherwise.
+  ['knowledge-ref-copy', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: false } }],
+  ['knowledge-ref-paste', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: true } }],
   ['remove', 'context', 'a', 'ok ro mg ok pr ms ok bk'], // single && !bookLock.structure; removeByKey → confirmRemoveNode refuses a merging branch
   // Keys (card keydown in renderNode, the view scope in installUndoScope, searchKey).
   ['add-child', 'key', 'a', 'ok ro ok ok pr ms ok bk'], // Mod+Enter: presentation/notesLoading/bookLock.structure swallowed, selection mode passed on
@@ -234,11 +241,11 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   // The AI card's toolbar is the card's with Run all's Stop first (paintPromptState prepends it).
   eq(CARD_TOOLBAR['ai-card'], ['stop-run-all', ...CARD_TOOLBAR.card]);
   eq(ids('toolbar', ctxFor('ai', 'normal', { runAllWorking: id => id === 'ai' })), ['stop-run-all', 'research', 'add-child', 'open-note', 'add-summary-field']);
-  // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, select subtopics, summary bracket, tidy this branch (A10), note style, run, AI card, book |
+  // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, focus this branch (B13), select subtopics, summary bracket, tidy this branch (A10), note style, run, AI card, book |
   // add sibling, add another type (add subtopic is on the toolbar) | fold, remove.
   const grouped = (surface, ctx) => actionsFor(surface, ctx).map(entry => `${entry.action.group}:${entry.action.id}`);
   eq(grouped('more', ctxFor('ai', 'normal')), ['3:card-settings', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:remove']);
-  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
+  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:focus-branch', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
   // addCardMenuActions (B07): the toolbar's actions in its order, then the ⋯ list in its order (the view puts a separator between them).
   eq(ids('context', ctxFor('a', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('a', 'normal'))]);
   eq(ids('context', ctxFor('ai', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('ai', 'normal'))]);
@@ -351,6 +358,56 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('remove-selected', ['a', 'd'], 'more'), [['removeSelected']]);
   eq(run('selection-help', ['a', 'd'], 'toolbar'), [['selectionHelp']]);
   eq(run('finish-selection', ['a', 'd'], 'toolbar'), [['finishSelection']]);
+});
+
+test('card actions: B13 focus this branch (card) and leave focus (map) as enterBranchFocus / exitBranchFocus have them', () => {
+  const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
+  const focus = action('focus-branch');
+  const leave = action('leave-focus');
+  assert.ok(focus && leave, 'both registered');
+  // Focus: a card with subtopics, not while already focused; the ⋯, the right-click and the palette offer it.
+  for (const surface of ['more', 'context', 'command']) assert.ok(ids(surface, ctxFor('a', 'normal')).includes('focus-branch'), surface);
+  assert.ok(!ids('context', ctxFor('b', 'normal')).includes('focus-branch'), 'a leaf has no branch');
+  assert.ok(!ids('context', ctxFor('a', 'normal', { branchFocused: true })).includes('focus-branch'), 'hidden while focused');
+  for (const surface of ['toolbar', 'key', 'edge', 'canvas']) assert.ok(!ids(surface, ctxFor('a', 'normal')).includes('focus-branch'), surface);
+  assert.ok(ruleMoreSet('card').includes('focus-branch') && ruleContextSet('card').includes('focus-branch'));
+  // enterBranchFocus refuses while presenting; picking topics has no card entries.
+  assert.deepEqual(S.plain(availability('focus-branch', 'context', ctxFor('a', 'normal'))), CODE.ok);
+  assert.deepEqual(S.plain(availability('focus-branch', 'context', ctxFor('a', 'presentation'))), CODE.pr);
+  assert.deepEqual(S.plain(availability('focus-branch', 'command', ctxFor('a', 'multiSelect'))), CODE.ms);
+  // Leave: map scope, only while focused.
+  eq(ids('command', ctxFor(null, 'normal')).filter(id => id === 'leave-focus'), []);
+  eq(ids('command', ctxFor(null, 'normal', { branchFocused: true })).filter(id => id === 'leave-focus'), ['leave-focus']);
+  assert.deepEqual(S.plain(availability('leave-focus', 'command', ctxFor(null, 'normal', { branchFocused: true }))), CODE.ok);
+  // Runs.
+  const first = recorder();
+  focus.run({ ...ctxFor('a', 'normal'), host: first.host, surface: 'context' });
+  eq(first.calls.map(([name, node]) => [name, node.id]), [['enterBranchFocus', 'a']]);
+  const second = recorder();
+  leave.run({ ...ctxFor(null, 'normal', { branchFocused: true }), host: second.host, surface: 'command' });
+  eq(second.calls, [['exitBranchFocus']]);
+  // Names in three languages.
+  assert.equal(titleKeyFor(leave, 'command', ctxFor(null, 'normal')), 'ui.exit_branch_focus');
+  for (const dictionary of [en, zhTW, zhCN]) for (const key of [focus.titleKey, leave.titleKey]) assert.ok(dictionary[key]?.trim(), key);
+});
+
+test('card actions: F01 Copy as reference / Paste reference join the card list (⋯ and right-click) where references may change', () => {
+  const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
+  const refs = list => list.filter(id => id.startsWith('knowledge-ref-'));
+  const editable = { knowledgeRefs: { editable: true, copied: false } };
+  const copied = { knowledgeRefs: { editable: true, copied: true } };
+  eq(refs(ids('context', ctxFor('a', 'normal'))), []);
+  eq(refs(ids('context', ctxFor('a', 'normal', editable))), ['knowledge-ref-copy']);
+  eq(refs(ids('context', ctxFor('a', 'normal', copied))), ['knowledge-ref-copy', 'knowledge-ref-paste']);
+  eq(refs(ids('more', ctxFor('ai', 'normal', copied))), ['knowledge-ref-copy', 'knowledge-ref-paste']);
+  eq(refs(ids('context', ctxFor('a', 'normal', { knowledgeRefs: { editable: false, copied: true } }))), [], 'not editable (AIM, picking, loading, a merging card): neither');
+  for (const surface of ['toolbar', 'command', 'key', 'edge', 'canvas']) eq(refs(ids(surface, ctxFor('a', 'normal', copied))), [], surface);
+  // After Add another type, before the fold / remove group.
+  const grouped = actionsFor('more', ctxFor('a', 'normal', copied)).map(entry => `${entry.action.group}:${entry.action.id}`);
+  eq(grouped.slice(grouped.indexOf('4:add-other')), ['4:add-other', '4:knowledge-ref-copy', '4:knowledge-ref-paste', '5:toggle-collapse', '5:remove']);
+  const calls = recorder();
+  for (const id of ['knowledge-ref-copy', 'knowledge-ref-paste']) action(id).run({ ...ctxFor('a', 'normal', copied), host: calls.host, surface: 'context' });
+  eq(calls.calls.map(([name, node]) => [name, node.id]), [['copyKnowledgeRef', 'a'], ['pasteKnowledgeRef', 'a']]);
 });
 
 test('card actions: the view builds the context next to mapCommand; the palette, the card ⋯, the right-click and the selection bar read the registry', () => {

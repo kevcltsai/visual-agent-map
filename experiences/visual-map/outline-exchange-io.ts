@@ -1,4 +1,5 @@
 import { Notice, type Vault } from "obsidian";
+import type { ReferenceOutline } from "./knowledge-refs";
 import { t } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import {
@@ -114,6 +115,8 @@ export async function exportMapExchange(
     map: Pick<MapDocument, "title" | "nodes">;
     notes: ReadonlyMap<string, { title: string; detail: string; livingNode?: { shareMarkdown?: string } }>;
     format: ExchangeFormat;
+    /** Reference lines (titles only) hung under their parent cards. */
+    references?: ReferenceOutline;
   }
 ): Promise<string> {
   const notes = new Map<string, ExchangeNoteInput>();
@@ -122,7 +125,9 @@ export async function exportMapExchange(
       title: note.title,
       body: [note.detail, note.livingNode?.shareMarkdown].filter(value => value?.trim()).join("\n\n")
     });
-  const input = { title: request.map.title, nodes: request.map.nodes };
+  const refs = request.references;
+  for (const [id, title] of refs?.titles ?? []) notes.set(id, { title, body: "" });
+  const input = { title: request.map.title, nodes: [...request.map.nodes, ...(refs?.nodes ?? [])] };
   const text = request.format === "opml" ? toOpml(input, notes) : toFreeMind(input, notes);
   const slash = request.mapPath.lastIndexOf("/");
   const folder = slash < 0 ? "" : request.mapPath.slice(0, slash + 1);
@@ -149,6 +154,7 @@ export async function exportMapWithNotice(
   request: Parameters<typeof exportMapExchange>[1]
 ): Promise<string | null> {
   try {
+    if (request.references?.nodes.length) new Notice(t("ui.knowledge_ref_export_notice"));
     const path = await exportMapExchange(vault, request);
     new Notice(t("ui.exchange_exported", path));
     return path;

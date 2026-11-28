@@ -151,10 +151,28 @@ test('B15: outline click and canvas selection, five times each, leave Map.md unc
   assert.ok(calls.active.includes('leaf.md') && calls.active.includes('root.md'), 'the outline is told which topic is active');
 });
 
-test('B15: an outline click on a card inside a collapsed branch selects it and centers on its nearest visible ancestor', async () => {
+test('B15: an outline click on a card inside a collapsed branch selects it and centers on the topic, opened for the view only', async () => {
   const { view, ids } = await viewWithMap();
   const [root, , leaf] = view.map.nodes; leaf.x = 1000; leaf.y = 400; root.x = 200; root.y = 100;
   await view.revealPath('leaf.md');
   assert.equal(view.selection.state.selected, ids.leaf);
-  assert.deepEqual({ ...view.map.viewport }, { x: 400 - (200 + 140), y: 300 - 180, zoom: 1 }, 'camera is on the collapsed root, the topmost visible ancestor');
+  assert.deepEqual({ ...view.map.viewport }, { x: 400 - (1000 + 140), y: 300 - (400 + 80), zoom: 1 }, 'camera is on the topic itself'); // B14: P1.6 reveal only temporarily opens the branch for the view
+});
+
+test('C08: outline search also reads summaries and Details; a row matched only by its body says so, a title match does not', () => {
+  const OutlineView = loadOutline();
+  const view = new OutlineView({ app: {} }, async () => {});
+  view.contentEl.root = { activeElement: null }; view.contentEl.ownerDocument = view.contentEl.root;
+  const nodes = [{ id: 'a', parentId: null, path: 'a.md' }, { id: 'b', parentId: 'a', path: 'b.md' }, { id: 'c', parentId: 'a', path: 'c.md' }];
+  const titles = new Map([['a', 'Alpha'], ['b', 'Beta'], ['c', 'Gamma']]);
+  const bodies = new Map([['b', 'Summary line\nA 價格 table'], ['c', 'beta again']]);
+  view.setMap({ title: 'M', nodes }, titles, new Map(), new Map(), bodies);
+  const input = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-search'))[0];
+  const rows = () => dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-note')).map(n => [n.attrs['data-path'], dom.findAll(n, i => dom.hasCls(i, 'vam-outline-body-hit')).length]);
+  input.value = '价格'; input.fire('input', {}); // Simplified query, Traditional Detail
+  assert.deepEqual(rows(), [['a.md', 0], ['b.md', 1]], 'parent shown as a path to the hit; only the body-only row is labelled');
+  input.value = 'beta'; input.fire('input', {});
+  assert.deepEqual(rows(), [['a.md', 0], ['b.md', 0], ['c.md', 1]], 'a title match is not labelled, a body-only one is');
+  const hit = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-body-hit'))[0];
+  assert.equal(hit.text, 'In text');
 });

@@ -694,7 +694,10 @@ export const en = {
   "ui.map_search_label": "Search topics",
   "ui.map_search_count_0": "{0} matches",
   "ui.map_search_none": "No matches",
+  "ui.search_temp_open": "Opened for search",
   "ui.map_search_position_0_1_2": "{0}/{1}: {2}",
+  "ui.map_search_body_hit": " (in text)",
+  "ui.outline_body_match": "In text",
   "ui.map_search_close": "Close search",
   "ui.presentation_start": "Start presentation",
   "ui.presentation_exit": "Exit presentation (Esc)",
@@ -757,6 +760,10 @@ export const en = {
     "Write what this picture is and what to research. Research and expansion cannot see the picture; they read this line and the anchor notes. The map chat looks at the picture when you select it.",
   "ui.annotated_image_convert_button": "Convert",
   "ui.annotated_image_place_anchor": "Place anchor",
+  "ui.image_explore": "Image exploration",
+  "ui.image_explore_ask": "Image exploration…",
+  "ui.image_explore_title": "Convert to an annotated image and let the AI see it?",
+  "ui.image_explore_button": "Convert and explore",
   "ui.anchor_new_title": "New anchor",
   "ui.anchor_edit_title": "Edit anchor",
   "ui.anchor_menu_edit": "Edit anchor…",
@@ -907,7 +914,19 @@ export const en = {
   "ui.merge_done_0": "Merged into “{0}”. You can undo.",
   "ui.move_links_dialog_notice_0":
     "{0} of your other notes link to this card. Obsidian may ask whether to update links; choose Update so they keep working.",
-  "ui.merge_check_warning_0": "{0} item(s) of source content may be missing or changed in the merge.",
+  "ui.merge_check_failed_0_1":
+    "Nothing was merged into “{0}”: {1} item(s) of source content are missing or changed in the AI draft. The original cards are unchanged.",
+  "ui.merge_check_failed_chat_0_1_2":
+    "Not merged: “{0}”, {1} item(s) of source content missing or changed ({2}). Retry or view the draft from the notice.",
+  "ui.merge_check_missing": "Missing from the draft:",
+  "ui.merge_check_added": "Not in any source:",
+  "ui.merge_retry": "Retry",
+  "ui.merge_view_draft": "View draft",
+  "ui.merge_draft_title_0": "AI merge draft, not applied: {0}",
+  "ui.merge_draft_copy": "Copy",
+  "ui.merge_draft_copied": "Draft copied",
+  "ui.merge_draft_copy_failed": "Unable to copy the draft.",
+  "ui.merge_draft_gone": "This draft is no longer kept. Merge the cards again.",
   "log.merge_check_warning": "AI merge check: source content not preserved",
   "ui.synthesis_written_0": "Synthesis written to “{0}”. You can undo.",
   "ui.synthesis_new_topic_0": "Created synthesis topic “{0}”. You can undo.",
@@ -1032,7 +1051,7 @@ export const en = {
   "ui.ai_locked_suggestions_skipped_0": "{0} suggestions touch locked topics and were skipped",
   "ui.ai_unlock_selected": "Unlock for AI",
   "ui.ai_locked_some_0_1": "{0} of {1} locked",
-  "ui.card_action_off_read_only": "The mind map can't be changed right now",
+  "ui.card_action_off_notes_loading": "Notes are still loading",
   "ui.card_action_off_merging": "This card is being merged; try again when it finishes",
   "ui.card_action_off_ai_lock": "This card is locked from AI; unlock it in the toolbar first",
   "ui.card_action_off_book_lock": "The picture book is running on this mind map; try again when it stops",
@@ -1322,6 +1341,8 @@ export const en = {
   "ui.structure_review_stale_missing": "This suggestion is out of date: a card it refers to is no longer on the map.",
   "ui.structure_review_stale_changed":
     "This suggestion is out of date: the card was renamed or moved after the review.",
+  "ui.structure_review_stale_content":
+    "This suggestion is out of date: a card it refers to was changed after the review. Nothing was applied.",
   "ui.structure_review_stale_structure":
     "This suggestion no longer fits the map: applying it now would create a loop or change nothing.",
   "ui.structure_review_merge_title": "Merge “{0}” into “{1}”",
@@ -2263,6 +2284,7 @@ export const en = {
   "note.no_conclusion_yet": "No conclusion yet",
   "note.untitled_topic": "Untitled topic",
   "note.source_unconfirmed_0": "Source to confirm: {0}",
+  "note.source_unverified": "(source not verified)",
   "note.external_source_0": "External source: {0}",
   "note.earlier_research_sources": "Sources from earlier research",
   "note.no_new_information": "No new information in this task.",
@@ -2808,6 +2830,7 @@ export const en = {
   "ui.topic_chat_failed_subtree": "No subtopic could be integrated.",
   "ui.topic_chat_record_failed": "The topic chat record was not saved.",
   "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
+  "ui.exchange_import_safety": "Only titles and notes were imported; icons, links and styles are not brought in.",
   "ui.invalid_merged_json":
     "The merged contents are not valid JSON: check the quotes, commas and braces, then save again.",
   "ui.note_style_folder_open_failed":
@@ -3072,6 +3095,9 @@ export const en = {
   "ui.book_start_title": "Turn this map into a book with pictures",
   "ui.book_start_intro":
     "The AI plans, writes, finds pictures for and proofreads every chapter; after planning it stops so you can check the direction.",
+  "ui.book_start_intro_ask":
+    "The AI fills in the whole-book settings from what you say here; after planning it stops so you can check the direction.",
+  "ui.book_start_advanced": "Advanced settings (models, reader, tone… six in all)",
   "ui.book_start_estimate_0_1_2": "{0} cards · about {1} · about {2} AI calls",
   "ui.book_start_tip_plan":
     "Reads the whole map and decides the book's structure, what each chapter covers and how chapters connect. It needs deep thinking: the strongest model is best.",
@@ -3087,6 +3113,7 @@ export const en = {
   "ui.book_start_proof_same_as_author": "Best a different model from the author",
   "ui.book_start_suggesting":
     "The AI is thinking up suggestions from the subject; they fill the fields below when ready",
+  "ui.book_start_suggesting_ask": "The AI is thinking up suggestions; you can send once they are ready",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
   "ui.book_start_go": "Start",
   "ui.book_progress_step_images": "Pictures",
@@ -3124,14 +3151,16 @@ export const en = {
   "ui.book_counts_0_1_2_3_4": "Proofread {0}/{1} · Written {2} · Planned {3} · Needs a look {4}",
   "ui.book_progress_text_0_1_2_3": "Proofread {0}, written {1}, planned {2}, needs a look {3}",
   "ui.book_stop": "Stop",
-  "ui.book_chat_label": "Tell the chief editor what to adjust",
-  "ui.book_chat_placeholder": 'For example: "make the reader high-school students"',
+  "ui.book_chat_label": "What kind of book do you want? Say it in a sentence or two",
+  "ui.book_chat_placeholder": 'For example: "for middle-school readers, light, one picture per chapter"',
   "ui.book_chat_send": "Send",
   "ui.book_chat_thinking": "The chief editor is thinking…",
   "ui.book_chat_editor": "Chief editor",
   "ui.book_chat_undo": "Undo this turn",
   "ui.book_chat_failed": "The chief editor did not answer, so nothing changed.",
   "ui.book_chat_edited": "Chief editor changed this",
+  "ui.book_chat_kept_0": "Kept what you filled in: {0}. To change them, open Advanced settings",
+  "ui.book_chat_kept_turn_0": "(filled in by the owner, not changed: {0})",
   "ui.book_settings_view": "Book settings",
   "ui.book_settings_view_failed": "Could not read the book settings.",
   "ui.book_settings_view_hint": "To change them, press Stop first, then tell the chief editor.",

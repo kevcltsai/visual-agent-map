@@ -38,6 +38,8 @@ import type { ChatOutcome } from "./chat-action-writer";
 
 export interface BookPlanCard extends PlanEditNote {
   summary: string;
+  /** `ai-locked: true` on the note: the chief editor does not change it. */
+  aiLocked?: boolean;
   fields: { bookRole?: BookRole };
   settings: BookSettings;
 }
@@ -131,7 +133,7 @@ export async function bookPlanChatInput(deps: BookPlanChatDeps): Promise<MapChat
         card.fields.bookRole ?? "body",
         card.title,
         card.prompt,
-        planLockedRaw(card.raw, card.prompt)
+        planLockedRaw(card.raw, card.prompt) || card.aiLocked === true
       )
     );
     nodes.push({ id, parentId: node.parentId ?? null, title: card.title });
@@ -194,7 +196,7 @@ export async function applyBookPlanEdit(
     }
     const now = await deps.readCard(path);
     seen.set(change.id, { prompt: proposed.prompt, kind: proposed.kind as CardKind, title: now.title });
-    if (!plan.unlocked.includes(change.id) || planLockedRaw(now.raw, now.prompt)) locked.add(change.id);
+    if (!plan.unlocked.includes(change.id) || planLockedRaw(now.raw, now.prompt) || now.aiLocked) locked.add(change.id);
     // The reader's own Summary (a kept chapter, a card the pipeline never wrote that has text, or one changed since the proposal)
     // stays when the covers change.
     if (now.summary !== (proposed.summary ?? "") || readerSummaryRaw(now.raw)) ownSummary.add(change.id);
@@ -271,6 +273,7 @@ export async function applyBookThreadEdit(
   const root = rootId ? map.nodes.find(node => node.id === rootId) : undefined;
   if (!root || !reviewRun(map)) return skip("ui.map_chat_skip_book_started");
   const card = await deps.readCard(root.path);
+  if (card.aiLocked) return skip("ui.ai_locked_notice");
   if (parseBookPlanBody(card.raw).thread !== plan.thread) return skip("ui.map_chat_skip_book_thread_changed");
   const next = replaceBookPlanThread(card.raw, action.content);
   if (next === undefined) return skip("ui.map_chat_skip_book_thread_none");

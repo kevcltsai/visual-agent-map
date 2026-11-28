@@ -57,7 +57,7 @@ async function harness({ collapse = true } = {}) {
   view.focusNode = (node, persist) => { centred.push({ id: node.id, persist }); };
   const reload = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   view.hydrate = reload;
-  const visible = () => view.map.nodes.filter(n => { for (let p = n.parentId; p;) { const a = view.map.nodes.find(x => x.id === p); if (a.collapsed) return false; p = a.parentId; } return true; });
+  const visible = () => view.canvasNodes(); // what the canvas draws, including a branch the search opens for itself (B14)
   let renders = 0;
   const carets = [];
   const build = () => {
@@ -127,7 +127,7 @@ test('34: Mod+F while the box is open selects the field text instead of reopenin
   assert.equal(h.doc.activeElement, h.bar().input);
 });
 
-test('34: titles match case-insensitively in Chinese and English, Traditional matches Simplified; body text is not searched', async () => {
+test('34: titles match case-insensitively in Chinese and English, Traditional matches Simplified; the title still matches without any body', async () => {
   const h = await harness();
   h.press(h.card('alpha'));
   h.type('ALPHA');
@@ -136,6 +136,88 @@ test('34: titles match case-insensitively in Chinese and English, Traditional ma
   h.type('市场'); // Simplified query against a Traditional-looking title
   assert.ok(h.card('beta').classes.has('is-search-match'), 'fold-insensitive');
   assert.ok(!h.card('alpha').classes.has('is-search-match'));
+});
+
+// C08: the summary and the Detail are searched too, from the notes the view already holds.
+const withBodies = h => {
+  h.view.notes.get(h.ids.beta).summary = '價格調查摘要';
+  h.view.notes.get(h.ids.alpha).detail = 'Long detail mentioning the zebra crossing.';
+  h.view.notes.get(h.ids.deep).detail = 'Hidden zebra inside two folded levels.';
+};
+
+test('C08: a word only in the Detail or summary finds the card; a word in neither finds nothing; Traditional and Simplified match in the body', async () => {
+  const h = await harness();
+  withBodies(h);
+  h.press(h.card('alpha')); h.type('zebra');
+  assert.ok(h.card('alpha').classes.has('is-search-match'), 'Detail hit');
+  assert.ok(!h.card('beta').classes.has('is-search-match'));
+  h.type('价格'); // Simplified query, Traditional summary
+  assert.ok(h.card('beta').classes.has('is-search-match'), 'summary hit, fold-insensitive');
+  h.type('nowhere-at-all');
+  for (const key of ['root', 'alpha', 'beta', 'branch']) assert.ok(!h.card(key).classes.has('is-search-match'));
+  assert.equal(h.bar().root.children.find(c => c.cls.includes('vam-map-search-count')).text, 'No matches');
+});
+
+test('C08: two cards with the same title in different files are both listed, not merged', async () => {
+  const h = await harness({ collapse: false });
+  h.view.notes.get(h.ids.deep2).title = 'Alpha plan';
+  assert.notEqual(h.view.map.nodes.find(n => n.id === h.ids.deep2).path, h.view.map.nodes.find(n => n.id === h.ids.alpha).path);
+  h.press(h.card('alpha')); h.type('alpha plan');
+  assert.ok(h.card('alpha').classes.has('is-search-match'));
+  assert.ok(h.card('deep2').classes.has('is-search-match'));
+  assert.equal(h.view.mapSearchResult().matches.length, 2);
+});
+
+test('C08: a body hit inside folded branches opens them for the search only; Map.md is byte-identical afterwards; Enter speaks (in text)', async () => {
+  const h = await harness();
+  withBodies(h);
+  const before = h.contents.get(MAP);
+  assert.equal(h.card('deep'), undefined);
+  h.press(h.card('alpha')); h.type('hidden zebra');
+  h.keydown('Enter'); await h.settle();
+  assert.ok(h.card('deep'), 'the card in the folded branch is drawn');
+  assert.ok(h.card('deep').classes.has('is-search-current'));
+  assert.equal(h.centred.at(-1).id, h.ids.deep);
+  assert.match(h.spoken(), /^1\/1: Deep Needle \(in text\)$/);
+  h.keydown('Escape'); await h.settle();
+  assert.equal(h.card('deep'), undefined, 'folded again');
+  assert.equal(h.contents.get(MAP), before, 'Map.md bytes unchanged');
+});
+
+test('C08: a title hit is spoken without (in text); a body-only hit is spoken with it', async () => {
+  const h = await harness({ collapse: false });
+  withBodies(h);
+  h.press(h.card('alpha')); h.type('alpha');
+  h.keydown('Enter'); await h.settle();
+  assert.ok(!/in text/.test(h.spoken()), h.spoken());
+  withBodies(h); // the harness reloads the notes after a jump; put the bodies back
+  h.type('zebra');
+  h.view.mapSearch.currentId = null;
+  h.keydown('Enter'); await h.settle();
+  assert.match(h.spoken(), /\(in text\)$/);
+});
+
+test('C08: a fresh view with the same notes gives the same result for the same query', async () => {
+  const a = await harness(); withBodies(a); a.press(a.card('alpha')); a.type('zebra');
+  const b = await harness(); withBodies(b); b.press(b.card('alpha')); b.type('zebra');
+  const titles = h => h.view.mapSearchResult().matches.map(id => h.view.notes.get(id).title);
+  assert.deepEqual([...titles(a)], [...titles(b)]);
+  assert.ok(titles(a).length >= 2);
+});
+
+test('C08: one keystroke computes the search result once for marks, count and announcement', async () => {
+  const h = await harness({ collapse: false });
+  withBodies(h);
+  const note = h.view.notes.get(h.ids.beta);
+  let reads = 0; const title = note.title;
+  Object.defineProperty(note, 'title', { get() { reads++; return title; }, configurable: true });
+  h.press(h.card('alpha'));
+  reads = 0; h.type('zebra');
+  assert.equal(reads, 1, 'beta title read once while one keystroke marks cards and sets the count');
+  h.flushTimers(); // the announcement reuses it
+  assert.equal(reads, 1, 'and the delayed announcement does not search again');
+  reads = 0; h.type('zebr');
+  assert.equal(reads, 1, 'a new query computes again, once');
 });
 
 test('34: a regex-looking query is literal and a blank query matches nothing and says so', async () => {
@@ -190,27 +272,32 @@ test('34: Enter during IME composition does not jump', async () => {
   assert.equal(h.centred.length, before);
 });
 
-test('34: a match inside two folded levels opens both in one history step, and undo folds them again', async () => {
+test('34: a match inside two folded levels opens them only for the search: no history, no file change, gone when the search closes', async () => {
+  // B14: P1.6 search only opens folded ancestors temporarily; this replaces the old "one history step, undo folds again".
   const h = await harness();
   assert.equal(h.card('deep'), undefined, 'the match starts hidden');
   h.press(h.card('alpha')); h.type('needle');
   const before = h.view.history.past.length;
+  const fileBefore = await h.saved();
+  const nodesBefore = JSON.stringify(h.view.map.nodes);
   h.keydown('Enter'); await h.settle();
   const map = h.view.map;
-  assert.equal(map.nodes.find(n => n.id === h.ids.branch).collapsed, false);
-  assert.equal(map.nodes.find(n => n.id === h.ids.inner).collapsed, false);
-  assert.equal(h.view.history.past.length, before + 1, 'exactly one history entry');
+  assert.equal(map.nodes.find(n => n.id === h.ids.branch).collapsed, true, 'still folded in the map');
+  assert.equal(map.nodes.find(n => n.id === h.ids.inner).collapsed, true);
+  assert.equal(h.view.history.past.length, before, 'no history entry');
+  assert.equal(JSON.stringify(map.nodes), nodesBefore, 'the stored map (positions too) is untouched');
+  assert.deepEqual((await h.saved()).nodes, fileBefore.nodes, 'Map.md reads back the same');
   assert.ok(h.card('deep'), 'the card is drawn');
   assert.ok(h.card('deep').classes.has('is-search-current'), 'and marked current');
+  assert.ok(h.card('branch').classes.has('is-temp-open'), 'the opened branch is marked');
   assert.equal(h.centred.at(-1).id, h.ids.deep);
-  const disk = await h.saved();
-  assert.equal(disk.nodes.find(n => n.id === h.ids.inner).collapsed, false, 'saved');
   h.keydown('Enter'); await h.settle();
-  assert.equal(h.view.history.past.length, before + 1, 'the second match is already visible: no new entry');
-  await h.view.travel(false);
-  const undone = h.view.map;
-  assert.equal(undone.nodes.find(n => n.id === h.ids.branch).collapsed, true);
-  assert.equal(undone.nodes.find(n => n.id === h.ids.inner).collapsed, true);
+  assert.equal(h.view.history.past.length, before, 'the second match is already visible: still no entry');
+  assert.ok(h.card('deep2'));
+  h.keydown('Escape'); await h.settle();
+  assert.equal(h.card('deep'), undefined, 'closing the search folds the branch view again');
+  assert.equal(h.card('deep2'), undefined);
+  assert.equal(h.view.map.nodes.find(n => n.id === h.ids.branch).collapsed, true);
 });
 
 test('34: a render during the search keeps the query, the current match, the field focus and the caret', async () => {
@@ -335,4 +422,71 @@ test('map search: a canceled announcement callback cannot clear or speak for its
   live();
   assert.equal(h.spoken(), '1 matches');
   assert.equal(h.view.mapSearch.cancelAnnouncement, null);
+});
+
+test('B14: starting a presentation repaints, so the search-only branch is not in the presentation', async () => {
+  const h = await harness();
+  h.press(h.card('alpha')); h.type('needle'); h.keydown('Enter'); await h.settle();
+  assert.ok(h.card('deep'), 'the search opened the branch');
+  h.view.selection.setSelected(h.ids.alpha);
+  await h.view.startPresentation();
+  assert.equal(h.card('deep'), undefined, 'the temporary cards are gone from the presentation');
+  assert.equal(h.view.searchOpen, null);
+});
+
+test('B14: a search-opened branch carries a small label that disappears with the search', async () => {
+  const h = await harness();
+  h.press(h.card('alpha')); h.type('needle'); h.keydown('Enter'); await h.settle();
+  const labels = () => h.card('branch').children.filter(c => c.classes.has('vam-search-temp-label') && !c.removed); // the stand-in keeps removed children listed
+  assert.equal(labels().length, 1, 'one label on the opened ancestor');
+  assert.equal(labels()[0].text, 'Opened for search');
+  assert.equal(labels()[0].classes.has('is-search'), false);
+  h.view.applySearchMarks();
+  assert.equal(labels().length, 1, 'marks redone: still one');
+  const kept = labels()[0];
+  h.keydown('Escape'); await h.settle();
+  assert.equal(kept.removed, true, 'the label is removed when the search closes');
+});
+
+test('B14: a hit that is already on screen jumps without repainting', async () => {
+  const h = await harness({ collapse: false });
+  h.press(h.card('alpha')); h.type('plan');
+  const before = h.renders();
+  h.keydown('Enter'); await h.settle();
+  assert.equal(h.renders(), before, 'no render for a visible hit');
+  assert.equal(h.centred.at(-1).id, h.ids.alpha);
+});
+
+test('B14: the next hit in another folded branch folds the earlier one back and opens the new one', async () => {
+  const h = await harness();
+  const mapDoc = h.view.map;
+  const make2 = async (title, parentId, y) => { const n = await h.repo.createNote(title, 'gpt-6-luna', mapDoc, MAP, 'inherited'); Object.assign(n, { parentId, x: 400, y }); mapDoc.nodes.push(n); return n; };
+  const other = await make2('Other', h.ids.root, 900); other.collapsed = true;
+  const far = await make2('Zebra Needle', other.id, 900);
+  await h.view.hydrate(); h.build();
+  h.press(h.card('alpha')); h.type('needle');
+  h.keydown('Enter'); await h.settle();
+  assert.ok(h.card('deep'), 'first hit: first branch open');
+  assert.equal(h.view.cardEls.get(far.id), undefined);
+  h.keydown('Enter'); h.keydown('Enter'); await h.settle();
+  assert.ok(h.view.cardEls.get(far.id), 'the new branch is open');
+  assert.equal(h.card('deep'), undefined, 'the earlier branch folded back');
+  assert.equal(h.card('deep2'), undefined);
+  assert.equal(h.view.map.nodes.find(n => n.id === h.ids.branch).collapsed, true);
+});
+
+test('B14: an outline reveal into a folded branch opens it for the view only, no collapse write, no history', async () => {
+  const h = await harness();
+  h.view.viewportEl.toggleClass = () => {};
+  const path = h.view.map.nodes.find(n => n.id === h.ids.deep).path;
+  const before = h.view.history.past.length;
+  const stored = JSON.stringify((await h.saved()).nodes);
+  assert.equal(h.card('deep'), undefined);
+  assert.equal(await h.view.revealPath(path), true); await h.settle();
+  assert.ok(h.card('deep'), 'the card is drawn');
+  assert.equal(h.view.map.nodes.find(n => n.id === h.ids.branch).collapsed, true);
+  assert.equal(h.view.map.nodes.find(n => n.id === h.ids.inner).collapsed, true);
+  assert.equal(h.view.history.past.length, before);
+  assert.equal(JSON.stringify((await h.saved()).nodes), stored, 'Map.md unchanged');
+  assert.equal(h.centred.at(-1).id, h.ids.deep, 'centered on the topic itself');
 });

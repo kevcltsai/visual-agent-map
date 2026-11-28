@@ -319,7 +319,7 @@ test('d: while reading, the edit switches are off and edit keys, menus, details 
   await tick();
   assert.equal(h.mutateCalls(), 0);
   assert.equal(h.opened(), 0, 'no details sidebar for a card that is not read');
-  assert.equal(h.menus(), 0);
+  assert.equal(h.menus(), 1, 'only the right-click opens a menu: its rows are greyed while reading (decision #35)');
   h.release(0, 1, 2);
   await done;
   assert.equal(view.canEditSummary(), true);

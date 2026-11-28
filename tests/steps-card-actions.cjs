@@ -167,7 +167,11 @@ const TABLE = [
   ['selection-help', 'more', ['a', 'd'], 'ok ok ok ok ok ok ok ok'], // B09: the bar's "?" is the ⋯ menu's last row
   // Right-click on a selection (the !single branch): canEditSummary.
   ['summary-add-selected', 'context', ['a', 'd'], 'ok ro ok ok pr ok ok ok'],
-  ['note-style', 'context', ['a'], 'ok ro ok ok pr ok ok ok'] // one topic in selection mode
+  ['note-style', 'context', ['a'], 'ok ro ok ok pr ok ok ok'], // one topic in selection mode
+  // Image right-click (openImageMenu → addCardActions, P5.3): the card gates; an image does not merge and no picture-book lock
+  // stops its menu today (convertImageDialog's canEditCanvasItems).
+  ['image-explore', 'context', null, 'ok ro ok ok pr ms ok ok', { image: { id: 'img1', annotated: true } }],
+  ['image-explore', 'context', null, 'ok ro ok ok pr ms ok ok', { image: { id: 'img1', annotated: false } }]
 ];
 
 test('card actions: available matches every current entry under each context', () => {
@@ -450,10 +454,36 @@ test('card actions: the view builds the context next to mapCommand; the palette,
   // B08: the card toolbar and its first button's repaint (paintPromptState).
   assert.equal(count(body('private paintCardToolbar')), 1, 'paintCardToolbar');
   assert.equal(count(body('private repaintRunTool')), 1, 'repaintRunTool');
-  assert.equal(count(view), 6, 'no other entry reads the registry yet');
+  assert.equal(count(body('private cardKeyAction')), 1, 'B10: the map keys (cardKeyAction)');
+  assert.equal(count(view), 7, 'B08 toolbar and repaint, B10 key entry; no other entry reads the registry yet');
   assert.equal((view.match(/CARD_ACTIONS/g) ?? []).length, 0);
   assert.match(body('private openCardMoreMenu'), /this\.addCardActions\(menu, "more", node\)/);
   assert.match(body('private addCardMenuActions'), /this\.addCardActions\(menu, "context", node,/);
+});
+
+test('card actions: Image exploration (P5.3) is the image right-click\'s only action, on no other surface or target', () => {
+  const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
+  const plainImage = { image: { id: 'img1', annotated: false } }, annotatedImage = { image: { id: 'img1', annotated: true } };
+  assert.equal(cardActionKind(ctxFor(null, 'normal', plainImage)), 'image');
+  // The map's own actions (zoom, search, …) stay off the image menu.
+  eq(ids('context', ctxFor(null, 'normal', plainImage)), ['image-explore']);
+  eq(ids('context', ctxFor(null, 'normal', annotatedImage)), ['image-explore']);
+  for (const surface of ['toolbar', 'more', 'command', 'key', 'edge', 'canvas']) eq(ids(surface, ctxFor(null, 'normal', plainImage)), [], surface);
+  for (const target of ['a', 'ai', ['a', 'd'], null])
+    for (const surface of ['toolbar', 'more', 'context', 'command', 'key']) assert.ok(!ids(surface, ctxFor(target, 'normal')).includes('image-explore'), `${surface} ${target}`);
+  assert.ok(!ruleMoreSet('card').includes('image-explore') && !ruleContextSet('ai-card').includes('image-explore'));
+  // A plain image's row ends in "…" (it asks first); an annotated image's does not.
+  const explore = action('image-explore');
+  assert.equal(titleKeyFor(explore, 'context', ctxFor(null, 'normal', plainImage)), 'ui.image_explore_ask');
+  assert.equal(titleKeyFor(explore, 'context', ctxFor(null, 'normal', annotatedImage)), 'ui.image_explore');
+  for (const dictionary of [en, zhTW, zhCN])
+    for (const key of ['ui.image_explore', 'ui.image_explore_ask', 'ui.image_explore_title', 'ui.image_explore_button']) assert.ok(dictionary[key]?.trim(), key);
+  assert.equal(zhTW['ui.image_explore'], '圖像探索');
+  assert.equal(zhTW['ui.image_explore_ask'], '圖像探索…');
+  // One click runs the view's exploreImage with the image's id.
+  const { calls, host } = recorder();
+  explore.run(ctxFor(null, 'normal', { ...plainImage, host }));
+  eq(calls, [['exploreImage', 'img1']]);
 });
 
 test('card actions: the edge "+ Topic card" (V3.3 A6) as paintCardEdgeEntries and addTopicFromEdge have it', () => {

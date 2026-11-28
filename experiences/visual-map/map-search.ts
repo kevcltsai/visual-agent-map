@@ -1,13 +1,39 @@
-import { foldSearchText } from "../../i18n/han-fold";
+import { foldSearchText, foldSearchTextCached } from "../../i18n/han-fold";
 import type { MapNode } from "../../map-graph";
 
 export { foldSearchText } from "../../i18n/han-fold";
 
-/** Ids whose title contains the query (literal substring, titles only), in `order`. A blank query matches nothing. */
-export function findMatches(order: string[], titleOf: (id: string) => string, query: string): string[] {
+/** What a topic offers to a search: its title and its body (summary and Detail). */
+export interface SearchText {
+  title: string;
+  body: string;
+}
+
+export interface MapMatches {
+  matches: string[];
+  /** Matches whose title does not contain the query: only the summary or Detail does. */
+  bodyOnly: ReadonlySet<string>;
+}
+
+/** Ids whose title, summary or Detail contains the query (literal substring, folded), in `order`. A blank query matches nothing. */
+export function searchMatches(order: string[], textOf: (id: string) => SearchText, query: string): MapMatches {
   const needle = foldSearchText(query.trim());
-  if (!needle) return [];
-  return order.filter(id => foldSearchText(titleOf(id)).includes(needle));
+  const matches: string[] = [];
+  const bodyOnly = new Set<string>();
+  if (!needle) return { matches, bodyOnly };
+  for (const id of order) {
+    const text = textOf(id);
+    if (foldSearchTextCached(text.title).includes(needle)) matches.push(id);
+    else if (foldSearchTextCached(text.body).includes(needle)) {
+      matches.push(id);
+      bodyOnly.add(id);
+    }
+  }
+  return { matches, bodyOnly };
+}
+
+export function findMatches(order: string[], textOf: (id: string) => SearchText, query: string): string[] {
+  return searchMatches(order, textOf, query).matches;
 }
 
 export interface MapMatchStep {

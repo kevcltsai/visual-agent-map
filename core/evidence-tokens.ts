@@ -22,7 +22,8 @@ export function noteNumbers(detail: string): Set<string> {
     .replace(/\]\([^)]*\)/g, "]")
     .replace(/https?:\/\/\S+/g, "")
     .replace(/\[\^[^\]]*\]/g, "")
-    .replace(/<!--[\s\S]*?-->/g, "");
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/%%vam-src:[^%\n]*%%/g, "");
   return new Set(numberTokens(t));
 }
 

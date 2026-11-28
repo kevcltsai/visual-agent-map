@@ -615,6 +615,29 @@ test('06 structure: suggestions touching a locked topic are dropped and counted;
   assert.equal(h.view.map.nodes.length, count);
 });
 
+test('V3.3 #02 structure: a card changed on disk after the review abandons the suggestion with a notice; nothing is written', async () => {
+  const { structureContentVersion } = S.load('core/structure-review-service.ts');
+  const h = await harness(['A', 'B']);
+  const [a, b] = h.nodes;
+  const basis = { targetTitle: '', targetParentId: null };
+  // What the review sent for each card (the view's cards at review time).
+  const reviewed = id => { const note = h.view.notes.get(id); return note ? structureContentVersion(note) : undefined; };
+  const seen = new Map([a, b].map(n => [n.id, reviewed(n.id)]));
+  await h.repo.updateNote(a.path, { summary: 'Edited outside the review window' });
+  const files = JSON.stringify([...h.contents]);
+  const count = h.view.map.nodes.length;
+  const stale = t('ui.structure_review_stale_content');
+  for (const suggestion of [{ kind: 'strengthen', targetId: a.id, basis }, { kind: 'move', targetId: b.id, newParentId: a.id, basis }]) {
+    await assert.rejects(h.view.applyStructureSuggestion(suggestion, 'New', () => null, id => seen.get(id)), error => error.message === stale, suggestion.kind);
+    assert.equal(h.view.map.nodes.length, count, suggestion.kind);
+    assert.equal(JSON.stringify([...h.contents]), files, `${suggestion.kind}: every file byte for byte as before`);
+  }
+  assert.equal(h.notices.filter(message => message === stale).length, 2);
+  // Unchanged since the review: applied as before.
+  await h.view.applyStructureSuggestion({ kind: 'strengthen', targetId: b.id, basis }, 'New', () => null, id => seen.get(id));
+  assert.equal(h.view.map.nodes.length, count + 1);
+});
+
 // ---- ticket 07: map chat ---------------------------------------------------------------------------------------------
 const chatBaseline = h => ({ mdHashes: {}, topicHashes: Object.fromEntries(h.view.map.nodes.map(n => [n.id, { title: h.view.notes.get(n.id).title, parentId: n.parentId }])) });
 const applyChat = (h, action, baseline = chatBaseline(h)) => h.view.applyChatWrite(action, baseline, () => true);

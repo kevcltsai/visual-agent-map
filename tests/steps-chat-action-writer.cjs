@@ -706,3 +706,65 @@ test('Living Node chat: configured creation never falls back to ordinary addNode
   assert.equal(done.run.refs.get('tracker'), 'configured');
   assert.deepEqual(w.only('addNode'), []);
 });
+
+// ---- the shared AI write gate (V3.3 #02) ----
+
+test('AI write gate (chat): a lock that lands after the lock check is still refused at the write, nothing written', async () => {
+  for (const action of [{ kind: 'rename_topic', nodeId: 'a', title: 'A2' }, { kind: 'update_summary', nodeId: 'a', summary: 'S2' }, { kind: 'edit_topic_note', nodeId: 'a', detail: 'D2' }]) {
+    const w = world();
+    const baseline = w.baseline();
+    baseline.topicHashes.a.detailHash = contentHash('');
+    // The lock check passed (no reason), then the card was locked on disk before the write read it again.
+    w.notes.get('a').aiLocked = true;
+    const { outcome } = await apply(w, action, baseline);
+    assert.deepEqual(outcome, skippedOutcome('ui.ai_locked_notice'), action.kind);
+    assert.deepEqual(w.only('noteChange'), [], action.kind);
+    assert.equal(w.history.length, 0, action.kind);
+  }
+});
+
+test('AI write gate (chat): partial apply skips only the changed card, keeps the earlier write and runs nothing again (chat-data)', async () => {
+  const w = world();
+  const baseline = w.baseline();
+  baseline.topicHashes.b.title = 'What the model saw';
+  const actions = [{ kind: 'rename_topic', nodeId: 'a', title: 'A2' }, { kind: 'rename_topic', nodeId: 'b', title: 'B2' }, { kind: 'rename_topic', nodeId: 'c', title: 'C2' }];
+  const run = w.run();
+  const outcomes = [];
+  for (const action of actions) outcomes.push((await apply(w, action, baseline, run)).outcome);
+  assert.deepEqual(outcomes, [{ status: 'done' }, skippedOutcome('ui.map_chat_skip_topic_changed'), { status: 'done' }]);
+  assert.deepEqual(w.only('noteChange'), [['noteChange', 'a', { title: 'A2' }], ['noteChange', 'c', { title: 'C2' }]]);
+  assert.equal(w.notes.get('a').title, 'A2', 'the succeeded action is not rolled back');
+  assert.equal(w.notes.get('b').title, 'B', 'the skipped card is as the user left it');
+  assert.deepEqual([...run.notes].sort(), ['a', 'c']);
+});
+
+test('AI write gate (chat): an injected or invalid action cannot change a topic identity, unlock a card or reach an unknown card', async () => {
+  const note = '---\nagent-map-node: true\nnode-id: a\n---\nbody';
+  const w = world({ files: { 'notes/x.md': note, 'notes/l.md': 'plain' } });
+  const baseline = w.baseline({ mdHashes: { 'notes/x.md': contentHash(note), 'notes/l.md': contentHash('plain') } });
+  const before = JSON.stringify([...w.files]);
+  const identity = await apply(w, { kind: 'edit_md_file', path: 'notes/x.md', find: 'node-id: a', replace: 'node-id: evil' }, baseline);
+  assert.deepEqual(identity.outcome.status, 'skipped');
+  const unlock = await apply(w, { kind: 'edit_md_file', path: 'notes/l.md', find: 'plain', replace: '---\nai-locked: false\n---\nplain' }, baseline);
+  assert.deepEqual(unlock.outcome.status, 'skipped');
+  const ghost = await apply(w, { kind: 'rename_topic', nodeId: 'ghost', title: 'X' }, baseline);
+  assert.deepEqual(ghost.outcome, skippedOutcome('ui.map_chat_skip_topic_gone'));
+  assert.equal(JSON.stringify([...w.files]), before, 'every file byte for byte as before');
+  assert.deepEqual(w.only('process'), []);
+  assert.deepEqual(w.only('noteChange'), []);
+  assert.equal(w.history.length, 0);
+});
+
+// ai-flows §AI 鎖定: the book plan chat leaves a note with `ai-locked: true` as it is and says why (the locked reason, not "changed").
+test('book plan chat, AI lock: a locked card is left as it is and named locked; a locked book card refuses the thread edit; nothing written there', async () => {
+  const w = planWorld();
+  w.cards.get('b.md').aiLocked = true;
+  const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'new entry' }, { id: 'c', entry: 'other entry' }]), { bookPlan: w.baselineOf(['b', 'c']) }));
+  assert.equal(outcome.status, 'done', JSON.stringify(outcome));
+  assert.match(outcome.note, /\(1 cards left as they are\): B \(locked\)$/);
+  assert.ok(!w.writes.includes('b.md'));
+  const root = planWorld({ rootRaw: threadRoot('old thread'), thread: 'old thread' });
+  root.cards.get('r.md').aiLocked = true;
+  assert.deepEqual(plain(await applyBookThreadEdit(root.deps, threadAction('x'), { bookPlan: root.baselineOf([]) })), skippedOutcome('ui.ai_locked_notice'));
+  assert.deepEqual(root.writes, []);
+});

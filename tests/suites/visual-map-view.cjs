@@ -130,7 +130,7 @@ integrationTest('a topic waiting in a research batch shows a scheduled frame and
   assert.equal(card.dataset.status, 'idea'); assert.equal(all(card, item => item.cls === 'vam-status vam-status-queued').length, 0);
 });
 // B15 (P1.6c): an outline reveal is read-only navigation, like a search hit (V3.3 decision #7): it never writes collapse.
-integrationTest('outline reveal selects the topic without writing collapse, centers on the top collapsed ancestor, and reports unknown paths', async () => {
+integrationTest('outline reveal selects the topic without writing collapse, centers on the topic (opened for the view only), and reports unknown paths', async () => {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const root = node('root'), child = node('child'), leaf = node('leaf');
   child.parentId = root.id; leaf.parentId = child.id; root.collapsed = true; child.collapsed = true;
@@ -146,7 +146,7 @@ integrationTest('outline reveal selects the topic without writing collapse, cent
   assert.equal(changes, 0, 'no map change'); assert.equal(saves, 0, 'the camera move is not saved');
   assert.equal(view.selection.state.selected, leaf.id); assert.equal(view.selection.state.multiSelected.size, 0);
   assert.equal(active.at(-1), 'leaf.md', 'the outline is told the active topic');
-  assert.deepEqual(plain(doc.viewport), { x: 400 - (root.x + 140), y: 300 - (root.y + 80), zoom: 1 }, 'centered on the top collapsed ancestor');
+  assert.deepEqual(plain(doc.viewport), { x: 400 - (leaf.x + 140), y: 300 - (leaf.y + 80), zoom: 1 }, 'centered on the topic itself'); // B14: P1.6 reveal only temporarily opens the branch for the view
   view.selection.toggleMultiSelect(); view.selection.replaceMulti(['root']); view.selection.setSelected(null);
   await view.revealPath('root.md');
   assert.deepEqual([...view.selection.state.multiSelected], ['root'], 'topic selection is kept'); assert.equal(view.selection.state.selected, null);

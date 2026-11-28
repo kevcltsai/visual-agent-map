@@ -99,3 +99,119 @@ test('B19a: a selection with a card and its grandchild-level relative keeps Merg
   assert.equal(merge.attrs['aria-disabled'], 'true'); assert.equal(merge.attrs.title, translate('en', 'ui.merge_ancestor_selected'));
   assert.equal(buttonOf(bar, 'Move to…').attrs['aria-disabled'], undefined);
 });
+
+// B19b (P1.9): the selection bar's Color popover. One swatch colours every selected card in one write and one undo step.
+const NOTE = title => `Agent Workspace/Topics/map-b/Notes/${title}.md`;
+const withoutColor = text => text.replace(/^topic-color: .*\n/m, '');
+/** Clicks Color in a fresh bar and returns the popover (null when none opened). */
+function openColor(h) {
+  const bar = h.bar();
+  const button = buttonOf(bar, 'Color ▾');
+  // The shared DOM stand-in has `parent`; the view finds the bar through parentElement, as in Obsidian.
+  Object.defineProperty(button, 'parentElement', { configurable: true, get() { return this.parent; } });
+  button.fire('click');
+  return { bar, button, pop: bar.children.find(child => child.cls.includes('vam-batch-popover')) ?? null };
+}
+const swatches = pop => dom.findAll(pop, item => item.tag === 'button' && item.cls.includes('vam-style-popover-color'));
+const swatch = (pop, id) => swatches(pop).find(item => item.dataset.styleChoice === `color-${id}`);
+
+test('B19b: mixed colours show "Mixed" beside the title and press no swatch; one colour presses only that one', async () => {
+  const h = await harness(SPEC);
+  await h.repo.writeTopicColor(h.named('A').path, 'blue');
+  await h.repo.writeTopicColor(h.named('C').path, 'blue');
+  await h.view.hydrate();
+  h.select(['A', 'B', 'C']);
+  const { button, pop } = openColor(h);
+  assert.ok(pop, 'the popover opens inside the selection bar'); assert.equal(button.attrs['aria-haspopup'], 'dialog');
+  assert.ok(pop.cls.includes('vam-style-popover'), 'the Style popover swatches');
+  assert.equal(swatches(pop).length, 7, 'none plus six colours');
+  assert.ok(dom.findAll(pop, item => item.cls.includes('vam-batch-popover-mixed') && item.text === 'Mixed').length === 1);
+  assert.deepEqual(swatches(pop).filter(item => item.attrs['aria-pressed'] === 'true'), [], 'nothing pre-selected');
+  assert.equal(translate('zh-TW', 'ui.batch_color_mixed'), '未統一');
+  h.select(['A', 'C']);
+  const same = openColor(h).pop;
+  assert.equal(dom.findAll(same, item => item.cls.includes('vam-batch-popover-mixed')).length, 0);
+  assert.deepEqual(swatches(same).filter(item => item.attrs['aria-pressed'] === 'true').map(item => item.dataset.styleChoice), ['color-blue']);
+});
+
+test('B19b: one swatch colours the whole selection in one write: only topic-color changes; one undo restores all, redo colours again', async () => {
+  const h = await harness(SPEC);
+  await h.repo.writeTopicColor(h.named('A').path, 'blue');
+  await h.view.hydrate();
+  h.select(['A', 'B', 'C']);
+  const before = h.files(), history = h.view.history.past.length;
+  const { bar, pop } = openColor(h);
+  swatch(pop, 'green').fire('click');
+  assert.equal(bar.children.includes(pop), false, 'a pick closes the popover');
+  await h.settled();
+  const after = h.files();
+  for (const title of ['A', 'B', 'C']) {
+    assert.match(after.get(NOTE(title)), /^topic-color: "green"$/m, title);
+    assert.equal(withoutColor(after.get(NOTE(title))), withoutColor(before.get(NOTE(title))), `${title}: every other byte is the same`);
+  }
+  for (const title of ['Root', 'A1']) assert.equal(after.get(NOTE(title)), before.get(NOTE(title)), `${title} is not selected`);
+  assert.equal(after.get(MAP), before.get(MAP), 'Map.md unchanged');
+  assert.equal(h.view.history.past.length, history + 1, 'one history step');
+  await h.view.history.undo().undo();
+  assert.deepEqual(h.files(), before, 'one undo restores every note byte for byte');
+  await h.view.history.redo().redo();
+  for (const title of ['A', 'B', 'C']) assert.match(h.files().get(NOTE(title)), /^topic-color: "green"$/m, `redo: ${title}`);
+});
+
+test('B19b: an AI-locked or merging card in the selection turns Color off with the group reason; neither the click nor the write entry writes', async () => {
+  const h = await harness(SPEC);
+  await h.repo.writeAiLocked(h.named('B').path, true);
+  await h.view.hydrate();
+  h.select(['A', 'B', 'C']);
+  const ids = ['A', 'B', 'C'].map(title => h.named(title).id);
+  const before = h.files(), history = h.view.history.past.length;
+  const reason = translate('en', 'ui.selection_locked_0_1', 1, 'B');
+  const { bar, button, pop } = openColor(h);
+  assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.disabled, false); assert.equal(button.attrs.title, reason);
+  assert.equal(bar.children.filter(child => child.cls.includes('vam-selection-why')).map(child => child.text).join(), reason, 'one reason line for Color, Move to and Merge');
+  assert.equal(pop, null, 'no popover');
+  await h.view.changeSelectionColor(ids, 'red');
+  assert.deepEqual(h.files(), before, 'Map.md and every note are byte-identical');
+  assert.equal(h.view.history.past.length, history);
+  assert.deepEqual(h.notices, [reason, reason], 'the click and the refused write each say why');
+  // A merging card as well: the reason lists both.
+  h.view.isMerging = id => id === h.named('C').id;
+  const merging = openColor(h);
+  assert.equal(merging.button.attrs.title, translate('en', 'ui.selection_locked_0_1', 2, 'B, C')); assert.equal(merging.pop, null);
+  const held = h.files();
+  await h.view.changeSelectionColor(ids, 'red');
+  assert.deepEqual(h.files(), held, 'zero writes while merging');
+});
+
+test('B19b: while the notes load Color is off with the loading reason and neither the click nor the write entry writes', async () => {
+  const h = await harness(SPEC);
+  h.select(['A', 'C']);
+  const ids = ['A', 'C'].map(title => h.named(title).id);
+  const before = h.files();
+  h.view.notesLoading = () => true;
+  const loading = openColor(h);
+  assert.equal(loading.button.attrs['aria-disabled'], 'true'); assert.equal(loading.button.attrs.title, translate('en', 'ui.card_action_off_notes_loading'));
+  assert.equal(loading.pop, null);
+  await h.view.changeSelectionColor(ids, 'red');
+  assert.deepEqual(h.files(), before);
+});
+
+test('B19b (parent ruling: the picture-book structure lock covers parent and order only): under the book locks Color stays on and colours the selection, only topic-color changes, Map.md unchanged', async () => {
+  const h = await harness(SPEC);
+  h.select(['A', 'C']);
+  const before = h.files();
+  h.view.bookLock = () => ({ ai: true, structure: true });
+  const { bar, button, pop } = openColor(h);
+  assert.equal(button.attrs['aria-disabled'], undefined, 'neither hidden nor off'); assert.ok(pop);
+  assert.equal(buttonOf(bar, 'Move to…'), undefined, 'control: Move to still leaves the bar under the structure lock');
+  assert.equal(bar.children.some(child => child.cls.includes('vam-selection-why')), false);
+  swatch(pop, 'red').fire('click');
+  await h.settled();
+  const after = h.files();
+  for (const title of ['A', 'C']) {
+    assert.match(after.get(NOTE(title)), /^topic-color: "red"$/m, title);
+    assert.equal(withoutColor(after.get(NOTE(title))), withoutColor(before.get(NOTE(title))), `${title}: every other byte is the same`);
+  }
+  for (const title of ['Root', 'A1', 'B']) assert.equal(after.get(NOTE(title)), before.get(NOTE(title)), `${title} is not selected`);
+  assert.equal(after.get(MAP), before.get(MAP), 'Map.md unchanged');
+});

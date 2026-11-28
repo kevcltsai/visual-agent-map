@@ -16651,102 +16651,115 @@ export class VisualAgentMapView extends ItemView {
           saving = run;
           return run;
         },
-        trial: node
-          ? async values => {
-              invalidateTrial();
-              // A card in a formal run cannot be tried out; the run reads and writes it.
-              if (
-                livingCoordinator(this.plugin).runOf(mapPath) ||
-                livingCoordinator(this.plugin).formalBusy(node.path)
-              ) {
-                new Notice(t("ui.living_node_trial_formal_busy"));
-                return false;
-              }
-              const attempt = new AbortController();
-              activeTrial = attempt;
-              const currentTrial = (): boolean =>
-                current() && activeTrial === attempt && !attempt.signal.aborted && this.aiCardOpen?.trial === trial;
-              try {
-                const prepared = await prepareLivingTrial(
-                  {
-                    app: this.app,
-                    repo: this.plugin.repo,
-                    calls: this.plugin.aiCalls,
-                    mapPath,
-                    viewSession,
-                    signal: attempt.signal,
-                    current: currentTrial,
-                    language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
-                    mapSources: signal => this.readLivingMapSourceReport(signal)
-                  },
-                  node.id,
-                  promptOf(values)
-                );
-                let ready = false;
-                let started = false;
-                win.setTrialWaiting(true);
-                try {
-                  await this.plugin.confirmAiUsage(prepared.model, async () => {
-                    win.setTrialWaiting(false);
-                    if (!currentTrial()) return;
-                    started = true;
-                    ready = await trial.run(prepared.request);
-                  });
-                } finally {
-                  win.setTrialWaiting(false);
-                }
-                if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
-                  // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
-                  if (currentTrial() && started) {
-                    invalidateTrial();
-                    new Notice(t("ui.living_node_trial_invalid"));
-                    const failed = livingTrialReason(trial.failure ?? trial.failureCode ?? "");
-                    win.showTrialFailure(failed.key, failed.code);
-                  }
-                  return false;
-                }
-                this.aiCardOpen.adoption = prepared.adoption;
-                const warnings = prepared.warnings.map(warning =>
-                  warning.startsWith("suppressed-dropped:")
-                    ? t("ui.living_node_suppressed_dropped_0", Number(warning.slice(19)))
-                    : t(
-                        warning === "upstream-stale"
-                          ? "ui.living_node_trial_stale_sources"
-                          : warning === "frozen-source"
-                            ? "ui.living_node_trial_frozen_sources"
-                            : warning === "omitted-edits-skipped"
-                              ? "ui.living_node_omitted_edits_skipped"
-                              : warning === "ai-latest-user-edited"
-                                ? "ui.living_node_ai_latest_user_edited"
-                                : warning === "ai-latest-deleted"
-                                  ? "ui.living_node_ai_latest_deleted"
-                                  : "ui.living_node_optional_source_unavailable"
-                      )
-                );
-                const shown = await this.plugin.showLivingTrial(
-                  this.plugin.repo.file(node.path),
-                  renderLivingPreview(trial.result),
-                  viewSession,
-                  currentTrial,
-                  warnings,
-                  trial.changes
-                );
-                if (!shown && currentTrial()) invalidateTrial();
-                if (shown && currentTrial()) watchTrial(prepared);
-                return shown && currentTrial();
-              } catch (error) {
-                if (currentTrial()) {
-                  invalidateTrial();
-                  const reason = this.plugin.recordFailure(t("ui.living_node_trial"), error);
-                  new Notice(reason);
-                  const failed = livingTrialReason(error);
-                  win.showTrialFailure(failed.key, failed.code);
-                }
-                return false;
-              }
+        trial: async values => {
+          invalidateTrial();
+          // A card in a formal run cannot be tried out; the run reads and writes it. An unsaved card has no formal state.
+          if (
+            node &&
+            (livingCoordinator(this.plugin).runOf(mapPath) || livingCoordinator(this.plugin).formalBusy(node.path))
+          ) {
+            new Notice(t("ui.living_node_trial_formal_busy"));
+            return false;
+          }
+          // An unsaved new card is tried from memory: no file, no configuration, nothing written.
+          const draft = node
+            ? undefined
+            : {
+                path: this.plugin.repo.topicFolder(mapPath, "Notes") + "/" + viewSession + ".md",
+                title: values.title || aiCardTitle(values.question),
+                parentId: parent?.id ?? null,
+                model: parent
+                  ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
+                  : this.plugin.currentModelChoice().model
+              };
+          const targetId = node?.id ?? viewSession;
+          const targetPath = node?.path ?? draft!.path;
+          const attempt = new AbortController();
+          activeTrial = attempt;
+          const currentTrial = (): boolean =>
+            current() && activeTrial === attempt && !attempt.signal.aborted && this.aiCardOpen?.trial === trial;
+          try {
+            const prepared = await prepareLivingTrial(
+              {
+                app: this.app,
+                repo: this.plugin.repo,
+                calls: this.plugin.aiCalls,
+                mapPath,
+                viewSession,
+                signal: attempt.signal,
+                current: currentTrial,
+                language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
+                mapSources: signal => this.readLivingMapSourceReport(signal)
+              },
+              targetId,
+              promptOf(values),
+              draft
+            );
+            let ready = false;
+            let started = false;
+            win.setTrialWaiting(true);
+            try {
+              await this.plugin.confirmAiUsage(prepared.model, async () => {
+                win.setTrialWaiting(false);
+                if (!currentTrial()) return;
+                started = true;
+                ready = await trial.run(prepared.request);
+              });
+            } finally {
+              win.setTrialWaiting(false);
             }
-          : undefined,
-        stopTrial: node ? invalidateTrial : undefined,
+            if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
+              // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
+              if (currentTrial() && started) {
+                invalidateTrial();
+                new Notice(t("ui.living_node_trial_invalid"));
+                const failed = livingTrialReason(trial.failure ?? trial.failureCode ?? "");
+                win.showTrialFailure(failed.key, failed.code);
+              }
+              return false;
+            }
+            this.aiCardOpen.adoption = prepared.adoption;
+            const warnings = prepared.warnings.map(warning =>
+              warning.startsWith("suppressed-dropped:")
+                ? t("ui.living_node_suppressed_dropped_0", Number(warning.slice(19)))
+                : t(
+                    warning === "upstream-stale"
+                      ? "ui.living_node_trial_stale_sources"
+                      : warning === "frozen-source"
+                        ? "ui.living_node_trial_frozen_sources"
+                        : warning === "omitted-edits-skipped"
+                          ? "ui.living_node_omitted_edits_skipped"
+                          : warning === "ai-latest-user-edited"
+                            ? "ui.living_node_ai_latest_user_edited"
+                            : warning === "ai-latest-deleted"
+                              ? "ui.living_node_ai_latest_deleted"
+                              : "ui.living_node_optional_source_unavailable"
+                  )
+            );
+            const shown = await this.plugin.showLivingTrial(
+              this.plugin.repo.file(node ? targetPath : mapPath),
+              renderLivingPreview(trial.result),
+              viewSession,
+              currentTrial,
+              warnings,
+              trial.changes,
+              !node
+            );
+            if (!shown && currentTrial()) invalidateTrial();
+            if (shown && currentTrial()) watchTrial(prepared);
+            return shown && currentTrial();
+          } catch (error) {
+            if (currentTrial()) {
+              invalidateTrial();
+              const reason = this.plugin.recordFailure(t("ui.living_node_trial"), error);
+              new Notice(reason);
+              const failed = livingTrialReason(error);
+              win.showTrialFailure(failed.key, failed.code);
+            }
+            return false;
+          }
+        },
+        stopTrial: invalidateTrial,
         adopt: node
           ? async () => {
               const check = this.aiCardOpen?.trial === trial ? this.aiCardOpen.adoption : undefined;

@@ -91,9 +91,12 @@ export class NodeDetailsSidebar {
     owner: string,
     isCurrent: () => boolean,
     warnings: readonly string[] = [],
-    changes?: LivingChangeSummary
+    changes?: LivingChangeSummary,
+    /** An unsaved new card: no official note exists, so the editor claims the pane here instead of through openDetails. */
+    draft = false
   ): Promise<boolean> {
-    const revision = this.revision;
+    if (draft) this.trialOwner = owner;
+    const revision = draft ? ++this.revision : this.revision;
     const current = (): boolean => revision === this.revision && this.trialOwner === owner && isCurrent();
     return this.enqueue(async () => {
       if (!current()) return false;
@@ -111,7 +114,7 @@ export class NodeDetailsSidebar {
         return false;
       }
       if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
-      await leaf.view.show(file, markdown, owner, warnings, false, changes);
+      await leaf.view.show(file, markdown, owner, warnings, false, changes, draft);
       if (!current()) return false;
       await this.app().workspace.revealLeaf(leaf);
       return current();

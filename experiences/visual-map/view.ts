@@ -236,6 +236,7 @@ import {
   livingCrossCut,
   type LivingConfigSave
 } from "./living-node-runtime";
+import { livingHighlight, type LivingDependencyGraph } from "./living-node-map";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
 import {
   livingNoteForModel,
@@ -2589,6 +2590,13 @@ export class VisualAgentMapView extends ItemView {
       event.stopPropagation();
       return;
     }
+    // A branch an outline reveal opened for the view (no search box) folds back first; with a search box Esc is the box's.
+    if (event.key === "Escape" && !this.mapSearch && this.searchOpen) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeMapSearch(false);
+      return;
+    }
     if (event.key === "Escape" && this.branchFocus) {
       event.preventDefault();
       event.stopPropagation();
@@ -3984,8 +3992,10 @@ export class VisualAgentMapView extends ItemView {
     this.notes = loaded;
     this.mapSourcesControl?.loadForMap(sources);
     this.livingValidity.clear();
+    this.livingGraph = undefined;
     if (map && path && [...loaded.values()].some(isAiCard) && !this.promptRunning()) {
       try {
+        let graph: LivingDependencyGraph | undefined;
         const validity = await inspectLivingValidity({
           app: this.app,
           repo: this.plugin.repo,
@@ -3996,9 +4006,13 @@ export class VisualAgentMapView extends ItemView {
           current: alive,
           noteReads: ctx,
           language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-          mapSources: signal => this.readLivingMapSourceReport(signal)
+          mapSources: signal => this.readLivingMapSourceReport(signal),
+          onDependencies: dependencies => (graph = dependencies)
         });
-        if (alive()) this.livingValidity = validity;
+        if (alive()) {
+          this.livingValidity = validity;
+          this.livingGraph = graph;
+        }
       } catch {
         // Unknown validity never pretends to be a fresh result.
       }
@@ -6687,6 +6701,11 @@ export class VisualAgentMapView extends ItemView {
     // The change is saved and in history; a failing rebuild is reported but leaves it there (Undo stays available).
     const ownership = (map: MapDocument): string =>
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
+    // The dependency graph comes from the cards, paths and parents (not their order or place); after a change to those it is
+    // stale and highlights nothing until the next hydrate brings it back.
+    const planned = (map: MapDocument): string =>
+      JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]).sort());
+    if (planned(before) !== planned(after)) this.livingGraph = undefined;
     try {
       if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0))
         await this.plugin.rebuildDerivedData();
@@ -10494,6 +10513,7 @@ export class VisualAgentMapView extends ItemView {
         el.style.width = `${from.w}px`;
         el.style.height = `${from.h}px`;
         ring?.update(0, 0);
+        if (ring) this.syncDependencyHighlight();
       };
       const up = (): void => {
         if (done) return;
@@ -11674,7 +11694,26 @@ export class VisualAgentMapView extends ItemView {
       if (target) {
         map.nodes.find(node => node.id === target.id)!.collapsed = false;
         // One layout for the moved branches under the target, in the same history entry as the move.
-        this.arrangeBranch(map, target.id, moved, undefined);
+        if (roots.length > 1 && !before && this.placesLocally(map)) {
+          // A batch move keeps the branches' distances to each other: the top branch is laid out, the rest shift by the same offset, then only overlaps are pushed apart.
+          const lead = roots
+            .map(root => map.nodes.find(item => item.id === root.id)!)
+            .reduce((a, b) => (b.y < a.y ? b : a));
+          const start = new Map(
+            map.nodes.filter(node => moved.has(node.id)).map(node => [node.id, { x: node.x, y: node.y }])
+          );
+          const first = start.get(lead.id)!;
+          this.arrangeBranch(map, target.id, branchOf.get(lead.id)!, undefined);
+          const placed = map.nodes.find(node => node.id === lead.id)!;
+          const dx = placed.x - first.x,
+            dy = placed.y - first.y;
+          const rest = new Set([...moved].filter(id => !branchOf.get(lead.id)!.has(id)));
+          for (const node of map.nodes) {
+            const was = rest.has(node.id) ? start.get(node.id) : undefined;
+            if (was) Object.assign(node, { x: was.x + dx, y: was.y + dy });
+          }
+          this.pushFrom(map, rest);
+        } else this.arrangeBranch(map, target.id, moved, undefined);
       } else {
         for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id)!);
       }
@@ -15067,6 +15106,7 @@ export class VisualAgentMapView extends ItemView {
     this.syncToolsVisibility();
     this.chat?.refreshSelection();
     this.syncRelationClasses();
+    this.syncDependencyHighlight();
   }
   /** With several cards selected only the hovered or focused card shows its tool row (see styles.css). */
   private syncToolsVisibility(): void {
@@ -15732,6 +15772,22 @@ export class VisualAgentMapView extends ItemView {
     this.focusNode(node, false);
     return true;
   }
+  /** An outline reveal's temporary opening (no search box) folds back when a card off the opened path is clicked. */
+  private foldRevealUnless(node: MapNode): void {
+    const open = this.searchOpen;
+    if (this.mapSearch || !open || !this.map) return;
+    const byId = new Map(this.map.nodes.map(item => [item.id, item] as const));
+    const seen = new Set<string>();
+    for (
+      let at: MapNode | undefined = node;
+      at && !seen.has(at.id);
+      at = at.parentId ? byId.get(at.parentId) : undefined
+    ) {
+      if (open.expanded.has(at.id)) return;
+      seen.add(at.id);
+    }
+    this.closeMapSearch(false);
+  }
   private selectMapNode(node: MapNode): void {
     // Opening a card is one of the things the canvas hint teaches; mark it first so the repaint does not draw the hint again.
     if (this.hintEl) this.markCanvasHintSeen();
@@ -16228,6 +16284,7 @@ export class VisualAgentMapView extends ItemView {
     if ((event.target as Element).closest("button")) return;
     // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
     if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
+    this.foldRevealUnless(node);
     if (this.selection.state.multiSelectMode) {
       this.applySelectionChange(this.selection.toggleByClick(node.id));
       return;
@@ -21394,6 +21451,11 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   private livingValidity = new Map<string, "none" | "valid" | "stale">();
+  /** What each runnable AI card depends on, from the same validity pass; absent while unknown. */
+  private livingGraph: LivingDependencyGraph | undefined;
+  /** The tree lines this view marked and the overlay lines it added for the selected card's dependencies. */
+  private depMarks: SVGPathElement[] = [];
+  private depOverlays: SVGPathElement[] = [];
 
   /** Latest outcome and validity are independent. Old knowledge stays readable after a failure. */
   private aiStatusOf(id: string): AiCardStatus | undefined {
@@ -26867,6 +26929,7 @@ export class VisualAgentMapView extends ItemView {
             this.renderAfterDrag = false;
             if (!this.closed) this.render();
           }
+          this.syncDependencyHighlight();
         }
       };
       const settle = (): void => {
@@ -26897,6 +26960,8 @@ export class VisualAgentMapView extends ItemView {
             this.renderAfterDrag = false;
             if (!this.closed) this.render();
           }
+          // A drop that puts the card back redraws no edges: the overlays come back here.
+          this.syncDependencyHighlight();
         }
       };
       const drop = (e: PointerEvent, landed: { node: MapNode; invalid: boolean } | null): void => {
@@ -27082,6 +27147,8 @@ export class VisualAgentMapView extends ItemView {
     });
     return {
       update: (dx, dy) => {
+        // Dependency overlays do not follow a drag; the next highlight pass draws them again.
+        this.clearDependencyOverlays();
         for (const { id, boxes } of spines) {
           const move = (item: string, box: CardBox): CardBox =>
             group.has(item) ? (shifted(item, dx, dy) ?? box) : box;
@@ -27206,6 +27273,7 @@ export class VisualAgentMapView extends ItemView {
     const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
     return {
       update: (x, y) => {
+        this.clearDependencyOverlays();
         if (spineId && spineBoxes) this.placeSpine(spineId, { id, box: { x, y, ...size } }, spineBoxes);
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
@@ -27436,6 +27504,50 @@ export class VisualAgentMapView extends ItemView {
     for (const line of lines) this.edgesEl.appendChild(line);
     this.drawRelations(boxFor);
     this.syncRelationClasses();
+    this.syncDependencyHighlight();
+  }
+  /**
+   * The selected AI card's dependencies, as the planner resolves them: an AI dependency gets the run style, an ordinary
+   * card it reads the read style, on the tree line between them. A pair with no tree line drawn (an explicit reference,
+   * or a tree line left out for a relation) gets an overlay line while selected. Semantic lines are never marked.
+   * Only the previous marks are undone, so a selection change costs the size of the highlight, not the map.
+   */
+  private syncDependencyHighlight(): void {
+    for (const path of this.depMarks) path.removeClass("is-dep-run", "is-dep-read");
+    this.depMarks = [];
+    this.clearDependencyOverlays();
+    const selected = this.selection.state.selected;
+    if (!this.edgesEl || !this.map || this.map.aim || !this.livingGraph || !selected) return;
+    if (this.selection.state.multiSelected.size > 1) return;
+    const { run, read } = livingHighlight(this.livingGraph, selected);
+    const mark = (pairs: [string, string][], cls: string): void => {
+      for (const [consumer, dep] of pairs) {
+        const key = `${consumer}\u0000${dep}`;
+        // A child that reads its parent shares the parent's tree line (keyed parent first).
+        const path = this.edgeEls.get(key) ?? this.edgeEls.get(`${dep}\u0000${consumer}`);
+        if (path) {
+          path.addClass(cls);
+          this.depMarks.push(path);
+          continue;
+        }
+        // Collapsed away: with one end hidden there is nothing to join.
+        const from = this.cardEls.get(consumer);
+        const to = this.cardEls.get(dep);
+        if (!from || !to) continue;
+        const overlay = createSvg("path");
+        overlay.setAttribute("d", relationPathData(boxOf(from), boxOf(to)));
+        overlay.setAttribute("data-dep", key);
+        overlay.addClass("vam-edge-dep-overlay", cls);
+        this.edgesEl?.appendChild(overlay);
+        this.depOverlays.push(overlay);
+      }
+    };
+    mark(run, "is-dep-run");
+    mark(read, "is-dep-read");
+  }
+  private clearDependencyOverlays(): void {
+    for (const overlay of this.depOverlays) overlay.remove();
+    this.depOverlays = [];
   }
   /**
    * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, each leaving

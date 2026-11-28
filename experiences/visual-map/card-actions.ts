@@ -40,6 +40,7 @@ export type CardActionId =
   | "add-other"
   | "knowledge-ref-copy"
   | "knowledge-ref-paste"
+  | "impact"
   | "book"
   | "remove"
   | "reorder-sibling"
@@ -48,6 +49,7 @@ export type CardActionId =
   | "search"
   | "shortcuts"
   | "batch-color"
+  | "batch-size"
   | "merge"
   | "multi-research"
   | "move-to"
@@ -120,12 +122,16 @@ export interface CardActionHost {
   /** Copy as reference (copyAsKnowledgeRef) / Paste reference under the card (pasteKnowledgeRef). */
   copyKnowledgeRef(node: MapNode): void;
   pasteKnowledgeRef(node: MapNode): void;
+  /** Impact analysis (F09): the card's direct and guessed impact, shown read-only in the map chat window. */
+  impactAnalysis(node: MapNode): void;
   zoomFit(): void;
   zoomReset(): void;
   search(): void;
   shortcuts(): void;
   /** The selection's Color popover (batch-popover.ts) above its button (`opener`) in the selection bar. */
   openBatchColor(opener?: HTMLElement): void;
+  /** The selection's Size popover (batch-popover.ts) above its button (`opener`) in the selection bar. */
+  openBatchSize(opener?: HTMLElement): void;
   merge(): void;
   multiResearch(): void;
   chooseParent(copy: boolean): void;
@@ -175,6 +181,8 @@ export interface CardActionContext {
   summaryFieldOffered(): boolean;
   /** The card's colour and styles may change here (markersEditable: not an AIM map). */
   stylesEditable: boolean;
+  /** The map is an old AIM map (map.aim): its cards keep no custom size. */
+  aimMap: boolean;
   /** The AI works on this card now (aiStatusOf "running": a batch, a single run, research, a merge…). */
   aiRunning(id: string): boolean;
   /** The card is a chapter of this map's picture book (addBookMenu has rows). */
@@ -249,9 +257,11 @@ const merging = (ctx: CardActionContext, ids: Iterable<string | null>): CardAvai
  */
 const selectionLock = (ctx: CardActionContext): CardAvailability => {
   const locked = ctx.ids.filter(id => ctx.note(id)?.aiLocked === true || ctx.isMerging(id));
-  return locked.length
-    ? { ok: false, reasonKey: "ui.selection_locked_0_1", reasonArgs: [locked.length, ctx.titles(locked)] }
-    : OK;
+  if (!locked.length) return OK;
+  // English needs its singular for one card.
+  return locked.length === 1
+    ? { ok: false, reasonKey: "ui.selection_locked_one_0", reasonArgs: [ctx.titles(locked)] }
+    : { ok: false, reasonKey: "ui.selection_locked_0_1", reasonArgs: [locked.length, ctx.titles(locked)] };
 };
 const branch = (ctx: CardActionContext, id: string): string[] => {
   const out = [id];
@@ -653,6 +663,18 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     run: ctx => ctx.host.pasteKnowledgeRef(card(ctx))
   },
   {
+    id: "impact",
+    titleKey: "ui.card_menu_impact",
+    icon: "git-fork",
+    scope: ["card", "ai-card"],
+    surfaces: ["context"],
+    order: 168,
+    group: 4,
+    // Read only (it writes nothing): it works while merging or on an AIM map, but like every row it is greyed while the notes load (decision #35).
+    available: ctx => gate(ctx, ["readOnly"]),
+    run: ctx => ctx.host.impactAnalysis(card(ctx))
+  },
+  {
     id: "toggle-collapse",
     titleKey: "ui.card_menu_collapse",
     titleFor: ctx => (ctx.node?.collapsed ? "ui.card_menu_expand" : "ui.card_menu_collapse"),
@@ -759,6 +781,21 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     group: 1,
     available: ctx => then(gate(ctx, ["presentation", "readOnly"]), () => selectionLock(ctx)),
     run: (ctx, options) => ctx.host.openBatchColor(options?.opener)
+  },
+  {
+    // P1.9 (B19c): one width and/or height for the whole selection, one Map.md write and one undo step (changeSelectionSize
+    // rechecks these). A size changes neither parent, order nor any other card's place, so the picture-book locks leave it on;
+    // an old AIM map has no card size.
+    id: "batch-size",
+    titleKey: "ui.batch_size",
+    icon: "scaling",
+    scope: ["multi"],
+    surfaces: ["toolbar"],
+    order: 296,
+    group: 1,
+    applies: ctx => !ctx.aimMap,
+    available: ctx => then(gate(ctx, ["presentation", "readOnly"]), () => selectionLock(ctx)),
+    run: (ctx, options) => ctx.host.openBatchSize(options?.opener)
   },
   {
     id: "merge",
@@ -933,7 +970,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
 export const CARD_TOOLBAR: Readonly<Record<"card" | "ai-card" | "multi", readonly CardActionId[]>> = {
   card: ["research", "style", "open-note"],
   "ai-card": ["stop-run-all", "run-stop", "ai-lock", "research", "ai-settings", "open-note"],
-  multi: ["batch-color", "move-to", "merge", "multi-research", "finish-selection"]
+  multi: ["batch-color", "batch-size", "move-to", "merge", "multi-research", "finish-selection"]
 };
 
 /** The palette commands (main.ts registers them by these ids) and the mapCommand action each one runs today. */

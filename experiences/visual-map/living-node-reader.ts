@@ -2,7 +2,14 @@ import { Component, ItemView, MarkdownRenderer, parseYaml, type TFile, type Work
 import { getUiLanguage, t } from "../../i18n";
 import { readLivingLastChange, type LivingChangeSummary } from "./living-node-changes";
 import { localizeLivingReader, readableDate } from "./living-node-markdown";
-import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
+import {
+  CANONICAL_HEADINGS,
+  decodeCalloutSections,
+  localizeHeadings,
+  noteHeadingSet,
+  removeSection
+} from "../../core/repository-note-body";
+import { LIVING_NODE_BEGIN, LIVING_NODE_END } from "../../core/living-node-region";
 
 export const LIVING_READER_VIEW = "vam-living-node-reader";
 
@@ -57,6 +64,28 @@ export class LivingReaderView extends ItemView {
     this.changes = changes;
     this.tab = "trial";
     await this.paint();
+  }
+
+  /** The formal content of a Living card with no trial: the right pane's normal reading of an AI card. */
+  async showOfficial(file: TFile, owner?: string): Promise<void> {
+    this.draft = false;
+    this.file = file;
+    this.owner = owner;
+    this.preview = "";
+    this.warnings = [];
+    this.invalid = false;
+    this.changes = undefined;
+    this.tab = "official";
+    await this.paint();
+  }
+
+  async onOpen(): Promise<void> {
+    // A run or an edit changes the note: the formal tab follows it.
+    this.registerEvent(
+      this.app.vault.on("modify", changed => {
+        if (this.tab === "official" && changed.path === this.file?.path) void this.paint();
+      })
+    );
   }
 
   /** A language change repaints the open reader: tab labels, banners and localized lines. */
@@ -120,6 +149,27 @@ export class LivingReaderView extends ItemView {
         };
   }
 
+  /**
+   * A Living note without a `## Current Summary` section still has its summary in the frontmatter (the card face shows it);
+   * the reader shows it as that section. Display only: the note file is not changed.
+   */
+  private withFrontmatterSummary(markdown: string, raw: string): string {
+    if (/^## Current Summary[ \t]*\r?$/m.test(markdown)) return markdown;
+    let summary: unknown;
+    try {
+      const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw)?.[1];
+      const parsed = fm === undefined ? undefined : (parseYaml(fm) as Record<string, unknown> | null);
+      if (parsed?.["ai-card"] !== true) return markdown;
+      summary = parsed["summary"];
+    } catch {
+      return markdown;
+    }
+    if (typeof summary !== "string" || !summary.trim()) return markdown;
+    const block = `## Current Summary\n\n${summary.trim()}\n\n`;
+    const title = /^# .*\r?\n+/.exec(markdown);
+    return title ? title[0] + block + markdown.slice(title[0].length) : block + markdown;
+  }
+
   private async paint(): Promise<void> {
     const file = this.file;
     if (!file) return;
@@ -145,6 +195,11 @@ export class LivingReaderView extends ItemView {
         void this.paint();
       });
     }
+    if (!this.draft) {
+      // Hand edits happen in the native editor; this is the visible, keyboard-reachable way there.
+      const edit = host.createEl("button", { text: t("ui.living_node_open_in_editor"), attr: { type: "button" } });
+      edit.addEventListener("click", () => void this.leaf.openFile(file));
+    }
     if (this.tab === "trial") {
       host.createDiv({
         cls: "vam-living-reader-banner",
@@ -169,9 +224,12 @@ export class LivingReaderView extends ItemView {
     try {
       let markdown = this.preview;
       if (this.tab === "official") {
-        markdown = decodeCalloutSections(raw.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+        const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+        markdown = decodeCalloutSections(body);
         markdown = removeSection(markdown, "Prompt");
         markdown = removeSection(markdown, "Rules");
+        markdown = this.withFrontmatterSummary(markdown, raw);
+        markdown = localizeHeadings(markdown, noteHeadingSet(body) ?? CANONICAL_HEADINGS);
       }
       markdown = localizeLivingReader(
         markdown,
@@ -183,6 +241,9 @@ export class LivingReaderView extends ItemView {
         },
         this.tab === "trial"
       );
+      // The official tab reads like the trial preview: the markers around the managed region are not for the reader.
+      if (this.tab === "official")
+        markdown = markdown.split(LIVING_NODE_BEGIN).join("").split(LIVING_NODE_END).join("");
       if (generation !== this.generation) return;
       await MarkdownRenderer.render(this.app, markdown, content, file.path, component);
       if (generation !== this.generation) return;

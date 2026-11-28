@@ -92,6 +92,9 @@ import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAG
 import { browserPngEnv, svgToPngBlob, toDataUri, wrapText, type MapScene } from "./map-export";
 import { collectExportScene, exportMap, type MapExportPorts } from "./map-export-run";
 import { describeFocus, focusIsLost, resolveFocus, type MapFocusAnchor } from "./map-focus";
+import { CrossMapSearch } from "./cross-map-search";
+import { renderCrossMapResults } from "./cross-map-results";
+import type { CorpusCard } from "./cross-map-corpus";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
 import {
@@ -249,6 +252,7 @@ import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
+import { collapseForEditorRoom, type SideDock } from "./living-editor-room";
 import { livingSaveReason, livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
@@ -519,6 +523,7 @@ import {
 } from "../../core/map-chat-basis";
 import {
   buildMapChatContext,
+  MAP_CHAT_OTHER_CARDS_LIMIT,
   type MapChatResearchNote,
   type MapChatSummary,
   type MapChatUserText,
@@ -555,6 +560,7 @@ import {
   type RecordTurnStatus
 } from "../../core/map-chat-records";
 import { buildResumeSummary, type ResumeSummary } from "../../core/map-chat-resume";
+import { buildImpact } from "../../core/map-impact";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
 import { MapChatConversation, type MapChatConversationPorts } from "./map-chat-conversation";
 import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
@@ -686,7 +692,12 @@ import {
 } from "./ai-mode";
 import { AiCardPopover, type AiCardPopoverValues } from "./ai-card-popover";
 import { openStylePopover, type StylePopover, type StylePopoverState } from "./style-popover";
-import { openBatchColorPopover, type BatchColorPopover } from "./batch-popover";
+import {
+  openBatchColorPopover,
+  openBatchSizePopover,
+  type BatchColorPopover,
+  type BatchSizeChange
+} from "./batch-popover";
 import { MapSourcePickerModal } from "../../ui/map-sources-panel";
 import {
   TopicChatWindow,
@@ -837,6 +848,18 @@ function applyStagedDelta(target: MapDocument, base: MapDocument, final: MapDocu
   }
 }
 /** A copy of `node` without any AIM field: what an old AIM map shares. */
+/** Sets (or, with undefined, clears) a card's custom width and/or height in place: only the keys present change. */
+function applyCardSize(node: MapNode, change: BatchSizeChange): void {
+  if ("width" in change) {
+    if (change.width === undefined || change.width === CARD_WIDTH) delete node.width;
+    else node.width = clampCardWidth(change.width);
+  }
+  if ("height" in change) {
+    const height = change.height === undefined ? undefined : clampCardHeight(change.height);
+    if (height === undefined) delete node.height;
+    else node.height = height;
+  }
+}
 function withoutAimFields(node: MapNode): MapNode {
   const copy = { ...node };
   delete copy.aimKind;
@@ -1655,7 +1678,11 @@ export class VisualAgentMapView extends ItemView {
   private mergeDrafts = new MergeDrafts({
     path: () => this.path,
     closed: () => this.closed,
-    changed: () => this.render(),
+    changed: () => {
+      this.render();
+      // A waiting card's Adopt follows the merge lock (greyed with the reason while merging, back when it ends).
+      this.chat?.refreshPlan();
+    },
     language: () => this.plugin.settings.language,
     detailTemplate: language => this.mapStyleCached(language, { notify: true }).template,
     progress: task => {
@@ -1711,6 +1738,8 @@ export class VisualAgentMapView extends ItemView {
   private styleOpen: { nodeId: string; mapId: string; pop: StylePopover } | null = null;
   /** The selection bar's Color popover (B19b); a new bar (a repaint, a changed selection) closes it. */
   private batchColorPop: BatchColorPopover | null = null;
+  /** The selection bar's Size popover (B19c), closed the same way. */
+  private batchSizePop: BatchColorPopover | null = null;
   /** The AI card setup window: `nodeId` is the card it edits, or null while it makes a new one under `parentId` (not made until 「存好」). */
   private aiCardOpen: {
     nodeId: string | null;
@@ -1915,6 +1944,8 @@ export class VisualAgentMapView extends ItemView {
   /** What the references on this map resolved to the last time they were read (memory only; never saved). */
   private refResolved = new Map<string, RefResolution>();
   private refLayerEl: HTMLElement | null = null;
+  /** The drawn references that resolved (an unavailable or orphan one is not here): a relation line may end at one (V3.3 P4.4). */
+  private readonly refEls = new Map<string, HTMLElement>();
   private refResolveSeq = 0;
   private shareRefTitles = new Map<string, string | null>();
   private refResolveTimer: number | null = null;
@@ -2214,6 +2245,8 @@ export class VisualAgentMapView extends ItemView {
     returnNodeId: string | null;
     returnEl: HTMLElement | null;
     cancelAnnouncement: (() => void) | null;
+    /** The scope switch and the cross-map snapshot (P4.2); "This map" until the user presses "All maps". */
+    cross?: CrossMapSearch;
   } | null = null;
   private mapSearchBar: MapSearchBar | null = null;
   /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
@@ -2534,6 +2567,7 @@ export class VisualAgentMapView extends ItemView {
       workspace.on("resize", () => {
         this.chat?.refreshNote();
         this.syncReaderToggle();
+        this.makeRoomForAiCard();
       })
     );
     // A deleted or renamed source note, folder or map changes what the data-sources button and panel say.
@@ -2807,6 +2841,16 @@ export class VisualAgentMapView extends ItemView {
     this.applySearchMarks();
     this.focusMapSearch();
   }
+  /** The scope switch of an open search, made when first needed (it reads nothing until "All maps" is pressed). */
+  private crossOf(search: { cross?: CrossMapSearch }): CrossMapSearch {
+    const made: CrossMapSearch = (search.cross ??= new CrossMapSearch(
+      () => this.plugin.repo.knowledgeRefIO(),
+      () => {
+        if (!this.closed && this.mapSearch?.cross === made) this.applySearchMarks();
+      }
+    ));
+    return made;
+  }
   private mountMapSearch(): void {
     const search = this.mapSearch;
     const overlay = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay");
@@ -2815,6 +2859,19 @@ export class VisualAgentMapView extends ItemView {
     const bar = buildMapSearchBar(overlay, {
       query: search.query,
       label: t("ui.map_search_label"),
+      scope: {
+        value: this.crossOf(search).scope,
+        groupLabel: t("ui.map_search_scope_label"),
+        mapLabel: t("ui.map_search_scope_map"),
+        allLabel: t("ui.map_search_scope_all")
+      },
+      onScope: scope => {
+        if (!live()) return;
+        search.currentId = null;
+        this.crossOf(search).setScope(scope);
+        this.mapSearchBar?.setScope(scope);
+        this.applySearchMarks();
+      },
       closeLabel: t("ui.map_search_close"),
       countText: this.mapSearchCountText(),
       onInput: value => {
@@ -2905,6 +2962,11 @@ export class VisualAgentMapView extends ItemView {
   private mapSearchCountText(): string {
     const search = this.mapSearch;
     if (!search || search.query === "") return "";
+    if (this.crossOf(search).scope === "all") {
+      if (this.crossOf(search).state !== "ready") return "";
+      const total = this.crossOf(search).hits(search.query).total;
+      return total ? t("ui.map_search_count_0", total) : t("ui.map_search_none");
+    }
     const matches = this.mapSearchResult()?.matches ?? [];
     if (!matches.length) return t("ui.map_search_none");
     const at = search.currentId === null ? -1 : matches.indexOf(search.currentId);
@@ -2913,7 +2975,10 @@ export class VisualAgentMapView extends ItemView {
   /** Marks the matching cards (the current one stronger) and refreshes the visible count. Never touches how a card is built. */
   private applySearchMarks(): void {
     const search = this.mapSearch;
-    const matches = new Set(search ? (this.mapSearchResult()?.matches ?? []) : []);
+    // The canvas marks belong to "This map"; the other scope lists its hits in the box instead.
+    const matches = new Set(
+      search && this.crossOf(search).scope === "map" ? (this.mapSearchResult()?.matches ?? []) : []
+    );
     this.clearSearchBadges();
     for (const [id, card] of this.cardEls) {
       card.toggleClass("is-search-match", matches.has(id));
@@ -2924,6 +2989,123 @@ export class VisualAgentMapView extends ItemView {
         this.searchBadges.push(card.createSpan({ cls: "vam-search-temp-label", text: t("ui.search_temp_open") }));
     }
     this.mapSearchBar?.setCount(this.mapSearchCountText());
+    this.renderCrossResults();
+  }
+  /** The cross-map hits under the search field: the snapshot filtered by the query now. Empty while the scope is this map. */
+  private renderCrossResults(): void {
+    const search = this.mapSearch;
+    const host = this.mapSearchBar?.results;
+    if (!search || !host || !this.map) return;
+    renderCrossMapResults(
+      host,
+      {
+        state: this.crossOf(search).state,
+        query: search.query,
+        hits: this.crossOf(search).hits(search.query),
+        currentMapId: this.map.id
+      },
+      {
+        loading: t("ui.map_search_all_loading"),
+        failed: t("ui.map_search_all_failed"),
+        none: t("ui.map_search_none"),
+        more: (shown, total) => t("ui.map_search_all_more_0_1", shown, total),
+        locate: t("ui.map_search_locate"),
+        cite: t("ui.map_search_cite"),
+        toChat: t("ui.map_search_to_chat")
+      },
+      {
+        locate: card => void this.locateCrossMapCard(card),
+        cite: card => this.citeCrossMapCard(card),
+        toChat: card => this.addCrossMapCardToChat(card)
+      }
+    );
+  }
+  /**
+   * Locate: the card of this map, or of another one, shown with the camera only (no layout, no collapse, no Map.md write). Another
+   * map follows switchToMap: a tab that has it open shows it; while this tab has running work it opens in a new tab; else this tab.
+   */
+  async locateCrossMapCard(card: CorpusCard): Promise<void> {
+    const here = this.map;
+    if (!here || this.closed) return;
+    try {
+      let target: VisualAgentMapView | null | "this" = null;
+      if (card.mapId === here.id) target = "this";
+      else {
+        const open = this.plugin.findMapLeaf(card.mapPath);
+        if (open) {
+          await this.plugin.showLeaf(open);
+          target = open.view instanceof VisualAgentMapView ? open.view : null;
+        } else if (this.hasRunningWork()) target = await this.plugin.openMapInNewTab(card.mapPath);
+        else {
+          await this.plugin.mutate(() => this.openMapInMutation(card.mapPath));
+          target = !this.closed && this.path === card.mapPath ? "this" : null;
+        }
+      }
+      if (!target || !(await (target === "this" ? this : target).revealPath(card.notePath)))
+        new Notice(t("ui.map_search_locate_failed"));
+    } catch (error) {
+      errorNotice(error);
+    }
+  }
+  /** Cite: a read-only reference to the card under the selected card (the root when none is selected), through the one addKnowledgeRef entry. */
+  citeCrossMapCard(card: Pick<CorpusCard, "mapId" | "mapPath" | "nodeId">): void {
+    const map = this.map;
+    if (!map) return;
+    const selected = this.selection.state.selected;
+    const parentId =
+      (selected && map.nodes.some(node => node.id === selected) ? selected : undefined) ??
+      map.nodes.find(node => node.parentId === null)?.id;
+    if (!parentId) {
+      new Notice(t("ui.knowledge_ref_need_card"));
+      return;
+    }
+    const target = { mapId: card.mapId, nodeId: card.nodeId, mapPath: card.mapPath };
+    this.enqueue(() => this.addKnowledgeRef(target, parentId));
+  }
+  /** Cards of other maps the user added to the next chat message: only the identity is kept; the text is read again when it is sent. */
+  private chatOtherCards = new Map<string, { mapId: string; nodeId: string; mapPath: string }>();
+  addCrossMapCardToChat(card: Pick<CorpusCard, "mapId" | "mapPath" | "nodeId" | "title">): void {
+    const key = `${card.mapId}\u0000${card.nodeId}`;
+    if (this.chatOtherCards.has(key)) {
+      new Notice(t("ui.map_search_chat_already"));
+      return;
+    }
+    if (this.chatOtherCards.size >= MAP_CHAT_OTHER_CARDS_LIMIT) {
+      new Notice(t("ui.map_search_chat_full_0", MAP_CHAT_OTHER_CARDS_LIMIT));
+      return;
+    }
+    this.chatOtherCards.set(key, { mapId: card.mapId, nodeId: card.nodeId, mapPath: card.mapPath });
+    new Notice(t("ui.map_search_chat_added_0", card.title));
+  }
+  /** The waiting cards for this message, read again now under the reference rules (a card that is gone, archived or unreadable is dropped), then forgotten. */
+  async takeOtherMapCards(): Promise<NonNullable<Parameters<typeof buildMapChatContext>[0]["otherMapCards"]>> {
+    const picked = [...this.chatOtherCards.values()];
+    this.chatOtherCards.clear();
+    if (!picked.length) return [];
+    const found = await resolveKnowledgeRefs(
+      picked.map((card, index) => ({
+        id: String(index),
+        mapId: card.mapId,
+        nodeId: card.nodeId,
+        pathHint: card.mapPath
+      })),
+      this.plugin.repo.knowledgeRefIO(),
+      { withBody: true }
+    );
+    return picked.flatMap((_, index) => {
+      const card = found.get(String(index));
+      return card?.ok
+        ? [
+            {
+              mapTitle: card.mapTitle,
+              title: card.title,
+              summary: card.summary ?? "",
+              detail: card.detail ?? "",
+              notePath: card.notePath
+            }
+          ]
+        : [];
+    });
   }
   /** The small "opened for search" labels; kept outside renderNode and removed whenever the marks are redone or the search ends. */
   private searchBadges: HTMLElement[] = [];
@@ -2932,7 +3114,11 @@ export class VisualAgentMapView extends ItemView {
     this.searchBadges = [];
   }
   /** Typing pauses for 300 ms before the count is spoken, so a screen reader does not read every keystroke. */
-  private announceSearchLater(search: { query: string; cancelAnnouncement: (() => void) | null }): void {
+  private announceSearchLater(search: {
+    query: string;
+    cancelAnnouncement: (() => void) | null;
+    cross?: CrossMapSearch;
+  }): void {
     search.cancelAnnouncement?.();
     const timerWindow = this.contentEl.ownerDocument?.defaultView ?? window;
     const cancel = (): void => {
@@ -2944,7 +3130,10 @@ export class VisualAgentMapView extends ItemView {
       if (search.cancelAnnouncement !== cancel) return;
       search.cancelAnnouncement = null;
       if (this.closed || this.mapSearch !== search || search.query === "") return;
-      const total = this.mapSearchResult()?.matches.length ?? 0;
+      const total =
+        this.crossOf(search).scope === "all"
+          ? this.crossOf(search).hits(search.query).total
+          : (this.mapSearchResult()?.matches.length ?? 0);
       this.announcer?.setText(total ? t("ui.map_search_count_0", total) : t("ui.map_search_none"));
     }, 300);
     search.cancelAnnouncement = cancel;
@@ -2954,6 +3143,7 @@ export class VisualAgentMapView extends ItemView {
     const search = this.mapSearch;
     if (!search || !this.map || this.closed) return;
     search.cancelAnnouncement?.();
+    if (this.crossOf(search).scope === "all") return; // the hits of every map are rows with a Locate button, not steps
     const query = search.query;
     const result = this.mapSearchResult();
     const step = result ? stepSearch(result, search.currentId, delta) : null;
@@ -3015,6 +3205,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     search.cancelAnnouncement?.();
+    search.cross?.dispose();
     this.mapSearch = null;
     this.mapSearchBar?.root.remove();
     this.mapSearchBar = null;
@@ -7110,6 +7301,7 @@ export class VisualAgentMapView extends ItemView {
         this.mergeOpen = false;
         started();
         this.render();
+        this.chat?.refreshPlan();
       });
       if (!this.mergeDrafts.failedDraft) {
         this.mergeFailureNotice?.hide();
@@ -7890,6 +8082,9 @@ export class VisualAgentMapView extends ItemView {
     if (this.closed || seq !== this.refResolveSeq || this.map?.id !== map.id) return;
     this.refResolved = found;
     this.paintKnowledgeRefs();
+    // A relation line to a reference appears (or goes) with what the reference resolved to.
+    const refIds = new Set(refs.map(ref => ref.id));
+    if ((map.topicRelations ?? []).some(link => refIds.has(link.from) || refIds.has(link.to))) this.drawEdges();
   }
   /**
    * Draws the references of the open map in a layer after the cards. They are not cards of the map: they live in
@@ -7898,6 +8093,7 @@ export class VisualAgentMapView extends ItemView {
   private paintKnowledgeRefs(): void {
     this.refLayerEl?.remove();
     this.refLayerEl = null;
+    this.refEls.clear();
     const stage = this.stageEl,
       map = this.map;
     if (!stage || !map) return;
@@ -7917,6 +8113,7 @@ export class VisualAgentMapView extends ItemView {
       if (!found) missing = true;
       const el = layer.createDiv("vam-knowledge-ref");
       el.dataset.refId = ref.id;
+      if (found?.ok) this.refEls.set(ref.id, el);
       el.setAttr("role", "note");
       el.tabIndex = 0;
       el.style.left = `${parent.x + ref.x}px`;
@@ -11040,7 +11237,7 @@ export class VisualAgentMapView extends ItemView {
     const run = (event: MouseEvent): void => {
       const now = { ...this.cardActionContext(node), surface: "toolbar" as const };
       const state = action.available(now);
-      if (!state.ok) new Notice(t(state.reasonKey));
+      if (!state.ok) new Notice(t(state.reasonKey, ...(state.reasonArgs ?? [])));
       else action.run(now, { opener: button, newTab: event.metaKey || event.ctrlKey });
     };
     button.addEventListener("click", event => (plain ? run(event) : this.whenEditing(() => run(event))));
@@ -11264,7 +11461,7 @@ export class VisualAgentMapView extends ItemView {
         if (!availability.ok) {
           item.setDisabled(true);
           (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-menu-has-reason");
-          this.menuHint(item, t(availability.reasonKey), "vam-menu-reason");
+          this.menuHint(item, t(availability.reasonKey, ...(availability.reasonArgs ?? [])), "vam-menu-reason");
           return;
         }
         if (action.id === "add-other") {
@@ -13379,6 +13576,7 @@ export class VisualAgentMapView extends ItemView {
       exitBranchFocus: () => void this.exitBranchFocus(),
       copyKnowledgeRef: card => this.copyAsKnowledgeRef(card),
       pasteKnowledgeRef: card => this.pasteKnowledgeRef(card.id),
+      impactAnalysis: card => void this.showCardImpact(card.id),
       zoomFit: () => this.fit(),
       zoomReset: () => {
         if (this.map) this.zoomBy(1 / this.map.viewport.zoom);
@@ -13386,6 +13584,7 @@ export class VisualAgentMapView extends ItemView {
       search: () => this.openMapSearch(),
       shortcuts: () => this.openKeyboardShortcuts(),
       openBatchColor: opener => this.openBatchColor(opener),
+      openBatchSize: opener => this.openBatchSize(opener),
       merge: () => this.openMerge(),
       multiResearch: () => this.openMultiResearch(),
       chooseParent: copy => this.chooseSelectedParent(copy),
@@ -13425,6 +13624,7 @@ export class VisualAgentMapView extends ItemView {
       titles: ids => ids.map(id => this.notes.get(id)?.title ?? id).join(t("ui.list_separator")),
       isArgumentCard: id => this.isArgumentCard(id),
       stylesEditable: !!node && this.markersEditable(node),
+      aimMap: !!this.map?.aim,
       aiRunning: id => this.aiStatusOf(id) === "running",
       summaryFieldOffered: () => {
         const note = node ? this.notes.get(node.id) : undefined;
@@ -16818,6 +17018,7 @@ export class VisualAgentMapView extends ItemView {
       viewSession
     };
     win.mount(overlay);
+    this.makeRoomForAiCard();
     if (node)
       void livingReplacedSources(this.app, this.plugin.repo, this.map, node.id)
         .then(names => {
@@ -16977,6 +17178,13 @@ export class VisualAgentMapView extends ItemView {
       await this.refreshAfterSavedChange();
     }
     return saved;
+  }
+  /** A narrow window with both side panels open leaves the central editor a few dozen pixels: fold a side panel until it fits. */
+  private makeRoomForAiCard(): void {
+    if (!this.aiCardOpen) return;
+    const width = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay")?.clientWidth ?? 0;
+    const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock };
+    collapseForEditorRoom(width, [workspace?.leftSplit, workspace?.rightSplit]);
   }
   /** Before a repaint: takes the setup window out of the page; true when it held the focus. */
   private detachAiCardPopover(): boolean {
@@ -18705,6 +18913,11 @@ export class VisualAgentMapView extends ItemView {
     return (
       (targetId ? this.aiLockReason("write", [targetId], fresh) : null) ?? this.aiLockReason("remove", removed, fresh)
     );
+  }
+  /** The resolved title of one of this map's knowledge references; undefined when it is not one or not resolved (V3.3 P4.4). */
+  private knowledgeRefTitle(id: string): string | undefined {
+    const found = this.refResolved.get(id);
+    return found?.ok ? found.title : undefined;
   }
   /** The notes of these cards read again from disk (a missing card or note is left out). */
   private async freshNotesOf(ids: readonly string[]): Promise<Map<string, Note>> {
@@ -21004,6 +21217,7 @@ export class VisualAgentMapView extends ItemView {
   private openBatchColor(opener?: HTMLElement): void {
     const open = this.batchColorPop;
     open?.close(false);
+    this.batchSizePop?.close(false);
     const host = opener?.parentElement;
     if (open || !opener || !host) return;
     const ids = [...this.selection.state.multiSelected];
@@ -21052,13 +21266,79 @@ export class VisualAgentMapView extends ItemView {
     await this.recolorTopics(ids, color);
   }
   /**
+   * The selection bar's Size popover (batch-popover.ts) above its button, as the Color one: each field shows the selection's
+   * one width or height, or "Mixed" (an unset height: "Auto"). Apply closes it and resizes the selection.
+   */
+  private openBatchSize(opener?: HTMLElement): void {
+    const open = this.batchSizePop;
+    open?.close(false);
+    this.batchColorPop?.close(false);
+    const host = opener?.parentElement;
+    if (open || !opener || !host || !this.map) return;
+    const ids = [...this.selection.state.multiSelected];
+    const nodes = this.map.nodes.filter(node => ids.includes(node.id) && !node.aimKind);
+    const widths = new Set(nodes.map(node => node.width ?? CARD_WIDTH));
+    const heights = new Set(nodes.map(node => node.height ?? null));
+    const outside = (event: PointerEvent): void => {
+      const target = event.target as Node | null;
+      if (target && !pop.el.contains(target) && !opener.contains(target)) pop.close(false);
+    };
+    const state = {
+      width: widths.size > 1 ? ("mixed" as const) : ([...widths][0] ?? CARD_WIDTH),
+      height: heights.size > 1 ? ("mixed" as const) : ([...heights][0] ?? null)
+    };
+    const pop = openBatchSizePopover(host, opener, state, nodes.length, {
+      onApply: change => {
+        this.enqueue(async () => {
+          await this.changeSelectionSize(ids, change);
+          if (!opener.isConnected)
+            this.selectionBarEl?.querySelector<HTMLElement>('[data-card-action="batch-size"]')?.focus();
+        });
+      },
+      onClose: () => {
+        if (this.batchSizePop === pop) this.batchSizePop = null;
+        pop.el.ownerDocument?.removeEventListener("pointerdown", outside, true);
+      }
+    });
+    pop.el.style.left = `${opener.offsetLeft}px`;
+    pop.el.ownerDocument?.addEventListener("pointerdown", outside, true);
+    this.batchSizePop = pop;
+  }
+  /**
+   * Sets (or, with undefined, resets) the width and/or height of every selected card in one Map.md write and one undo step
+   * (P1.9): only the keys in `change`, as resizeCard; an old AIM card is left out. It rechecks the Size button's gates first
+   * (presentation, loading notes, an AI-locked or merging card, an AIM map): a refused write says why and writes nothing.
+   */
+  private async changeSelectionSize(ids: readonly string[], change: BatchSizeChange): Promise<void> {
+    if (!this.map) return;
+    const ctx = this.cardActionContext(ids);
+    const availability = actionsFor("toolbar", ctx).find(entry => entry.action.id === "batch-size")?.availability;
+    if (!availability?.ok) {
+      if (availability) new Notice(t(availability.reasonKey, ...(availability.reasonArgs ?? [])));
+      return;
+    }
+    const changed = (node: MapNode): boolean => {
+      const next = { ...node };
+      applyCardSize(next, change);
+      return next.width !== node.width || next.height !== node.height;
+    };
+    const targets = new Set(
+      this.map.nodes.filter(node => ids.includes(node.id) && !node.aimKind && changed(node)).map(node => node.id)
+    );
+    if (!targets.size) return;
+    await this.mapChange(map => {
+      for (const node of map.nodes) if (targets.has(node.id)) applyCardSize(node, change);
+    }, false);
+  }
+  /**
    * The narrow bar along the canvas bottom: nothing until a card is picked, then "N selected", the toolbar actions of the card
-   * action registry (Color, Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
+   * action registry (Color, Size, Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
    * cannot run stays focusable (aria-disabled) and its reason is written on a line below the row. The canvas keeps its height
    * free (see `has-selection-bar`).
    */
   private renderSelectionBar(workspace: HTMLElement): HTMLElement {
     this.batchColorPop?.close(false);
+    this.batchSizePop?.close(false);
     const selection = workspace.createDiv("vam-selection-bar");
     const count = this.selection.state.multiSelected.size;
     workspace.toggleClass?.("has-selection-bar", count > 0);
@@ -21094,7 +21374,7 @@ export class VisualAgentMapView extends ItemView {
         if (reasonText) new Notice(reasonText);
         else action.run(context, { opener: button });
       });
-      if (action.id === "batch-color") {
+      if (action.id === "batch-color" || action.id === "batch-size") {
         button.setAttr("data-card-action", action.id);
         button.setAttr("aria-haspopup", "dialog");
       }
@@ -21147,9 +21427,10 @@ export class VisualAgentMapView extends ItemView {
         if (!availability.ok) {
           // The reason goes under the greyed row (a menu item has no subtitle of its own).
           const dom = (item as unknown as { dom?: HTMLElement }).dom;
-          dom?.setAttr?.("title", t(availability.reasonKey));
+          const why = t(availability.reasonKey, ...(availability.reasonArgs ?? []));
+          dom?.setAttr?.("title", why);
           dom?.addClass?.("vam-menu-item-has-why");
-          dom?.createDiv?.({ cls: "vam-menu-item-why", text: t(availability.reasonKey) });
+          dom?.createDiv?.({ cls: "vam-menu-item-why", text: why });
         }
       });
     });
@@ -22324,7 +22605,12 @@ export class VisualAgentMapView extends ItemView {
       group.documents.map(async (document, index) => {
         const file = vault.getAbstractFileByPath(document.path);
         if (!(file instanceof TFile)) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        return { ...document, nodeId: cited[index].id, rev: sourceRevision(await vault.read(file)) };
+        // The revision of the note as the model view (the same read topicReferenceGroup does), so a later comparison agrees.
+        return {
+          ...document,
+          nodeId: cited[index].id,
+          rev: sourceRevision(livingNoteForModel(await vault.read(file)))
+        };
       })
     );
     return { ...group, documents };
@@ -23793,6 +24079,7 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
+    const otherMapCards = await this.takeOtherMapCards();
     // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
     // chip, the open note or a map source goes in that part, not twice.
     const sentPaths = new Set<string>();
@@ -23829,11 +24116,19 @@ export class VisualAgentMapView extends ItemView {
       summaries: this.chatSummaries(),
       aim: !this.relationsEnabled(),
       relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
+      // This map's own references (V3.3 P4.4): a relation may end at one; the title only when it is already resolved.
+      knowledgeRefs: this.relationsEnabled()
+        ? visibleKnowledgeRefs(map).map(ref => {
+            const found = this.refResolved.get(ref.id);
+            return { id: ref.id, ...(found?.ok ? { title: found.title } : {}) };
+          })
+        : [],
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns(),
       ...(picture ? { selectedImage: picture.selected } : {}),
       ...(researchNotes.length ? { researchNotes } : {}),
       ...(mapSources ? { mapSources } : {}),
+      ...(otherMapCards.length ? { otherMapCards } : {}),
       ...(bookPlan ? { bookPlan } : {}),
       ...(continuation ? { continuation } : {})
     });
@@ -24156,6 +24451,7 @@ export class VisualAgentMapView extends ItemView {
     this.chatAutoApply = false;
     this.chatResearched.clear();
     this.chatResearchSent.clear();
+    this.chatOtherCards.clear();
     this.chatStartedResearch = false;
     this.chatReadsSources = false;
     this.chatSourcesMarkedIn = null;
@@ -24233,6 +24529,36 @@ export class VisualAgentMapView extends ItemView {
       window.setTimeout(() => card.removeClass("is-chat-located"), CHAT_LOCATE_FLASH_MS);
     }
     return true;
+  }
+  /**
+   * "Impact analysis" (F09): what this card touches in THIS map, shown read-only in the chat window. Nothing is written, no
+   * provider is called, no other map is read (a reference card shows only the title this view already resolved).
+   */
+  private async showCardImpact(id: string): Promise<void> {
+    const map = this.map;
+    const chat = this.chat;
+    if (!map || !chat) return;
+    let livingConsumerIds: string[] = [];
+    try {
+      livingConsumerIds = await livingRemovalConsumers(this.app, this.plugin.repo, clone(map), new Set([id]));
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Impact analysis: ${errorMessage(error)}`);
+    }
+    if (this.map !== map || this.chat !== chat) return;
+    const cards = map.nodes.map(node => {
+      const note = this.notes.get(node.id);
+      return {
+        id: node.id,
+        parentId: node.parentId ?? null,
+        title: note?.title ?? "",
+        summary: note?.livingNode?.summary || note?.summary || ""
+      };
+    });
+    const refs = visibleKnowledgeRefs(map).map(ref => {
+      const found = this.refResolved.get(ref.id);
+      return { id: ref.id, parentId: ref.parentId, ...(found?.ok ? { title: found.title } : {}) };
+    });
+    chat.showImpact(buildImpact({ targetId: id, cards, relations: map.topicRelations ?? [], livingConsumerIds, refs }));
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {
@@ -24357,7 +24683,11 @@ export class VisualAgentMapView extends ItemView {
   ): string {
     const nodes = this.map?.nodes ?? [];
     const title = (id: string): string =>
-      refTitles?.get(id) ?? this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
+      refTitles?.get(id) ??
+      this.notes.get(id)?.title ??
+      nodes.find(node => node.id === id)?.path ??
+      this.knowledgeRefTitle(id) ??
+      id;
     const targets = (ids: string[]): number => (ids.length ? ids.length : selection.length);
     switch (action.kind) {
       case "add_child": {
@@ -26923,16 +27253,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map?.nodes.some(node => node.id === id)) return;
     await this.mapChange(map => {
       const node = map.nodes.find(item => item.id === id);
-      if (!node) return;
-      if ("width" in change) {
-        if (change.width === undefined || change.width === CARD_WIDTH) delete node.width;
-        else node.width = clampCardWidth(change.width);
-      }
-      if ("height" in change) {
-        const height = change.height === undefined ? undefined : clampCardHeight(change.height);
-        if (height === undefined) delete node.height;
-        else node.height = height;
-      }
+      if (node) applyCardSize(node, change);
     }, false);
   }
   /**
@@ -28007,8 +28328,8 @@ export class VisualAgentMapView extends ItemView {
       anchor?: AnchorLine;
     }[] = [];
     for (const relation of this.map.topicRelations ?? []) {
-      const from = this.cardEls.get(relation.from),
-        to = this.cardEls.get(relation.to);
+      const from = this.cardEls.get(relation.from) ?? this.refEls.get(relation.from),
+        to = this.cardEls.get(relation.to) ?? this.refEls.get(relation.to);
       if (!from || !to) continue;
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }

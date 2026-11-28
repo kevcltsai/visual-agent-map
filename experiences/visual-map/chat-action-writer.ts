@@ -27,6 +27,7 @@ import {
   setTopicRelations,
   type TopicRelation
 } from "../../map-model";
+import { readKnowledgeRefs } from "./knowledge-refs";
 import { ringMemberIds } from "../../map-layout-text";
 import { isTopicMarker } from "../../topic-markers";
 import { ringMembers } from "./image-ring";
@@ -764,8 +765,17 @@ export class ChatActionWriter {
     const fromId = real(action.fromId),
       toId = real(action.toId);
     if (fromId === null || toId === null) return skipped("ui.map_chat_skip_parent_missing");
-    const ends = [fromId, toId].map(id => this.map?.nodes.find(node => node.id === id));
-    if (ends.some(node => !node)) return skipped("ui.map_chat_skip_topic_gone");
+    // An end is a card of this map or (adding only) one of its knowledge references, never both ends references (V3.3 P4.4).
+    const endsOf = (map: MapDocument): { gone: boolean; bothRefs: boolean } => {
+      const refIds = new Set(readKnowledgeRefs(map).map(ref => ref.id));
+      const kinds = [fromId, toId].map(id =>
+        map.nodes.some(node => node.id === id) ? "card" : refIds.has(id) ? "ref" : "gone"
+      );
+      return { gone: kinds.includes("gone"), bothRefs: kinds[0] === "ref" && kinds[1] === "ref" };
+    };
+    const early0 = endsOf(this.map);
+    if (early0.gone) return skipped("ui.map_chat_skip_topic_gone");
+    if (early0.bothRefs) return skipped("ui.map_chat_skip_relation_not_allowed");
     const pair = (link: TopicRelation): boolean =>
       (link.from === fromId && link.to === toId) || (link.from === toId && link.to === fromId);
     const link: TopicRelation = {
@@ -788,7 +798,14 @@ export class ChatActionWriter {
     const box: { refused: TranslationKey | null } = { refused: null };
     await this.ports.mapChange(map => {
       const list = map.topicRelations ?? [];
-      box.refused = refusal(list);
+      // The write is checked again on the map being edited: a reference may have been removed since.
+      const now = endsOf(map);
+      box.refused =
+        action.kind === "add_relation" && now.gone
+          ? "ui.map_chat_skip_topic_gone"
+          : now.bothRefs
+            ? "ui.map_chat_skip_relation_not_allowed"
+            : refusal(list);
       if (box.refused) return;
       if (action.kind === "remove_relation") {
         setTopicRelations(

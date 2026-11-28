@@ -78,7 +78,14 @@ export class NodeDetailsSidebar {
     }
     if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
     const leaf = this.detailsLeaf;
-    await leaf.openFile(file);
+    if (this.app().metadataCache.getFileCache(file)?.frontmatter?.["ai-card"] === true) {
+      // An AI card is read through the reader (same presentation as the trial preview), not as raw Markdown.
+      if (!(leaf.view instanceof LivingReaderView))
+        await leaf.setViewState({ type: LIVING_READER_VIEW, active: false });
+      if (revision !== this.revision || this.detailsLeaf !== leaf) return;
+      if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
+      await leaf.view.showOfficial(file, this.trialOwner);
+    } else await leaf.openFile(file);
     if (revision !== this.revision || this.detailsLeaf !== leaf) return;
     this.detailsPath = file.path;
     this.styleLeaf(leaf);

@@ -125,7 +125,6 @@ import {
 import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
-  closingPageSkipped,
   effectiveOrder,
   BOOK_EXPAND_PASSES,
   mapDifference,
@@ -594,13 +593,17 @@ export interface BookPipelinePorts {
   editBookStructure?(mapPath: string, work: StructureWork): Promise<StructureResult>;
   /**
    * The book's closing page ("still open") in `folder`: creates it, or rewrites an earlier one of ours; a same-named note that is not ours
-   * is never touched (another name is used). Absent: no page is written and the book is done without it.
+   * is never touched (another name is used). Absent: no page is written and the book is done without it. With `existingOnly` only an
+   * earlier page of ours is rewritten; none: nothing is created and the result is ok with an empty path.
    */
   writeOpenIssues?(
     folder: string,
     language: ContentLanguage,
-    content: string
+    content: string,
+    existingOnly?: boolean
   ): Promise<{ ok: true; path: string } | { ok: false }>;
+  /** The closing page's only items are these chapters (titles), skipped as locked (no new page): production shows a notice. */
+  lockedSkipped?(titles: string[]): void;
   /**
    * Production: `runAiProof(aiCalls, request, run)`: the independent proofread of one chapter (a different model from the author's).
    * The AI proofread runs only when `aiProof`, `aiFix` and `aiBookProof` are all given.
@@ -4264,9 +4267,17 @@ export class BookPipelineRuns {
           reason: open.reason
         });
       }
-      // Left out because AI-locked: each such chapter is named (it was not checked), not the book as a whole.
-      if (state.bookProof.incomplete)
-        for (const id of state.bookProof.locked?.length ? state.bookProof.locked : [""]) incomplete(id && title(id));
+      // Left out because AI-locked: each such chapter is named as skipped (locked), not as unfinished; `locked` is the only reason then.
+      const locked = state.bookProof.locked ?? [];
+      for (const id of locked)
+        issues.push({
+          source: "ai-proof",
+          chapterId: id,
+          chapterTitle: title(id),
+          problem: "",
+          reason: "proof_locked_skipped"
+        });
+      if (state.bookProof.incomplete && !locked.length) incomplete("");
     }
     for (const id of effectiveOrder(state)) {
       const info = drive.cards.get(id);
@@ -4324,10 +4335,12 @@ export class BookPipelineRuns {
     if (!this.ports.writeOpenIssues || !root) return !this.ports.writeOpenIssues;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (this.dead(drive)) return false;
-      // ai-flows AI lock: a book whose every chapter is locked and that nothing checked gets no page (no file is added for it).
-      if (closingPageSkipped(drive.store.state)) return true;
       try {
         const { checked, issues } = await this.openIssuesOf(drive);
+        // ai-flows AI lock: a page whose only items are chapters skipped as locked is not added (an earlier page of ours is rewritten,
+        // so nothing stale stays); the decision is saved for the bar, and a notice names the chapters.
+        const locked = drive.store.state.bookProof?.locked ?? [];
+        const skipped = !!locked.length && issues.every(issue => issue.reason === "proof_locked_skipped");
         const content = composeOpenIssuesNote({
           bookTitle: root.title,
           language: drive.config.language,
@@ -4335,8 +4348,16 @@ export class BookPipelineRuns {
           issues
         });
         const folder = root.path.includes("/") ? root.path.slice(0, root.path.lastIndexOf("/")) : "";
-        const written = await this.ports.writeOpenIssues(folder, drive.config.language, content);
-        if (written.ok) return true;
+        const written = await this.ports.writeOpenIssues(folder, drive.config.language, content, skipped);
+        if (!written.ok) continue;
+        if (this.dead(drive)) return false;
+        await drive.store.commit(state =>
+          state.closingSkipped === skipped
+            ? { state, accepted: false }
+            : { state: { ...state, closingSkipped: skipped, revision: state.revision + 1 }, accepted: true }
+        );
+        if (skipped) this.ports.lockedSkipped?.(locked.map(id => drive.cards.get(id)?.title ?? ""));
+        return true;
       } catch {
         // retried once
       }

@@ -473,8 +473,8 @@ test('C1 card context menu (B07): one topic gets the toolbar actions, then the �
   const titles = menu.items.map(i => i.title);
   // B08 (mockup stage-b §4): the toolbar part is AI explore, Style, Open note; Add subtopic and Add summary left the toolbar,
   // so they sit at their ⋯ place.
-  assert.deepEqual(titles, ['AI explore', 'Style…', 'Open note', 'Card settings…', 'Focus on this branch', 'Add summary', 'Select subtopics', 'Add summary bracket', 'Tidy this branch', 'Note style…', 'Make it an AI card', 'Add subtopic', 'Add sibling topic', 'Add another type', 'Copy as reference', 'Collapse subtopics', 'Remove from map']);
-  assert.deepEqual(menu.separators, [3, 11, 15], 'a separator after the toolbar part and between the ⋯ groups');
+  assert.deepEqual(titles, ['AI explore', 'Style…', 'Open note', 'Card settings…', 'Focus on this branch', 'Add summary', 'Select subtopics', 'Add summary bracket', 'Tidy this branch', 'Note style…', 'Make it an AI card', 'Add subtopic', 'Add sibling topic', 'Add another type', 'Copy as reference', 'Impact analysis', 'Collapse subtopics', 'Remove from map']);
+  assert.deepEqual(menu.separators, [3, 11, 16], 'a separator after the toolbar part and between the ⋯ groups');
   assert.ok(!titles.includes('Add text'), 'Add text lives only in the Add-another-type list');
   assert.ok(menu.items.find(i => i.title === 'Add another type').sub.items.some(i => i.title === 'Add text'), 'Add text is in its submenu');
   for (const gone of ['Research this card', 'This card', 'Edit card', 'Open details in right sidebar', 'Open note in new tab']) assert.ok(!titles.includes(gone), `${gone} is no longer in the single-card menu`);

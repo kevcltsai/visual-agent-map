@@ -918,7 +918,7 @@ test('selection bar: nothing before the first card is picked; then a narrow bott
   const labels = bar => bar.children.filter(c => c.tag === 'button').map(c => c.text);
   setSelection(view, true, ['a']);
   const one = host(); const oneBar = view.renderSelectionBar(one);
-  assert.deepEqual(labels(oneBar), ['Color ▾', 'Move to…', 'Merge', 'Research', '⋯', 'Done selecting'], 'B09: no "?" (it is the ⋯ menu\'s last row)');
+  assert.deepEqual(labels(oneBar), ['Color ▾', 'Size ▾', 'Move to…', 'Merge', 'Research', '⋯', 'Done selecting'], 'B09: no "?" (it is the ⋯ menu\'s last row)');
   assert.ok(one.classes.has('has-selection-bar'));
   assert.ok(oneBar.children.find(c => c.text === 'Research').classes.has('mod-cta'));
   assert.equal(oneBar.children.find(c => c.text === 'Merge').classes.has('mod-cta'), false);

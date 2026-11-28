@@ -6983,7 +6983,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 34 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 35 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
@@ -10724,4 +10724,30 @@ test('P4.8 resume: a host without the summary has no entry; the words follow the
   const { f, open } = summaryFixture({ state: 'empty', items: [] });
   f.setLanguage('zh-TW'); f.panel.relabel(); await open(); assert.match(visibleText(summaryBlock(f)), /資料不足，沒有可恢復的紀錄/); assert.match(visibleText(find(f.panel.el, i => hasClass(i, 'vam-map-chat-resume-open'))), /恢復摘要/);
   f.setLanguage('en');
+});
+// ---- F09 impact analysis: a read-only block in the same window, shown by the view's card menu (no message, no turn, no record) ------
+const impactItem = (extra = {}) => ({ section: 'direct', kinds: ['relation'], nodeId: 'a', title: 'Topic A', ...extra });
+const impactResult = (extra = {}) => ({ state: 'items', targetId: 'a', targetTitle: 'Target', direct: [impactItem(), impactItem({ kinds: ['descendant', 'living'], nodeId: 'gone', title: 'Old' }), impactItem({ kinds: ['reference'], refId: 'r1', title: '' })], speculative: [impactItem({ section: 'speculative', kinds: [], nodeId: 'b', title: 'Topic B', matched: 'Target' })], hidden: { direct: 0, speculative: 0 }, ...extra });
+const impactBlock = f => find(f.panel.el, i => hasClass(i, 'vam-map-chat-impact'));
+test('F09 impact: the block opens the window, lists direct and guessed items apart with their reasons, and each located item has a Locate button', () => {
+  const located = []; const f = panelFixture({ locateTopic: id => { located.push(id); return true; } });
+  assert.equal(impactBlock(f).hidden, true, 'hidden until asked: no new Tab stop');
+  f.panel.showImpact(impactResult());
+  assert.equal(impactBlock(f).hidden, false); assert.equal(f.panel.isOpen, true);
+  const text = visibleText(impactBlock(f));
+  assert.match(text, /Impact of “Target” \(read only\)/); assert.match(text, /Direct dependencies \(connected\) \(3\)/); assert.match(text, /May be affected \(guess\) \(1\)/);
+  assert.match(text, /Relation/); assert.match(text, /Subtopic · Living Node source/); assert.match(text, /“Reference card”/); assert.match(text, /Guess: the text mentions “Target”/);
+  assert.match(text, /Cannot locate/, 'a card that is gone');
+  const buttons = findAll(impactBlock(f), i => i.tag === 'button' && hasClass(i, 'vam-map-chat-impact-locate'));
+  assert.equal(buttons.length, 3); buttons[2].click(); eq(located, ['b']);
+  assert.equal(f.panel.hasMessages, false, 'not a message'); eq(f.panel.completedTurns(), []);
+});
+test('F09 impact: a missing card, an empty result, the cap note, closing, a new conversation and the interface language', () => {
+  const f = panelFixture({ locateTopic: () => true });
+  f.panel.showImpact(impactResult({ state: 'missing', direct: [], speculative: [] })); assert.match(visibleText(impactBlock(f)), /no longer on the map/);
+  f.panel.showImpact(impactResult({ state: 'empty', direct: [], speculative: [] })); assert.match(visibleText(impactBlock(f)), /Nothing is connected/);
+  f.panel.showImpact(impactResult({ hidden: { direct: 5, speculative: 0 } })); assert.match(visibleText(impactBlock(f)), /5 more not shown/);
+  findAll(impactBlock(f), i => hasClass(i, 'vam-map-chat-resume-close'))[0].click(); assert.equal(impactBlock(f).hidden, true);
+  f.panel.showImpact(impactResult()); f.panel.reset(); assert.equal(impactBlock(f).hidden, true);
+  f.panel.showImpact(impactResult()); f.setLanguage('zh-TW'); f.panel.relabel(); assert.match(visibleText(impactBlock(f)), /直接依賴（有連線）/); assert.match(visibleText(impactBlock(f)), /可能影響（推測）/); f.setLanguage('en');
 });

@@ -166,6 +166,23 @@ test('setup window: a replaced source offers "Confirm again"; choosing it is sav
   assert.equal(win.values().reconfirm, undefined, 'after a saved confirm the window no longer carries it');
 });
 
+test('setup window: after the keyboard adopts a trial the focus stays inside the editor and Escape still closes it (D1-x10)', async () => {
+  let doc;
+  const { win, calls, el } = open({ adopt: async () => { doc.activeElement = null; return true; } });
+  doc = el.ownerDocument;
+  find(el, i => i.tag === 'button' && i.text === ui.t('ui.living_node_try_prompt')).click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const adopt = find(el, i => i.tag === 'button' && i.text === ui.t('ui.living_node_adopt'));
+  assert.equal(adopt.disabled, false, 'the preview is ready to adopt');
+  adopt.focus();
+  adopt.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(adopt.disabled, true, 'the adopt button is spent');
+  assert.ok(doc.activeElement && el.contains(doc.activeElement), 'the focus did not fall out of the editor');
+  el.keydown({ key: 'Escape' });
+  assert.equal(calls.cancel, 1, 'Escape closes a clean editor');
+});
+
 test('setup window: a refused save keeps the confirm for another try; removing the source drops it', async () => {
   const { win, el } = open({ save: async () => false });
   win.markReplaced(['Ref']);
@@ -217,10 +234,24 @@ test('setup window: a relabel puts the focus back on the equivalent rebuilt cont
 const reasonModule = require('./support-replay.cjs').loadSource(`
 export { livingTrialReason } from "./experiences/visual-map/living-node-trial-reason";
 export { LivingTrial } from "./experiences/visual-map/living-node-trial";
-export { setUiLanguage } from "./i18n";
+export { setUiLanguage, t } from "./i18n";
 export { searchNotPerformedError } from "./ai/search-not-performed";
 export { livingSnapshotRevision } from "./experiences/visual-map/living-node-markdown";
 `, { obsidian: S.obsidian });
+
+test('trial failure: a source changed during the run has its own reason in every language (D1-x10)', () => {
+  const reasons = {};
+  for (const lang of ['zh-TW', 'zh-CN', 'en']) {
+    reasonModule.setUiLanguage(lang);
+    const r = reasonModule.livingTrialReason('source-changed');
+    assert.equal(r.key, 'ui.living_node_trial_reason_source_changed');
+    assert.notEqual(r.key, 'ui.living_node_trial_reason_provider');
+    assert.notEqual(r.reason, 'ui.living_node_trial_reason_source_changed', 'translated, not the bare key');
+    reasons[lang] = r.reason;
+  }
+  assert.equal(new Set(Object.values(reasons)).size, 3);
+  reasonModule.setUiLanguage('en');
+});
 
 test('trial failure: a provider error and a validation error each give a short reason, with the raw code only as a detail', () => {
   reasonModule.setUiLanguage('en');
@@ -280,9 +311,23 @@ test('trial failure (D1-x5b): a real trial whose runtime did not search ends wit
   const web = await run(reasonModule.searchNotPerformedError());
   assert.equal(web.key, 'ui.living_node_trial_reason_web');
   assert.equal(web.code, '', 'the sentence is never shown as a code');
-  const provider = await run(new Error('connect ECONNRESET /Users/me/secret'));
+  const provider = await run(new Error('connect EPROTO /Users/me/secret'));
   assert.equal(provider.key, 'ui.living_node_trial_reason_provider');
   assert.equal(provider.code, '');
+  // D1-x11: a network failure is its own class, for the trial; no path or raw text reaches the reason or the code.
+  const networkErrors = [new Error('connect ECONNRESET /Users/me/secret'), Object.assign(new Error('fetch failed'), { cause: new Error('getaddrinfo ENOTFOUND /Users/me/secret') }), new Error('connect ETIMEDOUT /Users/me/secret')];
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    reasonModule.setUiLanguage(language);
+    for (const error of networkErrors) {
+      const network = await run(error);
+      assert.equal(network.key, 'ui.living_node_trial_reason_network', language + ' ' + error.message);
+      assert.equal(network.code, '');
+      assert.doesNotMatch(network.reason + network.code, /secret|\/Users|ECONN|ENOTFOUND|ETIMEDOUT|fetch failed/);
+      assert.notEqual(network.reason, reasonModule.t('ui.living_node_trial_reason_provider'));
+    }
+  }
+  reasonModule.setUiLanguage('en');
+  assert.match((await run(networkErrors[0])).reason, /network/i);
 });
 
 test('setup window: an open failure follows a language change (zh-TW, en, zh-CN)', () => {
@@ -355,4 +400,67 @@ test('D1-x8: the trial preview of an observation shows no internal field names',
   assert.ok(shown.includes('### price'), 'the subject is the heading');
   assert.ok(shown.includes('D(2026-11-26)') && shown.includes('corrected') && shown.includes('> 100'), shown);
   assert.equal(markdown.localizeLivingReader('### Observation\n' + field('Subject', 'x'), labels, true).includes('Subject'), true, 'a block not in the written format is left alone');
+});
+
+// ---- D1-x11: the real right-pane reader (official tab) and the network reason ------------------------------------------
+const NOTE_FM = '---\nagent-map-node: true\ntitle: R4C\nsummary: "STUB FIXED lighthouse built 1887, 31 m."\nai-card: true\n---\n';
+const NOTE_BODY = '# R4C\n\n## 詳細內容\n\n<!-- visual-agent-map:detail:start -->\n\n<!-- visual-agent-map:detail:end -->\n\n> [!info]- 提示\n> Summarize\n\n' +
+  [BEGIN, '', '## Living Node', '', '### Current output', '- Ownership: "ai"', '', '> STUB FIXED lighthouse built 1887, 31 m.', '', '#### Evidence',
+    sourceLine('note:abc', '2026-11-28T10:37:25.377Z'), '', '### Suppression', '', END].join('\n') + '\n';
+async function officialMarkdown(raw, language = 'zh-TW') {
+  const rendered = [];
+  const view = require('./support-replay.cjs').loadSource(`
+export { LivingReaderView } from "./experiences/visual-map/living-node-reader";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: { ...S.obsidian, Component: class { load() {} unload() {} }, ItemView: class { constructor() { this.contentEl = element('div'); this.app = { vault: { read: async () => raw } }; } }, MarkdownRenderer: { render: async (_app, text) => { rendered.push(text); } } } });
+  view.setUiLanguage(language);
+  try {
+    const reader = new view.LivingReaderView({});
+    await reader.show({ path: 'a.md' }, 'preview', 'owner');
+    reader.tab = 'official';
+    await reader.paint();
+  } finally { view.setUiLanguage('en'); }
+  return rendered[rendered.length - 1];
+}
+
+test('D1-x11: the official tab shows no internal markers, like the trial preview', async () => {
+  const shown = await officialMarkdown(NOTE_FM + NOTE_BODY);
+  for (const word of ['vam-living-node', 'Ownership', 'Source: [', 'Suppression']) assert.equal(shown.includes(word), false, word + ' in:\n' + shown);
+  assert.ok(shown.includes('STUB FIXED lighthouse built 1887, 31 m.'));
+});
+
+test('D1-x11: the official tab shows the frontmatter summary when the note has no Current Summary section, and does not repeat it when it has one', async () => {
+  const without = await officialMarkdown(NOTE_FM + NOTE_BODY);
+  assert.match(without, /^## 目前摘要\n\nSTUB FIXED lighthouse built 1887, 31 m\.\n/m, without);
+  const withSection = await officialMarkdown(NOTE_FM + '# R4C\n\n## 目前摘要\n\nSection text\n\n' + NOTE_BODY.replace('# R4C\n\n', ''));
+  assert.equal((withSection.match(/目前摘要/g) || []).length, 1);
+  assert.equal(withSection.includes('STUB FIXED lighthouse built 1887, 31 m.\n\n## '), false);
+  const plainNote = await officialMarkdown('---\ntitle: x\nsummary: "ignored"\n---\n# x\n');
+  assert.equal(plainNote.includes('ignored'), false, 'a note that is not a Living card is left alone');
+});
+
+test('D1-x11: the reader has a keyboard-operable "Open in editor" entry that opens the note natively; none for an unsaved draft', async () => {
+  const view = require('./support-replay.cjs').loadSource(`
+export { LivingReaderView } from "./experiences/visual-map/living-node-reader";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: { ...S.obsidian, Component: class { load() {} unload() {} }, ItemView: class { constructor() { this.contentEl = element('div'); this.app = { vault: { read: async () => '' } }; } }, MarkdownRenderer: { render: async () => {} } } });
+  const opened = [];
+  const entry = reader => findAll(reader.contentEl, i => i.tag === 'button' && i.attrs?.role !== 'tab');
+  for (const [language, label] of [['en', 'Open in editor'], ['zh-TW', '在編輯器開啟'], ['zh-CN', '在编辑器打开']]) {
+    view.setUiLanguage(language);
+    try {
+      const reader = new view.LivingReaderView({});
+      reader.leaf = { async openFile(file) { opened.push(file.path); } };
+      await reader.showOfficial({ path: 'a.md' });
+      const buttons = entry(reader).filter(b => b.text === label);
+      assert.equal(buttons.length, 1, language);
+      assert.equal(buttons[0].attrs.type, 'button', 'a real button: reachable and operable by keyboard');
+      buttons[0].click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const draft = new view.LivingReaderView({});
+      await draft.show({ path: 'd.md' }, 'preview', 'owner', [], false, undefined, true);
+      assert.equal(entry(draft).filter(b => b.text === label).length, 0, 'an unsaved draft has no note to open');
+    } finally { view.setUiLanguage('en'); }
+  }
+  assert.deepEqual(opened, ['a.md', 'a.md', 'a.md']);
 });

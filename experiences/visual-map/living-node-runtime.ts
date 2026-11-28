@@ -11,7 +11,13 @@ import type { Repository, Note } from "../../repository";
 import type { MapDocument } from "../../map-model";
 import type { ReferenceGroup } from "../../ai/reference-materials";
 import { isAiCard, promptSourceLinks, splitPrompt } from "./prompt-run";
-import { introducesLivingCycle, planLivingMap, type LivingMapCard } from "./living-node-map";
+import {
+  introducesLivingCycle,
+  livingDependencyGraph,
+  planLivingMap,
+  type LivingDependencyGraph,
+  type LivingMapCard
+} from "./living-node-map";
 import {
   readLivingReferences,
   livingConfigPrompt,
@@ -1197,12 +1203,15 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
 }
 
 /** Local validity inspection makes no AI calls. A stale upstream is derived, not persisted as a knowledge change. */
-export async function inspectLivingValidity(port: LivingTrialPort) {
+export async function inspectLivingValidity(
+  port: LivingTrialPort & { onDependencies?: (graph: LivingDependencyGraph) => void }
+) {
   const map = await port.repo.readMap(port.mapPath);
   // One pass reads each note once: the view's reads are reused, and every other read is shared across cards.
   const noteReads = port.noteReads ?? createNoteReadContext(map);
   const { snapshots, cards } = await prepareMap(port, map, noteReads);
   const planned = planLivingMap(cards, [], sourceResolver(port.app));
+  port.onDependencies?.(livingDependencyGraph(cards, planned));
   const validity = new Map<string, "none" | "valid" | "stale">();
   for (const card of cards) {
     if (!isAiCard(card)) continue;

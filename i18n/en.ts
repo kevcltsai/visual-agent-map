@@ -3124,6 +3124,8 @@ export const en = {
   "ui.argument_searched_0": "Tried {0} searches; the note lists them",
   "ui.argument_paused_reason_user": "You stopped it",
   "ui.argument_paused_reason_error": "The AI reply was not in the right format; a retry also failed",
+  "ui.argument_paused_reason_write_discarded":
+    "The note was changed or locked while the step ran, so this step was not written; you can resume",
   "ui.argument_paused_reason_interrupted": "Interrupted last time",
   "ui.argument_paused_reason_limit": "Research calls used up",
   "ui.argument_paused_resume_aria": "Resume research from where it stopped",

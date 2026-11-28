@@ -1828,7 +1828,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 /* A waiting plan's new cards (V3.3 E3): dashed, in the accent colour, marked Preview; drawn only, they take no pointer. */
 .vam-view .vam-plan-ghosts { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; user-select: none; }
 .vam-view .vam-plan-ghost-edge { position: absolute; height: 0; border-top: 1.5px dashed var(--interactive-accent); transform-origin: 0 0; }
-.vam-view .vam-plan-ghost { position: absolute; box-sizing: border-box; padding: 6px 10px; border: 1.5px dashed var(--interactive-accent); border-radius: var(--vam-radius-card, 12px); background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)); color: var(--interactive-accent); font-weight: 500; overflow-wrap: anywhere; }
+.vam-view .vam-plan-ghost { position: absolute; box-sizing: border-box; padding: 6px 10px; border: 1.5px dashed var(--interactive-accent); border-radius: var(--vam-radius-card, 12px); background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)); color: var(--interactive-accent); font-weight: 500; overflow: hidden; }
+/* One line: the dashed card is exactly the box it was laid out in, so it never runs into a card below (E3-x); the plan card lists every title in full. */
+.vam-view .vam-plan-ghost-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vam-view .vam-plan-ghost-label { display: block; font-size: var(--font-ui-smaller); font-weight: 400; opacity: 0.8; }
 .vam-view .vam-plan-ghost.is-more { font-style: italic; }
 .vam-view .vam-anchor.is-linked { border-color: var(--background-primary); background: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); }

@@ -8800,28 +8800,39 @@ export class VisualAgentMapView extends ItemView {
     event.preventDefault();
     const menu = this.newMenu(),
       annotated = isAnnotatedImage(image) ? image : null;
+    // Loading or topic selection (decision #35): a row that writes is greyed, its reason on the next line, and has no click.
+    const off = this.notesLoading()
+      ? t(CARD_ACTION_REASONS.readOnly)
+      : this.selection.state.multiSelectMode
+        ? t(CARD_ACTION_REASONS.multiSelect)
+        : "";
+    const writes = (item: MenuItem, run: () => void): void => {
+      if (!off) {
+        item.onClick(run);
+        return;
+      }
+      item.setDisabled(true);
+      (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-menu-has-reason");
+      this.menuHint(item, off, "vam-menu-reason");
+    };
     // P5.3 Image exploration comes first, from the card action list.
     this.addCardActions(menu, "context", { image: { id, annotated: !!annotated } });
     menu.addSeparator();
     if (annotated) {
       menu.addItem(item =>
-        item
-          .setTitle(t("ui.annotated_image_place_anchor"))
-          .setIcon("map-pin")
-          .onClick(() => this.startPlacingAnchor(id))
+        writes(item.setTitle(t("ui.annotated_image_place_anchor")).setIcon("map-pin"), () =>
+          this.startPlacingAnchor(id)
+        )
       );
       menu.addItem(item =>
-        item
-          .setTitle(t("ui.annotated_image_edit_note"))
-          .setIcon("pencil")
-          .onClick(() => this.editImageNote(annotated))
+        writes(item.setTitle(t("ui.annotated_image_edit_note")).setIcon("pencil"), () => this.editImageNote(annotated))
       );
       const anchors = annotated.anchors.length;
       const make = (window as { createFragment?: typeof createFragment }).createFragment;
       menu.addItem(item => {
-        // With anchors the entry is disabled and a second, muted line says why.
+        // With anchors the entry is disabled and a second, muted line says why (loading and selection say theirs instead).
         const first = t("ui.annotated_image_convert_back"),
-          why = anchors ? t("ui.annotated_image_convert_back_blocked", anchors) : "";
+          why = anchors && !off ? t("ui.annotated_image_convert_back_blocked", anchors) : "";
         item
           .setTitle(
             why && make
@@ -8834,23 +8845,18 @@ export class VisualAgentMapView extends ItemView {
                 : first
           )
           .setIcon("image")
-          .setDisabled(anchors > 0)
-          .onClick(() => this.enqueue(() => this.convertImageBack(id)));
+          .setDisabled(anchors > 0);
+        writes(item, () => this.enqueue(() => this.convertImageBack(id)));
       });
       menu.addSeparator();
       menu.addItem(item =>
-        item
-          .setTitle(t("ui.annotated_image_delete"))
-          .setIcon("trash-2")
-          .setWarning(true)
-          .onClick(() => this.enqueue(() => this.removeCanvasItem(id)))
+        writes(item.setTitle(t("ui.annotated_image_delete")).setIcon("trash-2").setWarning(true), () =>
+          this.enqueue(() => this.removeCanvasItem(id))
+        )
       );
     } else {
       menu.addItem(item =>
-        item
-          .setTitle(t("ui.annotated_image_convert"))
-          .setIcon("map-pin")
-          .onClick(() => this.convertImageDialog(id))
+        writes(item.setTitle(t("ui.annotated_image_convert")).setIcon("map-pin"), () => this.convertImageDialog(id))
       );
       menu.addItem(item =>
         item
@@ -8860,11 +8866,9 @@ export class VisualAgentMapView extends ItemView {
       );
       menu.addSeparator();
       menu.addItem(item =>
-        item
-          .setTitle(t("ui.annotated_image_delete_plain"))
-          .setIcon("trash-2")
-          .setWarning(true)
-          .onClick(() => this.enqueue(() => this.removeCanvasItem(id)))
+        writes(item.setTitle(t("ui.annotated_image_delete_plain")).setIcon("trash-2").setWarning(true), () =>
+          this.enqueue(() => this.removeCanvasItem(id))
+        )
       );
     }
     // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the image.
@@ -11258,17 +11262,20 @@ export class VisualAgentMapView extends ItemView {
       }
       return;
     }
-    if (!this.canEditCanvasItems()) return;
+    const editable = this.canEditCanvasItems();
     const target = event.target as Element | null;
     const imageEl = target?.closest?.<HTMLElement>(".vam-canvas-image");
-    if (imageEl) {
+    // While the notes load or topics are picked the image's menu still opens, its rows that write greyed with the reason
+    // (decision #35, V3.3 G04-x); an anchor's menu does not. A presentation opens neither.
+    if (imageEl && !this.presentation) {
       const dot = target?.closest?.<HTMLElement>(".vam-anchor[data-anchor-id]");
       const anchorId = dot?.dataset.anchorId;
-      if (dot && anchorId && imageEl.dataset.itemId && !this.placing && !this.picking)
-        this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
-      else this.openImageMenu(event, imageEl);
+      if (dot && anchorId && imageEl.dataset.itemId && !this.placing && !this.picking) {
+        if (editable) this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
+      } else this.openImageMenu(event, imageEl);
       return;
     }
+    if (!editable) return;
     if (
       !target?.closest ||
       target.closest(".vam-node") ||

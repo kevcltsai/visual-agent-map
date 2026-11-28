@@ -95,7 +95,7 @@ test('renderNode and refreshCard: managed cards skip the summary, the add-summar
   assert.match(view, /if \(argumentView\) \{\n\s+summary\?\.remove\(\);\n\s+addLine\?\.remove\(\);/);
   assert.match(view, /if \(argumentView\) \{\n[^\n]*\n[^\n]*\n\s+renderArgumentKind\(header, argumentView\);/);
   // Baseline 11 on 4728cbcd; main's partial-repaint commit ffd32778 added one call site; F07b adds one (relation lines to knowledge references repaint after resolve); B12 adds one (a zoom tier change redraws the edges for the taller detail cards, parent-approved): 14.
-  assert.equal(view.split('\n').filter(line => line.includes('drawEdges')).length, 14, 'one more drawEdges call site each for F07b (knowledge-reference relations) and B12 (zoom tier change)');
+  assert.equal(view.split('\n').filter(line => line.includes('drawEdges')).length, 15, 'one more drawEdges call site each for F07b (knowledge-reference relations), B12 (zoom tier change) and F01-x (a reference added)');
   // 23 before the subtree chain; it checks the AI lock before each step (one more call site, same guard, no new AI entry).
   // The two goal-suggest guards (show filter, stale check) moved to goal-suggest.ts behind the lockedParent port: 24 - 2 + 1.
   // Living Node replaces runPromptItem with the guarded formal/trial runtime. Retain the editor guard and assert the new write boundary separately.

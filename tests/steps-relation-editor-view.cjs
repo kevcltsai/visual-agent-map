@@ -386,3 +386,13 @@ test('F07b-x. a relation to a knowledge reference names the card and its source 
   }
   } finally { setUiLanguage('en'); }
 });
+
+test('F07b-x. a reference whose parent card is gone still reads as unavailable in the editor, never as its ref id', async () => {
+  const h = await real({ relations: ids => [{ kind: 'supports', from: ids.root, to: 'ref-1' }] });
+  h.view.map.knowledgeRefs = [{ id: 'ref-1', mapId: 'other', nodeId: 'n1', parentId: 'gone', x: 300, y: 0, pathHint: 'Other/Map.md' }];
+  h.view.map.topicRelations = [{ kind: 'supports', from: h.ids.root, to: 'ref-1' }];
+  h.view.refResolved = new Map();
+  h.view.openRelationEditor(h.view.map.topicRelations[0]);
+  const sentence = find(h.modals.at(-1).modalEl, i => i.hasClass('vam-relation-sentence')).text;
+  assert.ok(!sentence.includes('ref-') && sentence.includes('Original card unavailable'), sentence);
+});

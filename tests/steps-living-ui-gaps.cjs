@@ -356,3 +356,40 @@ test('D1-x8: the trial preview of an observation shows no internal field names',
   assert.ok(shown.includes('D(2026-11-26)') && shown.includes('corrected') && shown.includes('> 100'), shown);
   assert.equal(markdown.localizeLivingReader('### Observation\n' + field('Subject', 'x'), labels, true).includes('Subject'), true, 'a block not in the written format is left alone');
 });
+
+// ---- D1-x11: the real right-pane reader (official tab) and the network reason ------------------------------------------
+const NOTE_FM = '---\nagent-map-node: true\ntitle: R4C\nsummary: "STUB FIXED lighthouse built 1887, 31 m."\nai-card: true\n---\n';
+const NOTE_BODY = '# R4C\n\n## 詳細內容\n\n<!-- visual-agent-map:detail:start -->\n\n<!-- visual-agent-map:detail:end -->\n\n> [!info]- 提示\n> Summarize\n\n' +
+  [BEGIN, '', '## Living Node', '', '### Current output', '- Ownership: "ai"', '', '> STUB FIXED lighthouse built 1887, 31 m.', '', '#### Evidence',
+    sourceLine('note:abc', '2026-11-28T10:37:25.377Z'), '', '### Suppression', '', END].join('\n') + '\n';
+async function officialMarkdown(raw, language = 'zh-TW') {
+  const rendered = [];
+  const view = require('./support-replay.cjs').loadSource(`
+export { LivingReaderView } from "./experiences/visual-map/living-node-reader";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: { ...S.obsidian, Component: class { load() {} unload() {} }, ItemView: class { constructor() { this.contentEl = element('div'); this.app = { vault: { read: async () => raw } }; } }, MarkdownRenderer: { render: async (_app, text) => { rendered.push(text); } } } });
+  view.setUiLanguage(language);
+  try {
+    const reader = new view.LivingReaderView({});
+    await reader.show({ path: 'a.md' }, 'preview', 'owner');
+    reader.tab = 'official';
+    await reader.paint();
+  } finally { view.setUiLanguage('en'); }
+  return rendered[rendered.length - 1];
+}
+
+test('D1-x11: the official tab shows no internal markers, like the trial preview', async () => {
+  const shown = await officialMarkdown(NOTE_FM + NOTE_BODY);
+  for (const word of ['vam-living-node', 'Ownership', 'Source: [', 'Suppression']) assert.equal(shown.includes(word), false, word + ' in:\n' + shown);
+  assert.ok(shown.includes('STUB FIXED lighthouse built 1887, 31 m.'));
+});
+
+test('D1-x11: the official tab shows the frontmatter summary when the note has no Current Summary section, and does not repeat it when it has one', async () => {
+  const without = await officialMarkdown(NOTE_FM + NOTE_BODY);
+  assert.match(without, /^## 目前摘要\n\nSTUB FIXED lighthouse built 1887, 31 m\.\n/m, without);
+  const withSection = await officialMarkdown(NOTE_FM + '# R4C\n\n## 目前摘要\n\nSection text\n\n' + NOTE_BODY.replace('# R4C\n\n', ''));
+  assert.equal((withSection.match(/目前摘要/g) || []).length, 1);
+  assert.equal(withSection.includes('STUB FIXED lighthouse built 1887, 31 m.\n\n## '), false);
+  const plainNote = await officialMarkdown('---\ntitle: x\nsummary: "ignored"\n---\n# x\n');
+  assert.equal(plainNote.includes('ignored'), false, 'a note that is not a Living card is left alone');
+});

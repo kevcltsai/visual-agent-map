@@ -289,6 +289,12 @@ import { chainRebase, type RenamePair } from "../../core/rename-batch";
 import { PLACEHOLDER_MAP_NAMES, isPlaceholderMapTitle, uniqueDefaultName } from "../../core/default-names";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
+import {
+  buildComparisonTable,
+  comparisonColumnHeader,
+  comparisonMarkdown,
+  type MapChatComparison
+} from "../../core/map-chat-comparison";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import { MapSwitcherModal } from "../../ui/modals/map-switcher-modal";
 import { KeyboardShortcutsModal, shortcutLabel } from "../../ui/modals/keyboard-shortcuts-modal";
@@ -23900,10 +23906,9 @@ export class VisualAgentMapView extends ItemView {
         ? { startArgumentResearch: (claim: string) => this.startArgumentFromTab(claim) }
         : {}),
       argumentCalls: () => WORST_CASE_AI_CALLS,
-      topicTitle: id => {
-        const node = this.map?.nodes.find(item => item.id === id);
-        return node ? (this.notes.get(id)?.title ?? node.path) : null;
-      },
+      topicTitle: id => this.chatTopicTitle(id),
+      comparisonSaveBlock: (comparison, anchor) => this.comparisonSaveBlock(comparison, anchor),
+      saveComparison: (comparison, anchor) => this.saveComparison(comparison, anchor),
       selectedIds: () => this.chatSelectionIds(),
       send: () => {
         // A new message of the user starts a new piece of work: the AI's earlier picks no longer stand in for "the selection".
@@ -24981,6 +24986,113 @@ export class VisualAgentMapView extends ItemView {
     if (this.presentation) return t("ui.map_chat_plan_blocked_presenting");
     if (this.notesLoading()) return t("ui.map_chat_plan_blocked_loading");
     return null;
+  }
+  /** The title of a card as the chat shows it (the note's title, else its path); null when the card is no longer on the map. */
+  private chatTopicTitle(id: string): string | null {
+    const node = this.map?.nodes.find(item => item.id === id);
+    return node ? (this.notes.get(id)?.title ?? node.path) : null;
+  }
+  /**
+   * Why a comparison cannot be saved as a card now (V3.3 F08b), or null: its map is not the open one, the map is read-only here
+   * (presented, notes loading, a legacy map), it is an AIM map, or one of its cards is being merged. Read when the button is drawn
+   * (and again when a merge starts or ends) and again just before the write.
+   */
+  comparisonSaveBlock(comparison: MapChatComparison, anchor: { path: string; id: string | undefined }): string | null {
+    const read = this.chatPlanBlock(anchor);
+    if (read) return read;
+    if (this.map?.aim) return t("ui.map_chat_comparison_blocked_aim");
+    if (!isManagedMapPath(this.plugin.settings, this.path)) return t("ui.legacy_map_view_only");
+    if (comparison.rows.some(row => this.isMerging(row.nodeId))) return t("ui.merge_locked");
+    return null;
+  }
+  /** A save is under way; a second press while it runs writes nothing. */
+  private comparisonSaving = false;
+  /**
+   * "Save as a new card" under a comparison (V3.3 F08b): only on the user's press, one new top-level card in this map through the
+   * ordinary new-card write (placed like any new top-level card, P1.4), holding the table as Markdown and linking the compared
+   * cards' notes as its sources. One undo step; no AI call; the compared cards and their notes are not touched.
+   */
+  async saveComparison(
+    comparison: MapChatComparison,
+    anchor: { path: string; id: string | undefined }
+  ): Promise<{ ok: true; nodeId: string } | { ok: false; reason: string }> {
+    const refuse = (reason: string): { ok: false; reason: string } => ({ ok: false, reason });
+    if (this.comparisonSaving) return refuse(t("ui.map_chat_comparison_saving"));
+    const blocked = this.comparisonSaveBlock(comparison, anchor);
+    if (blocked) return refuse(blocked);
+    this.comparisonSaving = true;
+    try {
+      let made: MapNode | undefined;
+      let reason = "";
+      await this.plugin.mutate(async () => {
+        // The queue may have waited: the map is checked again just before the write.
+        const again = this.comparisonSaveBlock(comparison, anchor);
+        if (again) reason = again;
+        else made = await this.writeComparisonCard(comparison);
+      });
+      return made ? { ok: true, nodeId: made.id } : refuse(reason || t("ui.map_chat_skip_unavailable"));
+    } catch (error) {
+      return refuse(chatFailureReason(error));
+    } finally {
+      this.comparisonSaving = false;
+    }
+  }
+  private async writeComparisonCard(comparison: MapChatComparison): Promise<MapNode | undefined> {
+    const map = this.map;
+    if (!map) return undefined;
+    const table = buildComparisonTable(comparison, {
+      titleOf: id => this.chatTopicTitle(id),
+      unknown: t("ui.map_chat_comparison_unknown")
+    });
+    const cut = comparison.truncated;
+    const detail = comparisonMarkdown(table, {
+      header: column =>
+        comparisonColumnHeader(column, {
+          withUnit: (name, unit) => t("ui.map_chat_comparison_header_0_1", name, unit),
+          noUnit: name => t("ui.map_chat_comparison_no_unit_0", name)
+        }),
+      gone: t("ui.map_chat_comparison_gone"),
+      notes: [
+        ...(cut?.rows ? [t("ui.map_chat_comparison_cut_rows_0", String(cut.rows))] : []),
+        ...(cut?.attributes ? [t("ui.map_chat_comparison_cut_attributes_0", String(cut.attributes))] : [])
+      ]
+    });
+    // The compared cards' notes, once each, in table order (a card that left the map has none).
+    const sourcePaths = [
+      ...new Set(
+        table.rows.flatMap(row => {
+          const node = map.nodes.find(item => item.id === row.nodeId);
+          return node ? [node.path] : [];
+        })
+      )
+    ];
+    const names = table.rows.flatMap(row => (row.title === null ? [] : [row.title])).slice(0, 3);
+    const title =
+      sanitizeGeneratedTitle(
+        names.length
+          ? t("ui.map_chat_comparison_card_title_0", names.join(t("ui.map_chat_count_separator")))
+          : t("ui.new_topic")
+      )
+        // The title becomes the note's H1: no tag, comment or hidden-text marker from a source card's title may reach it.
+        .replace(/[<>]/g, "")
+        .replace(/%+/g, match => (match.length > 1 ? "%" : match))
+        .trim() || t("ui.new_topic");
+    const repo = this.plugin.repo;
+    const parent = map.nodes.find(node => !node.parentId) ?? null;
+    // The model and settings come from the map's first top-level topic, like any other new top-level card.
+    const model = parent
+      ? (await repo.resolveTopicModel(parent.path, map)).model
+      : this.plugin.currentModelChoice().model;
+    const previous = this.history.undoEntry;
+    const made = await this.writeNewBranches(clone(map), null, async copies => {
+      const node = await repo.createNote(title, model, map, this.path, parent ? "inherited" : "workspace", { detail });
+      node.parentId = null;
+      copies.push(node);
+      await repo.updateNote(node.path, { sourcePaths, status: "completed" });
+    });
+    const pushed = this.history.undoEntry;
+    if (pushed && pushed !== previous) pushed.label = t("ui.map_chat_comparison_undo");
+    return made[0];
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   private stopMapChat(): void {

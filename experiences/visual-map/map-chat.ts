@@ -29,7 +29,8 @@ import {
 import { MapChatPaintScope } from "./map-chat-paint-scope";
 import type { ResumeItem, ResumeSummary } from "../../core/map-chat-resume";
 import type { ImpactItem, ImpactResult } from "../../core/map-impact";
-import { buildComparisonTable, type MapChatComparison } from "../../core/map-chat-comparison";
+import { errorMessage } from "../../core/error-message";
+import { buildComparisonTable, comparisonColumnHeader, type MapChatComparison } from "../../core/map-chat-comparison";
 
 /**
  * How much of each earlier round's reply a chain keeps in history. A chain has up to {@link MAP_CHAT_CHAIN_MAX_ROUNDS} rounds in one
@@ -351,6 +352,12 @@ export interface MapChatMessage {
   plan?: MapChatPlanCard;
   /** On an assistant message: the comparison table of the reply (V3.3 P4.5), read only; in memory only, never saved. */
   comparison?: MapChatComparison;
+  /** The "save as a new card" button of the comparison (P4.5, in memory only): the map the table is about and how far saving is. */
+  comparisonSave?: {
+    anchor: { path: string; id: string | undefined };
+    state: "idle" | "saving" | "saved" | "failed";
+    reason?: string;
+  };
   choices?: MapChatChoices;
   /** More result lines than fit are folded into a count; true while they are all shown. */
   linesOpen?: boolean;
@@ -449,6 +456,13 @@ export type MapChatReplyUndoState = "top" | "undone" | "other";
 export interface MapChatHost {
   /** Title of a topic, or null when it is no longer on the map. */
   topicTitle(id: string): string | null;
+  /** Why a comparison of `anchor`'s map cannot be saved as a new card now (read-only, merging, AIM, another map), or null. Absent: no save button. */
+  comparisonSaveBlock?(comparison: MapChatComparison, anchor: { path: string; id: string | undefined }): string | null;
+  /** The press of "save as a new card": makes the one card, or says why not. Absent: no save button. */
+  saveComparison?(
+    comparison: MapChatComparison,
+    anchor: { path: string; id: string | undefined }
+  ): Promise<{ ok: true; nodeId: string } | { ok: false; reason: string }>;
   /** Cards that are selected right now; they count as references without being dragged in. */
   selectedIds(): string[];
   /** The panel asks to send the current draft. */
@@ -1739,7 +1753,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /** Draws the waiting plan card again, so its Apply follows whether the map can be written now (a presentation began or ended). */
   refreshPlan(): void {
-    if (this.pendingPlan()) this.renderLog();
+    // A comparison still waiting to be saved follows the same gate (a merge began or ended), so its button is greyed at once.
+    if (this.pendingPlan() || this.messages.some(message => message.comparisonSave?.state === "idle")) this.renderLog();
   }
   /** The plan card still waiting for an answer, if any. */
   pendingPlan(): MapChatPlanCard | null {
@@ -3223,10 +3238,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
 
   /** The reply that was just finished carries a comparison table (P4.5): shown under it, read only. Nothing is written. */
-  attachComparison(comparison: MapChatComparison): void {
+  attachComparison(comparison: MapChatComparison, anchor?: { path: string; id: string | undefined }): void {
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return;
     last.comparison = comparison;
+    if (anchor && this.host.saveComparison) last.comparisonSave = { anchor, state: "idle" };
     this.renderLog();
   }
 
@@ -3357,6 +3373,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       message.replyUndo ? "undo" : "",
       message.comparison
         ? `cmp:${JSON.stringify(message.comparison)}:${t("ui.map_chat_comparison_title")}:${t("ui.map_chat_comparison_unknown")}:${this.comparisonTitles(message.comparison)}`
+        : "",
+      message.comparisonSave
+        ? `cmpsave:${message.comparisonSave.state}:${message.comparisonSave.reason ?? ""}:${this.comparisonBlock(message) ?? ""}:${t("ui.map_chat_comparison_save")}:${t("ui.map_chat_comparison_saved")}:${t("ui.map_chat_comparison_saving")}`
         : "",
       message.bookOffer ? `book:${t("ui.map_chat_book_offer")}` : "",
       this.chainWaitingState && this.messages.at(-1) === message
@@ -3566,7 +3585,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const undoPlaced = message.lines.length > 0 || applied ? this.buildOutcome(row, message, applied) : false;
     this.buildBasis(row, message);
     if (message.images?.length) this.buildImages(row, message.images);
-    if (message.comparison) this.buildComparison(row, message.comparison);
+    if (message.comparison) this.buildComparison(row, message.comparison, message);
     if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
     if (message.seenImage) {
       // The words stay one plain-text element; the eye sits beside it.
@@ -4121,7 +4140,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * (its title as it is on the map now), one column per attribute, split per unit when the values carry different units; a value
    * the cards do not give reads "Unknown". It has no button: saving it is a separate step. All text goes in as text.
    */
-  private buildComparison(row: HTMLElement, comparison: MapChatComparison): void {
+  private buildComparison(row: HTMLElement, comparison: MapChatComparison, message: MapChatMessage): void {
     const unknown = t("ui.map_chat_comparison_unknown");
     const table = buildComparisonTable(comparison, { titleOf: id => this.host.topicTitle(id), unknown });
     const box = row.createDiv({
@@ -4137,12 +4156,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const head = grid.createEl("tr");
     head.createEl("th", { text: "", attr: { scope: "col" } });
     for (const column of table.columns) {
-      const text =
-        column.unit !== null
-          ? t("ui.map_chat_comparison_header_0_1", column.name, column.unit)
-          : column.split
-            ? t("ui.map_chat_comparison_no_unit_0", column.name)
-            : column.name;
+      const text = comparisonColumnHeader(column, {
+        withUnit: (name, unit) => t("ui.map_chat_comparison_header_0_1", name, unit),
+        noUnit: name => t("ui.map_chat_comparison_no_unit_0", name)
+      });
       head.createEl("th", { text, attr: { scope: "col" } });
     }
     for (const line of table.rows) {
@@ -4162,6 +4179,62 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         cls: "vam-map-chat-resume-note",
         text: t("ui.map_chat_comparison_cut_attributes_0", String(comparison.truncated.attributes))
       });
+    if (message.comparisonSave) this.buildComparisonSave(box, comparison, message, message.comparisonSave);
+  }
+  /** Why this message's comparison cannot be saved as a card now, or null (the host decides; no host method = no gate). */
+  private comparisonBlock(message: MapChatMessage): string | null {
+    const save = message.comparisonSave;
+    return save && message.comparison && this.host.comparisonSaveBlock
+      ? this.host.comparisonSaveBlock(message.comparison, save.anchor)
+      : null;
+  }
+  /**
+   * The button under a comparison: "Save as a new card". Only a press writes (one card per success); while it saves or after it
+   * saved the button is off and says so, so a second press cannot make a second card. Greyed with the reason when the map cannot
+   * take a card now. A failure says why and the button stays usable.
+   */
+  private buildComparisonSave(
+    box: HTMLElement,
+    comparison: MapChatComparison,
+    message: MapChatMessage,
+    save: NonNullable<MapChatMessage["comparisonSave"]>
+  ): void {
+    const blocked = save.state === "saved" ? null : this.comparisonBlock(message);
+    const line = box.createDiv("vam-map-chat-comparison-save");
+    const button = line.createEl("button", {
+      cls: "vam-map-chat-comparison-save-button mod-cta",
+      text: t(
+        save.state === "saved"
+          ? "ui.map_chat_comparison_saved"
+          : save.state === "saving"
+            ? "ui.map_chat_comparison_saving"
+            : "ui.map_chat_comparison_save"
+      ),
+      attr: { type: "button" }
+    });
+    button.disabled = save.state === "saving" || save.state === "saved" || blocked !== null;
+    const note = save.state === "failed" ? t("ui.map_chat_comparison_save_failed_0", save.reason ?? "") : blocked;
+    if (note) line.createDiv({ cls: "vam-map-chat-plan-blocked", text: note });
+    button.addEventListener("click", () => {
+      // Taken before anything is awaited: a second press while it saves (or after it saved) does nothing.
+      if ((save.state !== "idle" && save.state !== "failed") || this.comparisonBlock(message) !== null) return;
+      const host = this.host;
+      if (!host.saveComparison) return;
+      save.state = "saving";
+      this.renderLog();
+      void host.saveComparison(comparison, save.anchor).then(
+        result => {
+          save.state = result.ok ? "saved" : "failed";
+          save.reason = result.ok ? undefined : result.reason;
+          this.renderLog();
+        },
+        error => {
+          save.state = "failed";
+          save.reason = errorMessage(error);
+          this.renderLog();
+        }
+      );
+    });
   }
   private buildImages(row: HTMLElement, blocks: MapChatImages[]): void {
     const live = blocks.filter(block => !block.stale);

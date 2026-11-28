@@ -2938,6 +2938,13 @@ export const en = {
   "ui.map_chat_comparison_gone": "(card no longer on the map)",
   "ui.map_chat_comparison_cut_rows_0": "{0} more rows are not shown (at most 8 rows).",
   "ui.map_chat_comparison_cut_attributes_0": "{0} more attributes are not shown (at most 8 attributes).",
+  "ui.map_chat_comparison_save": "Save as a new card",
+  "ui.map_chat_comparison_saved": "Saved as a new card",
+  "ui.map_chat_comparison_saving": "Saving…",
+  "ui.map_chat_comparison_save_failed_0": "Not saved: {0}",
+  "ui.map_chat_comparison_blocked_aim": "This map was built with AIM; a new card cannot be added to it here.",
+  "ui.map_chat_comparison_card_title_0": "Comparison: {0}",
+  "ui.map_chat_comparison_undo": "Save comparison as a new card",
   "ui.map_chat_restored_0": "Restored the conversation from {0}",
   "ui.map_chat_record_stale":
     "No longer valid: this cannot be applied after reopening. Ask again if you still need it.",

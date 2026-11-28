@@ -2263,6 +2263,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-map-chat-comparison-table th, .vam-map-chat-comparison-table td { padding: 2px 8px; border: 1px solid var(--background-modifier-border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 .vam-map-chat-comparison-table thead th, .vam-map-chat-comparison-table tr:first-child th { font-weight: var(--font-semibold); }
 .vam-map-chat-comparison-unknown { color: var(--text-muted); font-style: italic; }
+.vam-map-chat-comparison-save { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.vam-map-chat-comparison-save-button { height: 24px; padding: 0 10px; font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-map-chat-comparison-save-button:disabled { cursor: default; }
 .vam-map-chat-impact-heading { margin-top: 6px; font-weight: var(--font-semibold); }
 .vam-map-chat-impact .vam-map-chat-resume-record { flex-basis: auto; }
 .vam-map-chat-impact .vam-map-chat-resume-record[hidden] { display: none; }

@@ -10912,3 +10912,57 @@ test('F08a comparison: it is not a plan or a write, follows the interface langua
   assert.match(visibleText(cmpBlock(f)), /未知/); f.setLanguage('en');
   f.panel.reset(); assert.equal(cmpBlock(f), undefined);
 });
+// ---- F08b: "Save as a new card" under the comparison -----------------------------------------------------------------------------
+const cmpSaveHost = (extra = {}) => {
+  const state = { block: null, calls: [], result: { ok: true, nodeId: 'new' }, gate: null };
+  const host = {
+    comparisonSaveBlock: () => state.block,
+    saveComparison: async (comparison, anchor) => { state.calls.push([comparison, anchor]); if (state.gate) await state.gate; return state.result; },
+    ...extra
+  };
+  return { state, host };
+};
+const cmpSaveButton = f => find(f.panel.el, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-comparison-save-button'));
+const cmpAnchor = { path: 'Map.md', id: 'map-a' };
+const settle = () => new Promise(r => setTimeout(r, 5));
+test('F08b comparison save: the button sits under the table and one press saves once; it then shows the saved state and cannot be pressed again', async () => {
+  const { state, host } = cmpSaveHost(); const f = panelFixture(host); cmpOf(f); f.panel.attachComparison(cmpData(), cmpAnchor);
+  const button = cmpSaveButton(f); assert.ok(button, 'the button exists'); assert.equal(button.text, 'Save as a new card'); assert.equal(button.disabled, false);
+  assert.equal(findAll(cmpBlock(f), i => i.tag === 'button').length, 1, 'the one button is inside the comparison block');
+  let release; state.gate = new Promise(r => { release = r; });
+  button.click(); button.click(); await settle();
+  assert.equal(state.calls.length, 1, 'a second press while it saves does nothing');
+  assert.equal(cmpSaveButton(f).disabled, true); assert.equal(cmpSaveButton(f).text, 'Saving…');
+  release(); await settle();
+  assert.equal(cmpSaveButton(f).text, 'Saved as a new card'); assert.equal(cmpSaveButton(f).disabled, true);
+  cmpSaveButton(f).click(); await settle(); assert.equal(state.calls.length, 1, 'no duplicate after it was saved');
+  eq(plain(state.calls[0][1]), cmpAnchor); assert.equal(state.calls[0][0].rows.length, 3);
+});
+test('F08b comparison save (counter-example): blocked = greyed with the reason, nothing called; the reason follows the map at once when refreshPlan is called (merge start / end)', async () => {
+  const { state, host } = cmpSaveHost(); const f = panelFixture(host); cmpOf(f); f.panel.attachComparison(cmpData(), cmpAnchor);
+  state.block = 'Merging; try again when it finishes'; f.panel.refreshPlan();
+  assert.equal(cmpSaveButton(f).disabled, true); assert.match(visibleText(cmpBlock(f)), /Merging; try again when it finishes/);
+  cmpSaveButton(f).click(); await settle(); assert.equal(state.calls.length, 0, 'a disabled button writes nothing');
+  state.block = null; f.panel.refreshPlan();
+  assert.equal(cmpSaveButton(f).disabled, false, 'woken when the merge ends, with no click in between'); assert.doesNotMatch(visibleText(cmpBlock(f)), /Merging/);
+  state.block = 'This map is read only'; cmpSaveButton(f).click(); await settle();
+  assert.equal(state.calls.length, 0, 'a block that began after the last draw is read again at the press');
+});
+test('F08b comparison save (counter-example): a failure says why and the button works again; a throw is a failure too; a saved one stays off after refreshPlan', async () => {
+  const { state, host } = cmpSaveHost(); const f = panelFixture(host); cmpOf(f); f.panel.attachComparison(cmpData(), cmpAnchor);
+  state.result = { ok: false, reason: 'disk full' }; cmpSaveButton(f).click(); await settle();
+  assert.match(visibleText(cmpBlock(f)), /Not saved: disk full/); assert.equal(cmpSaveButton(f).disabled, false);
+  state.result = { ok: true, nodeId: 'n' }; cmpSaveButton(f).click(); await settle(); assert.equal(state.calls.length, 2);
+  assert.equal(cmpSaveButton(f).text, 'Saved as a new card'); assert.doesNotMatch(visibleText(cmpBlock(f)), /Not saved/);
+  f.panel.refreshPlan(); assert.equal(cmpSaveButton(f).disabled, true);
+  const g = cmpSaveHost({ saveComparison: async () => { throw new Error('boom'); } }); const f2 = panelFixture(g.host); cmpOf(f2); f2.panel.attachComparison(cmpData(), cmpAnchor);
+  cmpSaveButton(f2).click(); await settle(); assert.match(visibleText(cmpBlock(f2)), /Not saved: boom/); assert.equal(cmpSaveButton(f2).disabled, false);
+});
+test('F08b comparison save: no host method or no anchor = no button; it follows the interface language; the table itself is unchanged', () => {
+  const f = panelFixture(); cmpOf(f); f.panel.attachComparison(cmpData(), cmpAnchor); assert.equal(cmpSaveButton(f), undefined, 'a host without saving has no button');
+  const { host } = cmpSaveHost(); const g = panelFixture(host); cmpOf(g); g.panel.attachComparison(cmpData()); assert.equal(cmpSaveButton(g), undefined, 'no anchor, no button');
+  const h = panelFixture(host); cmpOf(h); h.panel.attachComparison(cmpData(), cmpAnchor);
+  h.setLanguage('zh-TW'); h.panel.relabel(); assert.equal(cmpSaveButton(h).text, '另存成新卡'); h.setLanguage('zh-CN'); h.panel.relabel(); assert.equal(cmpSaveButton(h).text, '另存为新卡'); h.setLanguage('en'); h.panel.relabel();
+  eq(cmpHeads(cmpBlock(h)), ['', 'Fee (NT$)', 'Fee (US$)', 'Discount (%)']);
+  h.panel.reset(); assert.equal(cmpSaveButton(h), undefined);
+});

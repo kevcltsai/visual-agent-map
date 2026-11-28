@@ -166,6 +166,23 @@ test('setup window: a replaced source offers "Confirm again"; choosing it is sav
   assert.equal(win.values().reconfirm, undefined, 'after a saved confirm the window no longer carries it');
 });
 
+test('setup window: after the keyboard adopts a trial the focus stays inside the editor and Escape still closes it (D1-x10)', async () => {
+  let doc;
+  const { win, calls, el } = open({ adopt: async () => { doc.activeElement = null; return true; } });
+  doc = el.ownerDocument;
+  find(el, i => i.tag === 'button' && i.text === ui.t('ui.living_node_try_prompt')).click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const adopt = find(el, i => i.tag === 'button' && i.text === ui.t('ui.living_node_adopt'));
+  assert.equal(adopt.disabled, false, 'the preview is ready to adopt');
+  adopt.focus();
+  adopt.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(adopt.disabled, true, 'the adopt button is spent');
+  assert.ok(doc.activeElement && el.contains(doc.activeElement), 'the focus did not fall out of the editor');
+  el.keydown({ key: 'Escape' });
+  assert.equal(calls.cancel, 1, 'Escape closes a clean editor');
+});
+
 test('setup window: a refused save keeps the confirm for another try; removing the source drops it', async () => {
   const { win, el } = open({ save: async () => false });
   win.markReplaced(['Ref']);

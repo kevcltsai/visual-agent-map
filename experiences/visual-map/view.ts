@@ -16149,7 +16149,8 @@ export class VisualAgentMapView extends ItemView {
     // Centering is the camera only: it is not saved, so an outline click never writes the map file.
     this.focusNode(node, false, true);
     // Focus goes back to the map (no scroll), so Esc after a reveal reaches the map's key handler, not a chat control.
-    this.contentEl.focus({ preventScroll: true });
+    // A view built without a focusable content element (tests) has nothing to focus.
+    if (typeof this.contentEl.focus === "function") this.contentEl.focus({ preventScroll: true });
     // The reader the outline opens beside the map slides in after this: the canvas narrows for a while, so re-centre on resize.
     this.revealResize = { id: node.id, until: Date.now() + 500 };
     return true;

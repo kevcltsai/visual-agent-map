@@ -71,7 +71,7 @@ function fakeChat() {
     markStopped() { chat.isBusy = false; },
     showPlan(card) { chat.plans.push(card); chat.calls.push(['plan']); },
     settlePlan(card, state, lines) { card.state = state; chat.calls.push(['settle', state]); if (lines) chat.lines.push(lines); },
-    refreshPlan() { chat.calls.push(['refreshPlan']); },
+    refreshPlan() { chat.calls.push(['refreshPlan']); chat.painted = chat.plans.filter(p => p.state === 'pending').map(p => (p.suggestions ?? []).map(row => row.blocked())); },
     markTurn() {}, refreshReplyUndo() {}, completedTurns: () => [], conversationId: undefined,
     takeQueued: () => [], takeSteerTexts: () => [], addSteer: () => ({}), setSteerState() {}, restoreDraft() {},
     setApplying() {}, focusInput() {}, reset() {},
@@ -209,4 +209,26 @@ test('F07a mixed (counter-example): a small action next to suggestions is not wr
   card.apply();
   await until(async () => (await h.saved()).nodes.length === 5);
   assert.deepEqual(plain((await h.saved()).topicRelations ?? []), [], 'Apply does not adopt a suggestion');
+});
+
+test('F07a-x merge gate: Adopt greys (with the reason) the moment a merge starts and wakes when it ends, with no click in between', async () => {
+  const { h, card } = await suggested();
+  const gate = [];
+  h.view.plugin.askModel = async (_context, _model, _reasoning, signal, _exchange, accepted) => {
+    accepted?.();
+    await new Promise((resolve, reject) => { gate.push(resolve); signal?.addEventListener('abort', () => reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }))); });
+    return { summary: 'AI summary', detail: 'AI detail', visualReferences: [], suggestions: [] };
+  };
+  h.view.plugin.mutate = async work => work();
+  for (const key of ['a', 'b']) await h.repo.updateNote(h.view.map.nodes.find(n => n.id === h.ids[key]).path, { summary: `${key} summary`, detail: 'Source detail', status: 'completed' });
+  await h.view.hydrate();
+  h.view.mergeOpen = false;
+  h.view.render = () => {};
+  h.chat.painted = null;
+  const sources = [h.ids.a, h.ids.b].map(id => ({ id, path: h.view.map.nodes.find(n => n.id === id).path }));
+  assert.equal(await h.view.startMergeDraft('M', { path: MAP, mapId: h.view.map.id, parentId: null, targetId: null, sources }, () => {}, new AbortController().signal), true);
+  assert.deepEqual(plain(h.chat.painted?.[0]), ['Merging; try again when it finishes', 'Merging; try again when it finishes', null], 'rows touching a merging card are greyed with the reason, painted at merge start');
+  h.view.mergeDrafts.stop(h.view.mergeDrafts.tasks.get(MAP));
+  assert.deepEqual(plain(h.chat.painted?.[0]), [null, null, null], 'wakes when the merge ends');
+  assert.equal(card.state, 'pending');
 });

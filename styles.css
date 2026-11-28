@@ -1698,8 +1698,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-loading-bar:last-child { width: 62%; }
 @keyframes vam-loading-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .vam-view .vam-loading-bar { animation: none; } }
-/* While notes are read only look and move are left: tools, resize handles and the add button are not shown (and so not reachable by keyboard). */
-.vam-view.is-notes-loading .vam-node-tools, .vam-view.is-notes-loading .vam-card-resize, .vam-view.is-notes-loading .vam-card-resize-y, .vam-view.is-notes-loading .vam-card-resize-corner { display: none; }
+/* While notes are read only look and move are left: resize handles and the add button are not shown. The card toolbar stays (notes + the more button; write items are disabled with the reason). */
+.vam-view.is-notes-loading .vam-card-resize, .vam-view.is-notes-loading .vam-card-resize-y, .vam-view.is-notes-loading .vam-card-resize-corner { display: none; }
 /* The first-use hint shares the bottom edge with the progress line: it waits until the notes are read. */
 .vam-view.is-notes-loading .vam-canvas-hint { display: none; }
 

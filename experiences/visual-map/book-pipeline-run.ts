@@ -79,6 +79,7 @@ import {
   abandonAi,
   closeAiRound,
   fixAgainPlan,
+  keptForLocked,
   reopenAiRound,
   rekeyBookProof,
   aiChapterDue,
@@ -2014,6 +2015,8 @@ export class BookPipelineRuns {
       if (data.phase !== "done") throw new BookPipelineRunError("not_gate");
       if (!fixAgainPlan(data, 0).items) throw new BookPipelineRunError("nothing");
       // Only the units that will really run are counted (the same key check the round makes: a hand-edited chapter is skipped), so the limit is raised for them alone.
+      // A locked chapter (ai-flows AI lock) is not a unit; a round left with nothing but locked units is refused as locked, before any call.
+      let lockedOut = false;
       const chapterKey = async (id: string): Promise<string | undefined> => {
         const info = drive.cards.get(id);
         const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
@@ -2021,18 +2024,32 @@ export class BookPipelineRuns {
           ? aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail)))
           : undefined;
       };
+      const keyOf = (input: { chapters: readonly { text: string }[] }): string =>
+        aiProofKey(0, input.chapters.map(chapter => chapter.text).join("\n\u0000\n"));
       const bookKey = async (): Promise<string | undefined> => {
         const input = await this.bookProofInput(drive).catch(() => undefined);
-        return input ? aiProofKey(0, input.chapters.map(chapter => chapter.text).join("\n\u0000\n")) : undefined;
+        return input ? keyOf(input) : undefined;
       };
       const chapterIds: string[] = [];
       for (const id of effectiveOrder(data)) {
         const key = await chapterKey(id);
-        if (key !== undefined && reopenAiRound(data, id, key).accepted) chapterIds.push(id);
+        if (key === undefined || !reopenAiRound(data, id, key).accepted) continue;
+        const info = drive.cards.get(id);
+        if (info && (await this.ports.readCard(info.path).catch(() => undefined))?.aiLocked) lockedOut = true;
+        else chapterIds.push(id);
       }
-      const bookNow = await bookKey();
-      const withBook = bookNow !== undefined && reopenAiRound(data, undefined, bookNow).accepted;
-      if (!chapterIds.length && !withBook) throw new BookPipelineRunError("nothing");
+      const input = await this.bookProofInput(drive).catch(() => undefined);
+      const reopened = input !== undefined ? reopenAiRound(data, undefined, keyOf(input)) : undefined;
+      let withBook = !!reopened?.accepted;
+      // The book's round sends only its targets outside locked chapters: with none left it is refused as locked, not run as a bare re-check.
+      if (
+        withBook &&
+        (reopened?.state.bookProof?.pending ?? []).every(t => input?.chapters[(t.chapter ?? 1) - 1]?.locked)
+      ) {
+        withBook = false;
+        lockedOut = true;
+      }
+      if (!chapterIds.length && !withBook) throw new BookPipelineRunError(lockedOut ? "ai_locked" : "nothing");
       // The card says about 2 calls per unit; a step may be tried up to MAX_STEP_ATTEMPTS times, so the limit leaves room for
       // those retries (it is a cap, not a spend) and one failed call does not pause the round on "budget used up".
       const calls = (2 * chapterIds.length + (withBook ? 2 : 0)) * MAX_STEP_ATTEMPTS;
@@ -3918,12 +3935,16 @@ export class BookPipelineRuns {
       report(`failed:${code(outcome.kind === "failed" ? outcome.reason : "failed")}`);
     }
   }
-  /** The chapters with text in reading order, as the whole-book proofread reads them (prose only), with the program's own findings as hints. */
+  /**
+   * The chapters with text in reading order, as the whole-book proofread reads them (prose only), with the program's own findings as hints.
+   * A chapter with `ai-locked: true` is marked `locked`: it stays in the list (its text keeps the key), but the calls leave it out, and the
+   * hints neither quote it nor count it (they number the chapters the call is sent).
+   */
   private async bookProofInput(drive: Drive): Promise<{
-    chapters: { id: string; title: string; text: string; raw: string; place?: AiBookChapter["place"] }[];
+    chapters: { id: string; title: string; text: string; raw: string; locked?: true; place?: AiBookChapter["place"] }[];
     hints: string[];
   }> {
-    const ordered: (ReferenceChapter & { raw: string; place?: AiBookChapter["place"] })[] = [];
+    const ordered: (ReferenceChapter & { raw: string; locked?: true; place?: AiBookChapter["place"] })[] = [];
     const structure = this.structureOf(drive, effectiveOrder(drive.store.state));
     for (const id of effectiveOrder(drive.store.state)) {
       const info = drive.cards.get(id);
@@ -3941,6 +3962,7 @@ export class BookPipelineRuns {
         title: card?.title ?? info.title,
         text: card ? aiProofBody(chapterBody(card.detail)) : "",
         raw: card?.raw ?? "",
+        ...(card?.aiLocked ? { locked: true as const } : {}),
         ...(chapter !== undefined ? { chapter } : {}),
         ...(place?.kind === "section" ? { section: true as const } : {}),
         ...(place
@@ -3955,8 +3977,10 @@ export class BookPipelineRuns {
       });
     }
     const chapters = ordered.filter(chapter => chapter.text);
+    const sent = chapters.filter(chapter => !chapter.locked);
+    const locked = new Set(chapters.filter(chapter => chapter.locked).map(chapter => chapter.id));
     const number = (id: string): string => {
-      const at = chapters.findIndex(chapter => chapter.id === id);
+      const at = sent.findIndex(chapter => chapter.id === id);
       return at < 0 ? "?" : String(at + 1);
     };
     const findings = [
@@ -3964,7 +3988,7 @@ export class BookPipelineRuns {
       ...directionFindings(ordered),
       ...numericFindings(chapters, []),
       ...removedChapterRefs(drive.store.state, chapters)
-    ];
+    ].filter(finding => !locked.has(finding.a) && !locked.has(finding.b));
     const hints = findings.map(
       finding =>
         `item ${number(finding.a)}: "${finding.claimA}"; ${
@@ -3990,6 +4014,29 @@ export class BookPipelineRuns {
     };
     if (!input) return giveUp();
     const { chapters, hints } = input;
+    // ai-flows AI lock: a locked chapter is left out of both calls (not only refused at the write); the key still covers it, so a lock alone
+    // does not start the book over. `shown` maps the check's positions back to the book's chapter numbers.
+    const shown = chapters.flatMap((chapter, at) => (chapter.locked ? [] : [at]));
+    const isLocked = (number: number | undefined): boolean => !!chapters[(number ?? 1) - 1]?.locked;
+    const lockedIds = chapters.filter(chapter => chapter.locked).map(chapter => chapter.id);
+    // The known problems of a locked chapter stay open (it is not checked again), as long as their quote is still in its text.
+    const squash = (text: string): string => text.replace(/\s+/g, "");
+    const kept = (): ReturnType<typeof keptForLocked> =>
+      keptForLocked(
+        drive.store.state.bookProof,
+        item =>
+          isLocked(item.chapter) && squash(chapters[(item.chapter ?? 1) - 1]?.text ?? "").includes(squash(item.quote))
+      );
+    if (!shown.length && chapters.length) {
+      this.log(drive, "ai_locked_skipped", drive.rootId, "proof", "ai_locked");
+      const open = kept();
+      await drive.store.commit(state =>
+        state.status === "running"
+          ? { state: abandonAi(state, undefined, { ids: lockedIds, open }), accepted: true }
+          : { state, accepted: false }
+      );
+      return;
+    }
     const joined = (texts: readonly string[]): string => texts.join("\n\u0000\n");
     const key = aiProofKey(0, joined(chapters.map(chapter => chapter.text)));
     const stored = drive.store.state.bookProof;
@@ -4023,14 +4070,18 @@ export class BookPipelineRuns {
     const run = { signal, admission: drive.admission };
     try {
       if (step === "proof") {
-        const prior = priorOf(same?.pending ?? []);
-        const review = await untilAborted(
+        const prior = priorOf((same?.pending ?? []).filter(target => !isLocked(target.chapter)));
+        const carried = kept();
+        const reviewed = await untilAborted(
           signal,
           this.ports.aiBookProof(
             {
               ...this.base(drive, drive.config.proofModel),
-              chapters: compactChapters(chapters.map(chapter => ({ title: chapter.title, text: chapter.text }))).map(
-                (chapter, at) => ({ ...chapter, ...(chapters[at].place ? { place: chapters[at].place } : {}) })
+              chapters: compactChapters(shown.map(at => ({ title: chapters[at].title, text: chapters[at].text }))).map(
+                (chapter, at) => ({
+                  ...chapter,
+                  ...(chapters[shown[at]].place ? { place: chapters[shown[at]].place } : {})
+                })
               ),
               hints,
               ...(prior.length ? { prior } : {})
@@ -4039,6 +4090,15 @@ export class BookPipelineRuns {
           )
         );
         if (this.dead(drive)) return;
+        const inBook = (number: number): number => (shown[number - 1] ?? number - 1) + 1;
+        const review = {
+          ...reviewed,
+          checks: reviewed.checks.map(check => ({
+            ...check,
+            ...(check.chapter ? { chapter: inBook(check.chapter) } : {}),
+            ...(check.otherChapter ? { otherChapter: inBook(check.otherChapter) } : {})
+          }))
+        };
         const pending = fixTargetsOf(review.checks);
         const open = review.checks
           .filter(check => checkState(check) === "unfixable")
@@ -4048,9 +4108,15 @@ export class BookPipelineRuns {
             quote: check.quote,
             problem: check.problem,
             reason: check.why ?? "unfixable"
-          }));
+          }))
+          .concat(carried);
         const done = await drive.store.commit(state =>
-          applyAiProof(state, token, { checked: review.checks.length, pending, open })
+          applyAiProof(state, token, {
+            checked: review.checks.length,
+            pending,
+            open,
+            ...(lockedIds.length ? { locked: lockedIds } : {})
+          })
         );
         if (!done?.accepted) {
           await drive.store.commit(state => applyAiStopped(state, token, false));
@@ -4058,23 +4124,26 @@ export class BookPipelineRuns {
         }
         return report("ok", { checked: review.checks.length, pending: pending.length, open: open.length });
       }
-      const targets = same?.pending ?? [];
+      // A target in a chapter locked after the check is not asked for (it stays unfixed; the next check leaves that chapter out).
+      const targets = (same?.pending ?? []).filter(target => !isLocked(target.chapter));
       const rootInfo = drive.cards.get(drive.rootId);
       const root = rootInfo ? await this.ports.readCard(rootInfo.path).catch(() => undefined) : undefined;
       const range = root
         ? lengthRange(effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)).length)
         : undefined;
-      const edits = await untilAborted(
-        signal,
-        this.ports.aiFix(
-          {
-            ...this.base(drive, drive.config.authorModel),
-            chapters: chapters.map((chapter, at) => ({ number: at + 1, title: chapter.title, text: chapter.text })),
-            targets
-          },
-          run
-        )
-      );
+      const edits = targets.length
+        ? await untilAborted(
+            signal,
+            this.ports.aiFix(
+              {
+                ...this.base(drive, drive.config.authorModel),
+                chapters: shown.map(at => ({ number: at + 1, title: chapters[at].title, text: chapters[at].text })),
+                targets
+              },
+              run
+            )
+          )
+        : [];
       if (this.dead(drive)) return;
       const refused: Record<string, AiFixRefusal> = {};
       const changed: string[] = [];
@@ -4194,7 +4263,9 @@ export class BookPipelineRuns {
           reason: open.reason
         });
       }
-      if (state.bookProof.incomplete) incomplete("");
+      // Left out because AI-locked: each such chapter is named (it was not checked), not the book as a whole.
+      if (state.bookProof.incomplete)
+        for (const id of state.bookProof.locked?.length ? state.bookProof.locked : [""]) incomplete(id && title(id));
     }
     for (const id of effectiveOrder(state)) {
       const info = drive.cards.get(id);

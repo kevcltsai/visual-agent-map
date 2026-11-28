@@ -368,7 +368,7 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
   assert.equal(h.menus.at(-1).mouse, true, 'a mouse right-click opens the menu at the pointer');
   h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 10, bottom: 20 }) }, h.view.map.nodes.find(n => n.id === h.ids.b));
   const entryTitles = h.menus.at(-1).items.map(i => i.title);
-  assert.deepEqual(entryTitles.slice(entryTitles.indexOf('Add summary bracket'), entryTitles.indexOf('Add summary bracket') + 2), ['Add summary bracket', 'Note style…'], 'T6 P3 added the topic note style entry after the bracket (D4)');
+  assert.deepEqual(entryTitles.slice(entryTitles.indexOf('Add summary bracket'), entryTitles.indexOf('Add summary bracket') + 3), ['Add summary bracket', 'Tidy this branch', 'Note style…'], 'A10: the ⋯ menu adds "Tidy this branch" after the bracket; T6 P3 added the topic note style entry after the bracket (D4)');
   assert.deepEqual(plain(h.menus.at(-1).at), { x: 10, y: 20 }, 'the More list opens under its button');
   h.menus.at(-1).items.find(i => i.title === 'Add summary bracket').click();
   assert.ok(h.area(), 'one card is enough; the editor opens');
@@ -463,13 +463,14 @@ test('C1 card context menu (B07): one topic gets the toolbar actions, then the �
   h.view.removeByKey = node => calls.push(['remove', node.id]);
   h.view.startCardSummaryEdit = node => calls.push(['summary', node.id]);
   h.view.addSummaryOver = ids => calls.push(['bracket', ...ids]);
+  h.view.openTidyPreview = id => calls.push(['tidy', id]);
   h.view.chooseTopicStyle = node => calls.push(['style', node.id]);
   h.view.openAiCardPopover = node => calls.push(['ai-card', node.id]);
   h.view.onCanvasContextMenu(event());
   const menu = h.menus.at(-1);
   const titles = menu.items.map(i => i.title);
-  assert.deepEqual(titles, ['AI explore', 'Add subtopic', 'Open note', 'Add summary', 'Card settings…', 'Select subtopics', 'Add summary bracket', 'Note style…', 'Make it an AI card', 'Add sibling topic', 'Add another type', 'Collapse subtopics', 'Remove from map']);
-  assert.deepEqual(menu.separators, [4, 9, 11], 'a separator after the toolbar part and between the ⋯ groups');
+  assert.deepEqual(titles, ['AI explore', 'Add subtopic', 'Open note', 'Add summary', 'Card settings…', 'Select subtopics', 'Add summary bracket', 'Tidy this branch', 'Note style…', 'Make it an AI card', 'Add sibling topic', 'Add another type', 'Collapse subtopics', 'Remove from map']);
+  assert.deepEqual(menu.separators, [4, 10, 12], 'a separator after the toolbar part and between the ⋯ groups');
   assert.ok(!titles.includes('Add text'), 'Add text lives only in the Add-another-type list');
   assert.ok(menu.items.find(i => i.title === 'Add another type').sub.items.some(i => i.title === 'Add text'), 'Add text is in its submenu');
   for (const gone of ['Research this card', 'This card', 'Edit card', 'Open details in right sidebar', 'Open note in new tab']) assert.ok(!titles.includes(gone), `${gone} is no longer in the single-card menu`);
@@ -481,7 +482,7 @@ test('C1 card context menu (B07): one topic gets the toolbar actions, then the �
   const b = h.view.map.nodes.find(n => n.id === h.ids.b);
   // The two add entries go through the map's work queue, so they land after the direct ones; the order is not the point.
   const sorted = list => plain(list).map(item => JSON.stringify(item)).sort();
-  assert.deepEqual(sorted(calls), sorted([['ai', h.ids.b], ['add', h.ids.b], ['details', h.ids.b], ['summary', h.ids.b], ['panel', h.ids.b, 'structure'], ['select', h.ids.b], ['bracket', h.ids.b], ['style', h.ids.b], ['ai-card', h.ids.b], ['add', b.parentId], ['fold', h.ids.b], ['tab', h.ids.b], ['remove', h.ids.b]]));
+  assert.deepEqual(sorted(calls), sorted([['ai', h.ids.b], ['add', h.ids.b], ['details', h.ids.b], ['summary', h.ids.b], ['panel', h.ids.b, 'structure'], ['select', h.ids.b], ['bracket', h.ids.b], ['tidy', h.ids.b], ['style', h.ids.b], ['ai-card', h.ids.b], ['add', b.parentId], ['fold', h.ids.b], ['tab', h.ids.b], ['remove', h.ids.b]]));
   h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
   h.view.onCanvasContextMenu(event());
   assert.deepEqual(h.menus.at(-1).items.map(i => i.title), ['Add summary bracket'], 'several topics: only the bracket');

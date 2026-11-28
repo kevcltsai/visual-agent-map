@@ -811,6 +811,23 @@ test('P3.3 a refused save says why in plain words, not a raw code', async () => 
   assert.ok(h.view.aiCardOpen);
 });
 
+test('P3.3 batch UI: a refused save shows one notice, not a raw code first and the plain reason second', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  const { plainFailure } = S.load('ai/plain-error.ts', { obsidian });
+  h.host.recordFailure = (context, error) => plainFailure(context, error);
+  // As main.ts mutate(): every error that leaves the queued work also raises its own notice.
+  h.host.mutate = work => { const result = Promise.resolve().then(work); result.catch(error => h.notices.push(String(error?.message ?? error))); return result; };
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'My draft');
+  await h.repo.updateNote(h.node('A').path, { prompt: 'Changed elsewhere' });
+  h.saveButton().click();
+  await until(() => h.notices.length > 0);
+  await dom.tick(); await dom.tick();
+  const shown = h.notices.map(n => String(n.message ?? n));
+  assert.equal(shown.length, 1, shown.join(' | '));
+  assert.equal(/changed-configuration/.test(shown[0]), false, shown[0]);
+});
+
 test('P3.3 refusal reasons are localized in English, Traditional and Simplified Chinese; an unknown code gives none', () => {
   const ui = require('./support-replay.cjs').loadSource(`
 export { livingSaveReason } from "./experiences/visual-map/living-node-trial-reason";

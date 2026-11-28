@@ -111,6 +111,7 @@ const TABLE = [
   ['ai-card', 'more', 'a', 'ok ro ok ok pr ms bk ok'], // canSetAiCard: !bookLock.ai
   ['select-subtopics', 'more', 'a', 'ok ro ok ok pr ms ok bk'],
   ['summary-add', 'more', 'a', 'ok ro ok ok pr ms ok ok'], // canEditSummary
+  ['tidy-branch', 'more', 'a', 'ok ro ok ok pr ms ok ok'], // canEditSummary and subtopics (A10)
   ['note-style', 'more', 'a', 'ok ro ok ok pr ms ok ok'], // canEditSummary
   ['add-other', 'more', 'a', 'ok ro ok ok pr ms ok bk'],
   // Right-click (onCanvasContextMenu → addCardMenuActions): canEditSummary on a card; the single-card list only outside selection mode.
@@ -136,7 +137,6 @@ const TABLE = [
   ['merge', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok bk ok'], // if (!bookLock.ai); aria-disabled by mergeCheck (below)
   ['multi-research', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok bk ok'],
   ['move-to', 'toolbar', ['a', 'd'], 'ok ok mg ok ok ok ok bk'], // chooseSelectedParent refuses merging branches
-  ['selection-help', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['finish-selection', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['synthesize', 'more', ['a', 'd'], 'ok ok ok ok ok ok bk ok'],
   ['copy-to', 'more', ['a', 'd'], 'ok ok mg ok ok ok ok bk'],
@@ -145,6 +145,7 @@ const TABLE = [
   ['ai-lock-selected', 'more', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['clear-selection', 'more', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['remove-selected', 'more', ['a', 'd'], 'ok ok mg ok ok ok ok bk'], // confirmRemoveSelected refuses merging branches
+  ['selection-help', 'more', ['a', 'd'], 'ok ok ok ok ok ok ok ok'], // B09: the bar's "?" is the ⋯ menu's last row
   // Right-click on a selection (the !single branch): canEditSummary.
   ['summary-add-selected', 'context', ['a', 'd'], 'ok ro ok ok pr ok ok ok'],
   ['note-style', 'context', ['a'], 'ok ro ok ok pr ok ok ok'] // one topic in selection mode
@@ -168,7 +169,7 @@ test('card actions: the table covers every action, and every unavailable answer 
       const result = availability(id, surface, ctxFor(target, state, extra));
       if (!result.ok) reasons.add(result.reasonKey);
     }
-  reasons.add('ui.select_at_least_two_topics').add('ui.multi_research_already_running');
+  reasons.add('ui.select_at_least_two_topics').add('ui.multi_research_already_running').add('ui.card_action_off_no_lockable');
   for (const key of [...reasons, ...Object.values(R)])
     for (const [name, dictionary] of [['en', en], ['zh-TW', zhTW], ['zh-CN', zhCN]]) assert.ok(dictionary[key]?.trim(), `${key} in ${name}`);
   assert.equal(Object.keys(R).length, 6);
@@ -210,10 +211,11 @@ test('card actions: what a card offers follows the card, as the entries decide i
   // Note style on a selection only for one topic; the selection ⋯ never has it.
   assert.ok(!ids('context', ctxFor(['a', 'd'], 'normal')).includes('note-style'));
   assert.ok(!ids('more', ctxFor(['a'], 'normal')).includes('note-style'));
-  // Lock from AI: the label follows the selection (all locked → Unlock), and a selection with no lockable topic has none.
+  // Lock from AI: the label follows the selection (all locked → Unlock); a selection with no lockable topic still lists it (B09), off, with the reason.
   assert.equal(titleKeyFor(action('ai-lock-selected'), 'more', ctxFor(['a', 'd'], 'aiLocked')), 'ui.ai_unlock_selected');
   assert.equal(titleKeyFor(action('ai-lock-selected'), 'more', ctxFor(['a', 'd'], 'normal')), 'ui.ai_lock_toggle');
-  assert.ok(!ids('more', ctxFor(['a', 'd'], 'normal', { isArgumentCard: () => true })).includes('ai-lock-selected'));
+  eq(availability('ai-lock-selected', 'more', ctxFor(['a', 'd'], 'normal', { isArgumentCard: () => true })), { ok: false, reasonKey: 'ui.card_action_off_no_lockable' });
+  eq(availability('ai-lock-selected', 'more', ctxFor(['a', 'd'], 'normal')), { ok: true });
   assert.equal(titleKeyFor(action('synthesize'), 'more', ctxFor(['a', 'd'], 'normal')), 'ui.synthesize_0_topics');
   assert.equal(titleKeyFor(action('synthesize'), 'more', ctxFor(['a'], 'normal')), 'ui.synthesize');
   // A card's actions never come with a selection context, nor a selection's with a card's.
@@ -232,18 +234,18 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   // The AI card's toolbar is the card's with Run all's Stop first (paintPromptState prepends it).
   eq(CARD_TOOLBAR['ai-card'], ['stop-run-all', ...CARD_TOOLBAR.card]);
   eq(ids('toolbar', ctxFor('ai', 'normal', { runAllWorking: id => id === 'ai' })), ['stop-run-all', 'research', 'add-child', 'open-note', 'add-summary-field']);
-  // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, select subtopics, summary bracket, note style, run, AI card, book |
+  // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, select subtopics, summary bracket, tidy this branch (A10), note style, run, AI card, book |
   // add sibling, add another type (add subtopic is on the toolbar) | fold, remove.
   const grouped = (surface, ctx) => actionsFor(surface, ctx).map(entry => `${entry.action.group}:${entry.action.id}`);
   eq(grouped('more', ctxFor('ai', 'normal')), ['3:card-settings', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:remove']);
-  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:select-subtopics', '3:summary-add', '3:note-style', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
+  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
   // addCardMenuActions (B07): the toolbar's actions in its order, then the ⋯ list in its order (the view puts a separator between them).
   eq(ids('context', ctxFor('a', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('a', 'normal'))]);
   eq(ids('context', ctxFor('ai', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('ai', 'normal'))]);
   assert.equal(action('add-other').group, 4, 'the ⋯ list puts a separator before Add another type');
-  // renderSelectionBar: Merge, Research, Move to (⋯) ?, Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove.
-  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['merge', 'multi-research', 'move-to', 'selection-help', 'finish-selection']);
-  eq(actionsFor('more', ctxFor(['a', 'd'], 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`), ['1:synthesize', '1:copy-to', '1:add-frame', '1:summary-add-selected', '1:ai-lock-selected', '2:clear-selection', '2:remove-selected']);
+  // renderSelectionBar (B09): Move to, Merge, Research, (⋯) Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove, Selection help.
+  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['move-to', 'merge', 'multi-research', 'finish-selection']);
+  eq(actionsFor('more', ctxFor(['a', 'd'], 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`), ['1:synthesize', '1:copy-to', '1:add-frame', '1:summary-add-selected', '1:ai-lock-selected', '2:clear-selection', '2:remove-selected', '2:selection-help']);
   // The rules B06/B07 move to: ⋯ = the card's menu actions minus the toolbar set; right-click = toolbar, separator, ⋯.
   for (const kind of ['card', 'ai-card']) {
     const more = ruleMoreSet(kind);
@@ -323,6 +325,7 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('ai-card', 'a', 'more'), [['editAiCard', 'a']]);
   eq(run('select-subtopics', 'a', 'more'), [['selectSubtopics', 'a']]);
   eq(run('summary-add', 'a', 'more'), [['addSummary', ['a']]]);
+  eq(run('tidy-branch', 'a', 'more'), [['tidyBranch', 'a']]);
   eq(run('note-style', 'a', 'more'), [['noteStyle', 'a']]);
   eq(run('note-style', ['d'], 'context'), [['noteStyle', 'd']]);
   eq(run('add-other', 'a', 'more', { menu }), [['fillAddMenu', menu, 'a']]);
@@ -348,20 +351,24 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('finish-selection', ['a', 'd'], 'toolbar'), [['finishSelection']]);
 });
 
-test('card actions: the view builds the context next to mapCommand; the palette, the card ⋯ and the right-click read the registry', () => {
+test('card actions: the view builds the context next to mapCommand; the palette, the card ⋯, the right-click and the selection bar read the registry', () => {
   const view = read('experiences/visual-map/view.ts');
   const at = view.indexOf('  cardActionContext(');
   assert.ok(at > view.indexOf('  mapCommand(action: MapCommandAction'), 'cardActionContext follows mapCommand');
   assert.ok(at < view.indexOf('  openKeyboardShortcuts(): void'));
-  // B05 mapCommand, B06/B07 addCardActions (openCardMoreMenu and addCardMenuActions call it); the other entries move in B08–B10.
+  // B05 mapCommand, B06/B07 addCardActions (openCardMoreMenu and addCardMenuActions call it), B09 the selection bar and its ⋯; the other entries move in B08 and B10.
   const body = name => {
     const start = view.indexOf(`  ${name}(`);
     assert.ok(start >= 0, name);
     return view.slice(start, view.indexOf('\n  }\n', start));
   };
-  assert.equal((body('mapCommand').match(/actionsFor\(/g) ?? []).length, 1, 'mapCommand');
-  assert.equal((body('private addCardActions').match(/actionsFor\(/g) ?? []).length, 1, 'addCardActions');
-  assert.equal((view.match(/actionsFor\(/g) ?? []).length, 2, 'no other entry reads the registry yet');
+  const count = text => (text.match(/actionsFor\(/g) ?? []).length;
+  assert.equal(count(body('mapCommand')), 1, 'mapCommand');
+  assert.equal(count(body('private addCardActions')), 1, 'addCardActions');
+  const selectionStart = view.indexOf('  private renderSelectionBar('), selectionEnd = view.indexOf("  /** The dialog's choices for each child's research");
+  assert.ok(selectionStart > 0 && selectionEnd > selectionStart);
+  assert.equal(count(view.slice(selectionStart, selectionEnd)), 2, 'B09: the bar and its ⋯');
+  assert.equal(count(view), 4, 'no other entry reads the registry yet');
   assert.equal((view.match(/CARD_ACTIONS/g) ?? []).length, 0);
   assert.match(body('private openCardMoreMenu'), /this\.addCardActions\(menu, "more", node\)/);
   assert.match(body('private addCardMenuActions'), /this\.addCardActions\(menu, "context", node,/);

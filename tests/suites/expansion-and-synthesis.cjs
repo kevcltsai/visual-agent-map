@@ -1468,11 +1468,23 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   h.view.selection.selectSubtopics([h.nodes[0].id]); // enters selection mode like the user's own pick
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
   assert.equal(h.view.selection.state.multiSelectMode, false); assert.equal(h.view.selection.state.multiSelected.size, 0);
-  h.view.selection.replaceMulti([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, true);
-  assert.equal(items.find(i => i.text === 'Researching: 0 of 1 done'), undefined);
+  h.view.selection.replaceMulti([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, false, 'B09: stays focusable'); assert.equal(research().attrs['aria-disabled'], 'true');
+  assert.ok(items.find(i => i.cls === 'vam-selection-why' && i.text.includes('A multi-topic research is already running on this map.')), 'the reason is written under the row');
+  h.notices.length = 0; research().listeners.click({ stopPropagation() {} }); await new Promise(r => setTimeout(r, 20));
+  assert.equal(h.runs.length, 1, 'B09: an aria-disabled Research never starts another run'); assert.equal(h.notices.length, 1, 'B09: and says why'); assert.match(String(h.notices[0]), /already running/);
+  assert.equal(items.find(i => i.text === 'In progress: 0 of 1 done'), undefined);
   items = toolbar();
-  assert.ok(items.find(i => i.tag === 'span' && i.text === `Researching: 0 of 1 done · ${h.nodes[0].id}`), items.map(i => i.text).join('|'));
+  assert.ok(items.find(i => i.tag === 'span' && i.text === `In progress: 0 of 1 done · ${h.nodes[0].id}`), items.map(i => i.text).join('|'));
   assert.ok(items.find(i => i.tag === 'div' && /vam-aim-statusbar/.test(i.cls)));
+  const spans = items.filter(i => i.tag === 'span').map(i => i.text);
+  assert.equal(spans.filter(x => x === 'Research').length, 1, 'title once'); assert.equal(spans.filter(x => /^In progress: 0 of 1 done/.test(x)).length, 1, 'value once');
+  assert.ok(!items.map(i => i.text).join('').includes('研究研究'));
+  const i18nDir = path.join(__dirname, '..', '..', 'i18n');
+  for (const [file, title, re] of [['zh-TW.ts', '研究', /進行中：完成/], ['zh-CN.ts', '研究', /进行中：完成/]]) {
+    const src = fs.readFileSync(path.join(i18nDir, file), 'utf8');
+    const value = src.match(/"ui\.multi_research_progress": "([^"]*)"/)[1]; const ended = src.match(/"ui\.multi_research_ended": "([^"]*)"/)[1];
+    assert.ok(re.test(value) && !(title + value).includes('研究研究') && !(title + ended).includes('研究研究'), `${file}: ${title}${value} / ${title}${ended}`);
+  }
   const stop = items.find(i => i.tag === 'button' && i.text === 'Stop research'); assert.ok(stop);
   stop.listeners.click({ stopPropagation() {} });
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'stopped');
@@ -1489,13 +1501,13 @@ integrationTest('the multi research bar counts the topics running and names the 
   h.view.notes = new Map(h.nodes.map((n, index) => [n.id, { title: 'ABCDEFGH'[index] }]));
   h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 6);
-  assert.ok(text().includes('Researching: 0 of 8 done · 6 running: A, B and more'), text());
+  assert.ok(text().includes('In progress: 0 of 8 done · 6 running: A, B and more'), text());
   for (const id of ['A', 'B', 'C']) h.finish.get(id)();
   await until(() => h.plugin.expansionBatches.get(h.key).completed === 3 && h.runs.length === 8);
-  assert.ok(text().includes('Researching: 3 of 8 done · 5 running: D, E and more'), text());
+  assert.ok(text().includes('In progress: 3 of 8 done · 5 running: D, E and more'), text());
   for (const id of ['D', 'E', 'F', 'G']) h.finish.get(id)();
   await until(() => h.plugin.expansionBatches.get(h.key).completed === 7);
-  assert.ok(text().includes('Researching: 7 of 8 done · H'), text());
+  assert.ok(text().includes('In progress: 7 of 8 done · H'), text());
   assert.ok(text().includes('Stop research'));
   h.view.stopMultiResearch();
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'stopped');

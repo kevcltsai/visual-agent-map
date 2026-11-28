@@ -85,6 +85,8 @@ export interface MapChatLine {
   basis?: MapChatBasis;
   /** Shown on its own like a line the reader has to look at, not folded into the done count. */
   loud?: boolean;
+  /** The one card the line is about: the panel offers "Locate" while it is on the map. In memory only (the record drops it). */
+  nodeId?: string;
 }
 
 /** A search block that ended with a picture put into its card. */
@@ -671,6 +673,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private liveEl!: HTMLElement;
   private stopResizing: (() => void) | null = null;
   private chipsEl!: HTMLElement;
+  /** "This turn may change: …" above the message box (P2.2a). */
+  private scopeEl!: HTMLElement;
   private statusEl!: HTMLElement;
   private resumeOpenEl: HTMLButtonElement | null = null;
   private resumeEl: HTMLElement | null = null;
@@ -2268,6 +2272,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       this.renderResumeButton();
     }
     // The send / stop key sits inside the message box, bottom right: one box, one key at a time (↵ when idle, ■ while working).
+    // What this turn may change, said as it is: the whole map, and the selection an action that names no card falls back to.
+    this.scopeEl = form.createDiv({ cls: "vam-map-chat-scope" });
     const box = form.createDiv("vam-map-chat-composer");
     this.inputEl = box.createEl("textarea", {
       cls: "vam-map-chat-input",
@@ -3101,6 +3107,14 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
 
   private renderChips(): void {
     if (!this.built) return;
+    const chosen = this.host.selectedIds().filter(id => this.host.topicTitle(id) !== null).length;
+    this.scopeEl.setText(
+      chosen === 0
+        ? t("ui.map_chat_scope_all")
+        : chosen === 1
+          ? t("ui.map_chat_scope_selected_one")
+          : t("ui.map_chat_scope_selected_0", String(chosen))
+    );
     this.chipsEl.empty();
     const dragged = new Set(this.chips.filter(chip => chip.kind === "topic").map(chip => (chip as { id: string }).id));
     const picture = this.host.image?.() ?? null;
@@ -3609,13 +3623,26 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       if (hasDetail) this.buildDetailToggle(summary, message, open);
       if (undo) this.buildReplyUndo(summary, undo.token);
     }
-    for (const line of loud) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    for (const line of loud) this.buildResultLine(list, line);
     if (open) {
       if (applied) this.buildPlan(list, applied, message);
-      for (const line of folded) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+      for (const line of folded) this.buildResultLine(list, line);
     }
     for (const note of notes) list.createDiv({ cls: "vam-map-chat-line is-note", text: note.text });
     return !!undo;
+  }
+
+  /** One result line; "Locate ›" after it when the card it is about is still on the map (the line's own text stays as it is). */
+  private buildResultLine(list: HTMLElement, line: MapChatLine): void {
+    const el = list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    const id = line.nodeId;
+    if (!id || this.host.topicTitle(id) === null) return;
+    const locate = el.createEl("button", {
+      cls: "vam-map-chat-line-locate",
+      text: t("ui.map_chat_locate"),
+      attr: { type: "button" }
+    });
+    locate.addEventListener("click", () => this.host.locateTopic?.(id));
   }
 
   /**

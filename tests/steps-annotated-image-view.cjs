@@ -32,7 +32,7 @@ async function harness(items, lang = 'en') {
   const menus = [];
   class Menu {
     constructor() { this.items = []; menus.push(this); }
-    addItem(cb) { const item = { title: '', disabled: false, setTitle(t) { this.title = t; return this; }, setIcon(i) { this.icon = i; return this; }, setWarning() { this.warning = true; return this; }, setDisabled(d) { this.disabled = d; return this; }, onClick(fn) { this.fn = fn; return this; } }; cb(item); this.items.push(item); return this; }
+    addItem(cb) { const item = { title: '', disabled: false, dom: element('div'), setTitle(t) { this.title = t; return this; }, setIcon(i) { this.icon = i; return this; }, setWarning() { this.warning = true; return this; }, setDisabled(d) { this.disabled = d; return this; }, onClick(fn) { this.fn = fn; return this; } }; cb(item); this.items.push(item); return this; }
     addSeparator() { return this; } showAtMouseEvent() { this.mouse = true; return this; } showAtPosition(at) { this.at = at; return this; }
   }
   const modals = [];
@@ -321,7 +321,8 @@ test('counter-example (read-only): selection mode draws the look but give no men
       assert.equal(el.listeners.pointerdown, undefined, mode);
       assert.equal(el.listeners.keydown, undefined, mode);
     }
-    assert.equal(h.contextMenu(), null, mode);
+    // V3.3 G04-x: the menu opens, every row greyed (an annotated image has no read-only row) and none runs.
+    assert.ok(h.contextMenu().items.every(i => i.disabled && !i.fn), mode);
     const before = h.fileText();
     h.view.convertImageDialog('img2');
     await h.view.removeCanvasItem('img1');
@@ -1465,6 +1466,57 @@ test('counter-example (stale menu): a row clicked after the map turned read-only
       assert.equal(h.view.chatImageId, null, mode);
       assert.equal(h.fileText(), before, mode);
     }
+});
+
+// V3.3 G04-x (decision #35): while the notes load or topics are picked the image menu still opens; every row that writes or
+// asks the AI is greyed with the reason on the next line and a click does nothing. Open original file (read-only) stays.
+const reasonOf = item => find(item.dom, i => i.hasClass('vam-menu-reason'))?.text;
+for (const [mode, reason] of [['loading', 'Notes are still loading'], ['selection', 'Not available while selecting several topics']])
+  test(`G04-x: ${mode}: the image menu opens, its writing rows greyed with "${reason}"; a click writes nothing and sets no chat picture`, async () => {
+    for (const [items, titles] of [
+      [[image()], ['Image exploration…', 'Convert to annotated image…', 'Open original file', 'Delete image']],
+      [[annotated({ note: 'n' })], ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']]
+    ]) {
+      const h = await harness(items);
+      h.view.render();
+      if (mode === 'loading') h.view.notesLoading = () => true;
+      if (mode === 'selection') h.view.selection.toggleMultiSelect();
+      const before = h.fileText(), entries = h.view.history.past.length;
+      const menu = h.contextMenu();
+      assert.ok(menu && menu.prevented && menu.mouse, mode);
+      assert.deepEqual(menu.items.map(h.titleOf), titles, mode);
+      for (const row of menu.items) {
+        const readOnly = h.titleOf(row) === 'Open original file';
+        assert.equal(row.disabled, !readOnly, `${mode}: ${h.titleOf(row)}`);
+        assert.equal(reasonOf(row), readOnly ? undefined : reason, `${mode}: ${h.titleOf(row)}`);
+        if (!readOnly) assert.equal(row.fn, undefined, `${mode}: ${h.titleOf(row)} has no click`);
+      }
+      menu.items.find(row => h.titleOf(row) === 'Open original file')?.fn();
+      await h.settle();
+      assert.equal(h.modals.length, 0, mode);
+      assert.equal(h.view.chatImageId, null, mode);
+      assert.equal(h.view.placing ?? null, null, mode);
+      assert.equal(h.fileText(), before, mode);
+      assert.equal(h.view.history.past.length, entries, mode);
+      assert.deepEqual(h.opened, items[0].kind === 'image' ? ['attachments/a.png'] : [], mode);
+    }
+  });
+
+test('G04-x: the loading reason in Traditional Chinese is 筆記載入中', async () => {
+  const h = await harness([image()], 'zh-TW');
+  h.view.render();
+  h.view.notesLoading = () => true;
+  assert.equal(reasonOf(h.contextMenu().items[0]), '筆記載入中');
+});
+
+test('G04-x counter-example (presentation): the image menu does not open, loading or not', async () => {
+  for (const loading of [false, true]) {
+    const h = await harness([image()]);
+    h.view.render();
+    h.view.presentation = {};
+    if (loading) h.view.notesLoading = () => true;
+    assert.equal(h.contextMenu(), null, `loading ${loading}`);
+  }
 });
 
 test('image exploration: the plain image row in Traditional Chinese (the annotated name is checked in steps-card-actions)', async () => {

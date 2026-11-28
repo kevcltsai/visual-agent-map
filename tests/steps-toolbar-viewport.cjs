@@ -877,11 +877,15 @@ test('a repaint gives the new stage its viewport before any card is drawn or foc
   assert.match(view, /private applyStageTransform\(\): void \{[\s\S]*?style\.transform = `translate\(\$\{x\}px, \$\{y\}px\) scale\(\$\{zoom\}\)`/);
   assert.match(view, /private applyStageTransform\(\): void \{[\s\S]*?--vam-zoom/, 'the tool row counter-scale is measured right too');
 });
-test('card tools: four labelled buttons (Research, Add, Note, More) in the selected card toolbar; the icon-only hover tools and the + circle are gone', () => {
+test('card tools: labelled buttons from the card action list (AI explore, Style, Note, More) in the selected card toolbar; no Add, no icon-only hover tools, no + circle', () => {
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode, addSummary = false\)/);
+  // B08: the toolbar is drawn from the action list (CARD_TOOLBAR), each button's class from CARD_TOOL_CLASSES.
+  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode\): void \{[\s\S]*?actionsFor\("toolbar", ctx\)/);
   assert.match(view, /private openCardMoreMenu\(button: HTMLElement, node: MapNode\)/, 'the toolbar More menu');
-  for (const cls of ['vam-ai-explore', 'vam-add-child-tool', 'vam-detail-button', 'vam-card-tool-more']) assert.match(view, new RegExp(`"${cls}"`), `${cls} button`);
+  const classes = view.slice(view.indexOf('const CARD_TOOL_CLASSES'), view.indexOf('};', view.indexOf('const CARD_TOOL_CLASSES')));
+  for (const cls of ['vam-ai-explore', 'vam-card-tool-style', 'vam-detail-button']) assert.match(classes, new RegExp(`"${cls}"`), `${cls} button`);
+  assert.match(view, /"vam-card-tool-more"/, 'the More button');
+  assert.doesNotMatch(view, /vam-add-child-tool/, 'the toolbar has no Add (the edge + and Cmd-Enter add a subtopic)');
   assert.doesNotMatch(view, /"vam-node-tool"|"vam-fold-tool"|"vam-structure-tool"|"vam-select-subtopics-tool"|"vam-add-child"/, 'no icon-only hover tools, no + circle');
   assert.match(view, /private openSelectionMoreMenu\(/, 'the selection bar keeps its More');
   assert.match(view, /alignCardTools\(card: HTMLElement\)[\s\S]*placeCardTools\(card, tools/);

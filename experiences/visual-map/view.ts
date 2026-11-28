@@ -10452,17 +10452,18 @@ export class VisualAgentMapView extends ItemView {
     open.pop.el.style.left = `${Math.round(box.left - area.left)}px`;
     open.pop.el.style.top = `${Math.round(box.bottom - area.top + 4)}px`;
   }
-  /** Before a repaint: takes the Style popover out of the page; true when it held the focus. */
-  private detachStylePopover(): Element | null {
+  /** Before a repaint: takes the Style popover out of the page; returns the control inside it that held the focus. */
+  private detachStylePopover(): HTMLElement | null {
     const open = this.styleOpen;
     if (!open) return null;
     const active = this.contentEl?.ownerDocument?.activeElement ?? null;
-    const held = active && open.pop.el.contains(active) ? active : null;
+    // Not instanceof HTMLElement: a popout window has its own HTMLElement.
+    const held = active && open.pop.el.contains(active) ? (active as HTMLElement) : null;
     open.pop.el.remove();
     return held;
   }
   /** After a repaint: puts the popover back under its card, or closes it when the card or the map is gone or cannot be styled. */
-  private remountStylePopover(held: Element | null): void {
+  private remountStylePopover(held: HTMLElement | null): void {
     const open = this.styleOpen;
     if (!open) return;
     const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
@@ -10472,7 +10473,7 @@ export class VisualAgentMapView extends ItemView {
     }
     overlay.appendChild(open.pop.el);
     this.placeStylePopover();
-    if (held instanceof HTMLElement) held.focus();
+    held?.focus();
   }
   /** The edge "+ Topic card" on a single editable card (V3.3 A6); it sits on the card's edge and never changes its size. */
   private paintCardEdgeEntries(card: HTMLElement, node: MapNode): void {

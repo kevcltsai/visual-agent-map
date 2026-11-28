@@ -247,3 +247,35 @@ test('B08 toolbar: the picture-book structure lock hides Style; the AI lock hide
   h.view.bookLock = () => ({ ai: true, structure: false });
   assert.deepEqual(kinds(paint(h, 'b')), ['vam-card-tool-ai-lock', 'vam-detail-button', 'vam-card-tool-more']);
 });
+
+test('B08 style popover: a refused choice puts the saved pressed state back (no colour stays pressed)', async () => {
+  const h = await harness([['a', null, { noAi: true }]]);
+  const before = h.raw('a');
+  const { choice } = openStyle(h, 'a');
+  h.view.isMerging = () => true;
+  choice('color-red').click();
+  await settle();
+  assert.equal(h.raw('a'), before, 'no write');
+  assert.equal(choice('color-red').attrs['aria-pressed'], 'false', 'red is not left pressed');
+  assert.equal(choice('color-none').attrs['aria-pressed'], 'true', 'the saved "none" is pressed again');
+});
+
+test('B08 style popover: a repaint takes it out and puts it back under its card; it closes when the card is gone', async () => {
+  const h = await harness([['a', null, { noAi: true }]]);
+  const overlay = h.view.contentEl.createDiv('vam-canvas-overlay');
+  h.view.cardEls.set(h.node('a').id, element('div'));
+  const { pop } = openStyle(h, 'a');
+  const inside = findAll(pop, i => i.tag === 'button')[0];
+  h.view.contentEl.ownerDocument = { activeElement: inside };
+  let refocused = 0; inside.focus = () => { refocused++; };
+  const held = h.view.detachStylePopover();
+  assert.equal(held, inside, 'it held the focus');
+  assert.ok(!findAll(h.view.contentEl, i => i === pop).length, 'taken out for the repaint');
+  h.view.remountStylePopover(held);
+  assert.ok(overlay.children.includes(pop), 'put back into the overlay');
+  assert.equal(refocused, 1, 'the focus goes back inside');
+  assert.ok(h.view.styleOpen, 'still open');
+  h.view.cardEls.delete(h.node('a').id);
+  h.view.remountStylePopover(h.view.detachStylePopover());
+  assert.equal(h.view.styleOpen, null, 'closed: the card is gone');
+});

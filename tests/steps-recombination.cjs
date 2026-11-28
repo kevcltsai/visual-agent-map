@@ -189,3 +189,26 @@ test('P4.6 every reference sent to the AI is named in the synthesis dialog', asy
     assert.ok(names.some(name => name.includes(title)), `${doc.path} is sent but the dialog lists only ${JSON.stringify(names)}`);
   }
 });
+
+test('P4.6 (F06-x) two recombinations in a row: the new cards never overlap any card, and an untouched card keeps its x and y', async () => {
+  const h = await harness();
+  const far = await h.repo.createNote('Far', 'gpt-6-luna', h.view.map, HOST, 'workspace');
+  Object.assign(far, { parentId: null, x: 3000, y: 3000 }); h.view.map.nodes.push(far);
+  await h.repo.saveMap(HOST, h.view.map);
+  await h.view.hydrate();
+  const failures = [];
+  await run(h, failures);
+  await until(() => h.view.map.nodes.length === 4);
+  await run(h, failures);
+  await until(() => h.view.map.nodes.length === 5);
+  assert.deepEqual(failures, []);
+  const nodes = h.view.map.nodes;
+  const rect = n => ({ l: n.x, r: n.x + (n.width ?? 300), t: n.y, b: n.y + (h.view.cardHeightOf(n.id) ?? 180) });
+  for (const a of nodes) for (const b of nodes) {
+    if (a.id >= b.id) continue;
+    const p = rect(a), q = rect(b);
+    assert.equal(p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b, false, `${a.id} overlaps ${b.id}`);
+  }
+  const farNow = nodes.find(n => n.id === far.id);
+  assert.deepEqual([farNow.x, farNow.y], [3000, 3000], 'an unaffected card does not move');
+});

@@ -22209,8 +22209,6 @@ export class VisualAgentMapView extends ItemView {
         { detailTemplate, newVisualReferences: true }
       );
       integrated.parentId = null;
-      integrated.x = Math.max(...sources.map(node => node.x)) + 340;
-      integrated.y = sources.reduce((sum, node) => sum + node.y, 0) / sources.length;
       const previousEntry = this.history.undoEntry;
       try {
         await this.mapChangeSnapshots(
@@ -22223,6 +22221,14 @@ export class VisualAgentMapView extends ItemView {
                 if (relationAllowed(map.topicRelations ?? [], link))
                   setTopicRelations(map, [...(map.topicRelations ?? []), link]);
               }
+            // Placed like any new top-level card (P1.4): clear of every card, and no existing card moves.
+            map.nodes = arrangeNewTree(
+              map.nodes,
+              integrated.id,
+              new Set([integrated.id]),
+              this.cardHeightOf,
+              layoutOf(map)
+            );
           },
           true,
           [integrated.path]
@@ -22234,6 +22240,11 @@ export class VisualAgentMapView extends ItemView {
       }
       this.plugin.topicRuns.clearSelection(this);
       this.selection.afterSynthesis(integrated.id);
+      // The layout replaced the card object, so the camera is aimed at the placed one.
+      Object.assign(
+        integrated,
+        this.map.nodes.find(node => node.id === integrated.id)
+      );
       await this.hydrate();
       this.render();
       this.focusNode(integrated);
@@ -22265,6 +22276,10 @@ export class VisualAgentMapView extends ItemView {
       } else {
         this.plugin.topicRuns.clearSelection(this);
         this.map = disk;
+        Object.assign(
+          integrated,
+          disk.nodes.find(node => node.id === integrated.id)
+        );
         this.selection.afterSynthesis(integrated.id);
         try {
           await this.plugin.rebuildDerivedData();

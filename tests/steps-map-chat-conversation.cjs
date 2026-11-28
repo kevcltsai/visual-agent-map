@@ -47,7 +47,7 @@ function rig(options = {}) {
     plans: () => plans,
     showPreview: (token, anchors) => log.push(['showPreview', token, anchors]),
     clearPreview: () => log.push(['clearPreview']),
-    applyBlock: () => state.block ?? null,
+    applyBlock: () => state.block ?? null, mergeBlock: () => null, targetStamps: async () => ({}),
     refTitles: actions => new Map(),
     actionLabel: action => `L:${action.kind}`,
     applyActions: (...args) => { applyCalls.push(args); return state.apply ? state.apply(...args) : Promise.resolve([{ status: 'done', text: 'ok' }]); }
@@ -192,6 +192,7 @@ test('apply: panel order, applyActions arguments, run.work, merged lines to reco
   r.log.length = 0;
   const baseline = { selectedCount: 0, basis: 'b', parents: [] };
   const pending = r.conv.applyChatPlan(card, token, { ...result, message: 'msg' }, baseline, { ...ANCHOR }, run);
+  await new Promise(done => setImmediate(done)); // the targets are compared before the write
   assert.equal(r.conv.applying, true);
   assert.deepEqual(names(r.log), ['clearPreview', 'settlePlan', 'setApplying']);
   assert.equal(r.log[1][1], 'applied');
@@ -286,6 +287,7 @@ for (const shows of [true, false]) {
     r.state.apply = () => gate.promise;
     r.log.length = 0;
     const pending = r.conv.applyChatPlan(card, token, result, { selectedCount: 0 }, { ...ANCHOR }, run);
+    await new Promise(done => setImmediate(done)); // the targets are compared before the write
     r.conv.planToken++;
     r.conv.planStopped = true;
     assert.equal(r.applyCalls[0][2](), false);
@@ -317,6 +319,7 @@ test('closed when the apply ends: no settle, record, chain or flush; applying st
   r.state.apply = () => gate.promise;
   r.log.length = 0;
   const pending = r.conv.applyChatPlan(card, token, result, { selectedCount: 0 }, { ...ANCHOR }, run);
+  await new Promise(done => setImmediate(done)); // the targets are compared before the write
   r.state.closed = true;
   gate.resolve([]);
   await pending;
@@ -452,7 +455,7 @@ function turnRig(options = {}) {
     panel: () => state.panel, closed: () => state.closed, path: () => state.path, map: () => state.map,
     notesLoading: () => state.notesLoading, selectionIds: () => state.selection, imageId: () => state.imageId,
     chain: () => chain, plans: () => plans,
-    showPreview: () => {}, clearPreview: () => log.push(['clearPreview']), applyBlock: () => null, refTitles: () => new Map(), actionLabel: a => a.kind,
+    showPreview: () => {}, clearPreview: () => log.push(['clearPreview']), applyBlock: () => null, mergeBlock: () => null, targetStamps: async () => ({}), refTitles: () => new Map(), actionLabel: a => a.kind,
     applyActions: (...args) => { log.push(['apply']); return Promise.resolve(state.applyLines); },
     buildRequest: (message, origin, signal) => { log.push(['build', message]); state.buildSignal = signal; return state.build(message, origin, signal); },
     confirmAiUsage: async (model, run, hooks) => {

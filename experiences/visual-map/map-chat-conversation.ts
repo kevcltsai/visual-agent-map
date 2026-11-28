@@ -137,6 +137,11 @@ export interface MapChatConversationPorts {
   applyBlock(anchor: { path: string; id: string | undefined }): string | null;
   /** Why a change to these cards cannot be made now (one of them is merging); null = it can. */
   mergeBlock(ids: readonly string[]): string | null;
+  /**
+   * What the cards `ids` are right now, one stamp per card on the map (its note's content and its parent); a card that is not on
+   * the map has none. A plan's stamps are taken when it is offered and compared again when it is applied.
+   */
+  targetStamps(ids: readonly string[]): Promise<Record<string, string>>;
   /** Why a relation between these cards or knowledge references cannot be made now (one is no longer on the map); null = it can. */
   endBlock(ids: readonly string[]): string | null;
   refTitles(actions: readonly MapChatAction[]): Map<string, string>;
@@ -199,6 +204,11 @@ export class MapChatConversation {
   planStopped = false;
   /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
   planToken = 0;
+  /** Per waiting plan card: the cards its actions name and whether one of them changed after the proposal (E3-y). */
+  private readonly planGates = new WeakMap<
+    MapChatPlanCard,
+    { targets: string[]; stale: boolean; check(): Promise<boolean> }
+  >();
   /** The running turn's request (Stop and closing abort it); null while none runs. */
   controller: AbortController | null = null;
   /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
@@ -324,6 +334,20 @@ export class MapChatConversation {
         movesToShow
       );
     drawPreview();
+    // The cards the plan names, as they are now: Apply compares them again, so a proposal made for older notes is never applied.
+    const targets = planTargetIds(result.actions, baseline.selectedIds);
+    const seen = this.ports.targetStamps(targets).catch(() => null);
+    const gate = {
+      targets,
+      stale: false,
+      check: async (): Promise<boolean> => {
+        const before = await seen;
+        if (!before) return gate.stale;
+        const now = await this.ports.targetStamps(targets);
+        gate.stale = gate.stale || targets.some(id => before[id] !== now[id]);
+        return gate.stale;
+      }
+    };
     const refTitles = this.ports.refTitles(result.actions);
     // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
     const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
@@ -414,7 +438,10 @@ export class MapChatConversation {
       aiWork: result.actions.some(action => action.kind === "run_map_action"),
       state: "pending",
       ...(ghosts.length ? { previewNote: t("ui.map_chat_plan_preview_note") } : {}),
-      blocked: () => this.ports.applyBlock(anchor),
+      blocked: () =>
+        this.ports.applyBlock(anchor) ??
+        (gate.stale ? t("ui.map_chat_plan_blocked_changed") : null) ??
+        this.ports.mergeBlock(targets),
       apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
       cancel: () => {
         if (token !== this.planToken) return;
@@ -425,6 +452,7 @@ export class MapChatConversation {
         this.ports.chain().interruptChain(run, "plan_cancelled");
       }
     };
+    this.planGates.set(card, gate);
     if (record) this.ports.plans().set(card, record);
     chat.showPlan(card);
   }
@@ -497,11 +525,30 @@ export class MapChatConversation {
     }
     // The map is checked again just before the write: read-only here now (a presentation, notes still loading) writes nothing and
     // the card keeps waiting and is drawn again, with the reason under its greyed Apply.
-    if (this.ports.applyBlock(anchor) !== null) {
+    // Also a card of the plan that is merging (nothing is written then) or a target card whose note changed after the proposal.
+    if ((card.blocked?.() ?? this.ports.applyBlock(anchor)) !== null) {
       chat.refreshPlan();
       return;
     }
+    const gate = this.planGates.get(card);
     this.applying = true;
+    if (gate) {
+      let changed = true;
+      try {
+        changed = await gate.check();
+      } catch {
+        // Cannot tell: the plan is not applied.
+      }
+      const blocked = changed || this.ports.closed() || token !== this.planToken || card.state !== "pending";
+      if (blocked || (card.blocked?.() ?? null) !== null) {
+        this.applying = false;
+        if (!this.ports.closed()) {
+          chat.refreshPlan();
+          this.flushSteers(false);
+        }
+        return;
+      }
+    }
     this.planStopped = false;
     // The user's yes: the chain's later rounds are asked for.
     if (run) run.changeRequested = true;
@@ -1008,4 +1055,19 @@ export class MapChatConversation {
     if (this.steer) this.returnSteers(this.steer);
     this.ports.panel()?.focusInput();
   }
+}
+
+/** The cards a plan names: every id its actions carry (and the selection an action may work on) that is not a planned `new:` ref. */
+function planTargetIds(actions: readonly MapChatAction[], selectedIds: readonly string[] = []): string[] {
+  const ids = new Set<string>(selectedIds);
+  const keys = ["nodeId", "nodeIds", "parentId", "newParentId", "beforeId", "fromId", "toId"];
+  for (const action of actions) {
+    const fields = action as unknown as Record<string, unknown>;
+    for (const key of keys) {
+      const value = fields[key];
+      for (const id of Array.isArray(value) ? value : [value])
+        if (typeof id === "string" && id && !id.startsWith("new:")) ids.add(id);
+    }
+  }
+  return [...ids];
 }

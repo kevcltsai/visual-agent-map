@@ -1786,6 +1786,8 @@ export const en = {
   "ui.map_chat_plan_blocked_stale": "Apply is off: this plan was made for a map that is no longer open.",
   "ui.map_chat_plan_blocked_presenting": "Apply is off: the map is read-only while it is presented.",
   "ui.map_chat_plan_blocked_loading": "Apply is off: the map is read-only until its notes finish loading.",
+  "ui.map_chat_plan_blocked_changed":
+    "Apply is off: a target card was changed after this proposal. Send your message again to get a new one.",
   "ui.map_chat_ghost_label": "Preview",
   "ui.map_chat_ghost_more_0": "… {0} more",
   "ui.map_chat_plan_reason_many_actions_0": "{0} actions",

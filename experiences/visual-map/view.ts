@@ -544,6 +544,7 @@ import {
 } from "../../core/map-chat-basis";
 import {
   buildMapChatContext,
+  contentHash,
   MAP_CHAT_OTHER_CARDS_LIMIT,
   type MapChatResearchNote,
   type MapChatSummary,
@@ -24652,6 +24653,16 @@ export class VisualAgentMapView extends ItemView {
       clearPreview: () => this.clearChatPreview(),
       applyBlock: anchor => this.chatPlanBlock(anchor),
       mergeBlock: ids => (ids.some(id => this.isMerging(id)) ? t("ui.merge_locked") : null),
+      targetStamps: async ids => {
+        const stamps: Record<string, string> = {};
+        for (const id of ids) {
+          const node = this.map?.nodes.find(item => item.id === id);
+          if (!node) continue;
+          const text = await this.chatFileText(node.path).catch(() => "unreadable");
+          stamps[id] = `${node.parentId ?? ""}|${text === null ? "missing" : contentHash(text)}`;
+        }
+        return stamps;
+      },
       endBlock: ids =>
         this.map &&
         ids.some(

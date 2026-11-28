@@ -3190,7 +3190,7 @@ export const en = {
     "This picture was not placed by the picture-book run (or it was changed by hand), so it is not searched for again.",
   "ui.book_refind_menu": "Find another picture",
   "ui.book_refind_cancel": "Stop finding another picture",
-  "ui.command_book_refind_image": "Picture book: find another picture for this one",
+  "ui.command_book_refind_image": "Picture book: re-find this picture",
   "ui.book_refind_started": "Looking for another picture. Choose the menu item again to stop.",
   "ui.book_refind_done": "The picture was replaced",
   "ui.book_refind_none": "No other fitting picture was found. The chapter was not changed.",

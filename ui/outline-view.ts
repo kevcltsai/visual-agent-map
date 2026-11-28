@@ -34,6 +34,8 @@ export class OutlineView extends ItemView {
   private dropRow: HTMLElement | null = null;
   /** A row that took focus before a move rebuilds the tree: focus returns to the same topic. */
   private refocusId: string | null = null;
+  /** Set by render() for the renderTree() it runs: the focused row read before the pane was emptied. */
+  private keepFocusPath: string | undefined;
   private reasonEl: HTMLElement | null = null;
   constructor(
     leaf: WorkspaceLeaf,
@@ -159,7 +161,14 @@ export class OutlineView extends ItemView {
     }
     activeRow?.scrollIntoView?.({ block: "nearest" });
   }
+  /** The path of the outline row that has the keyboard focus, read before a rebuild takes it out of the document. */
+  private focusedRowPath(): string | undefined {
+    const focused = (this.contentEl.ownerDocument as Document | undefined)?.activeElement;
+    return [...this.noteEls].find(([, el]) => el === focused)?.[0];
+  }
   private render(): void {
+    // Emptying the pane drops the focus to the body at once, so the focused row is read here, before it.
+    this.keepFocusPath ??= this.focusedRowPath();
     this.contentEl.empty();
     this.contentEl.addClass("vam-outline");
     const heading = this.contentEl.createDiv("vam-outline-heading");
@@ -171,6 +180,7 @@ export class OutlineView extends ItemView {
         cls: "vam-outline-empty",
         text: t("ui.open_a_mind_map_to_see_its_topic_hierarchy_here")
       });
+      this.keepFocusPath = undefined;
       return;
     }
     const input = this.contentEl.createEl("input", {
@@ -282,9 +292,9 @@ export class OutlineView extends ItemView {
     row.addClass(`is-drop-${place}`);
   }
   private renderTree(): void {
-    // A rebuild replaces every row: the row that had the keyboard focus gets it back (a move can rebuild twice in a row).
-    const focused = (this.contentEl.ownerDocument as Document | undefined)?.activeElement;
-    const focusedPath = [...this.noteEls].find(([, el]) => el === focused)?.[0];
+    // A full render (a map change: a move can bring two in a row) gives the row that had the keyboard focus its focus back.
+    const focusedPath = this.keepFocusPath;
+    this.keepFocusPath = undefined;
     this.contentEl.querySelector(".vam-outline-tree")?.remove();
     this.toggleEls.clear();
     this.branches.clear();

@@ -10,7 +10,10 @@ const loadOutline = () => load('ui/outline-view.ts', { obsidian: { ...obsidian, 
 function outline() {
   const OutlineView = loadOutline();
   const view = new OutlineView({ app: {} }, async () => {});
-  const doc = { activeElement: null };
+  // As in a real document: an element taken out of the tree no longer has the focus (activeElement falls back to null/body).
+  let focused = null;
+  const attached = el => { if (!el.parent) return true; for (let at = el; at; at = at.parent) { if (at === view.contentEl) return true; if (!at.parent?.children.includes(at)) return false; } return false; };
+  const doc = { get activeElement() { return focused && attached(focused) ? focused : null; }, set activeElement(el) { focused = el; } };
   view.contentEl.root = doc; view.contentEl.ownerDocument = doc;
   view.collapsed = new Set(['root', 'child']);
   view.setMap({ title: 'M', nodes: [

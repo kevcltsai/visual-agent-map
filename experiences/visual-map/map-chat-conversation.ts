@@ -104,7 +104,7 @@ export interface MapChatConversationPorts {
   panel(): ChatTurnPanel | null;
   closed(): boolean;
   path(): string;
-  map(): Pick<MapDocument, "id"> | null;
+  map(): Pick<MapDocument, "id" | "nodes"> | null;
   notesLoading(): boolean;
   selectionIds(): string[];
   imageId(): string | null;
@@ -335,7 +335,7 @@ export class MapChatConversation {
       );
     drawPreview();
     // The cards the plan names, as they are now: Apply compares them again, so a proposal made for older notes is never applied.
-    const targets = planTargetIds(result.actions, baseline.selectedIds);
+    const targets = planTargetIds(result.actions, baseline.selectedIds, this.ports.map()?.nodes);
     const seen = this.ports.targetStamps(targets).catch(() => null);
     const gate = {
       targets,
@@ -1057,17 +1057,38 @@ export class MapChatConversation {
   }
 }
 
-/** The cards a plan names: every id its actions carry (and the selection an action may work on) that is not a planned `new:` ref. */
-function planTargetIds(actions: readonly MapChatAction[], selectedIds: readonly string[] = []): string[] {
+/**
+ * The cards a plan names: every id its actions carry, also inside a book plan's structure items and plan
+ * changes, plus the selection an action may work on, and the whole branch under a branch delete. A planned `new:` ref is skipped.
+ */
+function planTargetIds(
+  actions: readonly MapChatAction[],
+  selectedIds: readonly string[] = [],
+  nodes: readonly { id: string; parentId: string | null }[] = []
+): string[] {
   const ids = new Set<string>(selectedIds);
   const keys = ["nodeId", "nodeIds", "parentId", "newParentId", "beforeId", "fromId", "toId"];
+  const take = (value: unknown): void => {
+    for (const id of Array.isArray(value) ? value : [value])
+      if (typeof id === "string" && id && !id.startsWith("new:")) ids.add(id);
+  };
+  const branches: string[] = [];
+  const read = (item: object): void => {
+    const fields = item as Record<string, unknown>;
+    for (const key of keys) take(fields[key]);
+    if (fields.branch === true && typeof fields.nodeId === "string") branches.push(fields.nodeId);
+  };
   for (const action of actions) {
-    const fields = action as unknown as Record<string, unknown>;
-    for (const key of keys) {
-      const value = fields[key];
-      for (const id of Array.isArray(value) ? value : [value])
-        if (typeof id === "string" && id && !id.startsWith("new:")) ids.add(id);
-    }
+    read(action);
+    if (action.kind === "edit_book_structure") for (const item of action.items) read(item);
+    if (action.kind === "edit_book_plan") for (const change of action.changes) take(change.id);
   }
+  // Children are found by parent, so the descendants of a branch delete are named too.
+  for (let at = 0; at < branches.length; at++)
+    for (const node of nodes)
+      if (node.parentId === branches[at] && !ids.has(node.id)) {
+        ids.add(node.id);
+        branches.push(node.id);
+      }
   return [...ids];
 }

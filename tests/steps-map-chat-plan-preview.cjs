@@ -436,3 +436,23 @@ test('E3-y merge (counter-example): a merge of cards the plan does not name leav
   h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: 'unrelated' }] });
   assert.equal(card.blocked(), null);
 });
+
+test('E3-y branch delete (counter-example): a descendant of the deleted branch changed after the proposal: Apply is refused with the reason and nothing is deleted', async () => {
+  const h = await harness();
+  const deep = await h.repo.createNote('Deep', 'gpt-6-luna', h.view.map, MAP, 'inherited');
+  Object.assign(deep, { parentId: h.ids.a, x: 700, y: 400 });
+  h.view.map.nodes.push(deep);
+  await h.repo.saveMap(MAP, h.view.map);
+  h.control.reply = async () => ({ reply: 'Plan', actions: [{ kind: 'delete_topic', nodeId: h.ids.a, branch: true }, ...Array.from({ length: 16 }, (_, i) => child(h.ids.root, `Extra${i}`))], rejected: [] });
+  await h.send('delete the ribeye branch');
+  assert.equal(h.chat.plans.length, 1, 'the plan waits for Apply');
+  const card = h.chat.plans[0];
+  await new Promise(r => setTimeout(r, 20)); // the proposal's stamps are read
+  const before = h.view.map.nodes.length;
+  const file = h.app.vault.getAbstractFileByPath(deep.path);
+  await h.app.vault.process(file, text => text + '\nuser edit after the proposal\n');
+  card.apply(); await new Promise(r => setTimeout(r, 30));
+  assert.equal(card.state, 'pending');
+  assert.equal(h.view.map.nodes.length, before, 'nothing deleted');
+  assert.match(card.blocked(), /changed after this proposal/);
+});

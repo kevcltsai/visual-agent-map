@@ -47,7 +47,7 @@ function rig(options = {}) {
     plans: () => plans,
     showPreview: (token, anchors) => log.push(['showPreview', token, anchors]),
     clearPreview: () => log.push(['clearPreview']),
-    applyBlock: () => state.block ?? null, mergeBlock: () => null, targetStamps: async () => ({}),
+    applyBlock: () => state.block ?? null, mergeBlock: ids => (ids.some(id => state.merging?.includes(id)) ? 'merging' : null), targetStamps: async ids => { (state.asked ??= []).push([...ids]); return Object.fromEntries(ids.map(id => [id, state.stamp ?? 'v1'])); },
     refTitles: actions => new Map(),
     actionLabel: action => `L:${action.kind}`,
     applyActions: (...args) => { applyCalls.push(args); return state.apply ? state.apply(...args) : Promise.resolve([{ status: 'done', text: 'ok' }]); }
@@ -1123,4 +1123,36 @@ test('E3 apply gate: a read-only map at Apply writes nothing, keeps the card wai
   r.state.block = null;
   card.apply(); card.apply(); await new Promise(resolve => setImmediate(resolve));
   assert.equal(r.applyCalls.length, 1, 'written once');
+});
+
+// E3-y: the cards a plan names include the ones inside a book plan's items and changes and a branch's descendants.
+test('E3-y targets: a card named inside edit_book_structure items or edit_book_plan changes, or a branch delete\'s descendants is checked for merging and for a change after the proposal', async () => {
+  const cases = [
+    ['structure move', [{ kind: 'edit_book_structure', items: [{ kind: 'move', nodeId: 'x1', newParentId: 'y1', beforeId: 'z1' }] }], ['x1', 'y1', 'z1']],
+    ['structure remove', [{ kind: 'edit_book_structure', items: [{ kind: 'remove', nodeId: 'x1' }, { kind: 'add', parentId: 'p1', title: 't', summary: 's' }] }], ['x1', 'p1']],
+    ['book plan changes', [{ kind: 'edit_book_plan', changes: [{ id: 'c1' }, { id: 'c2' }] }], ['c1', 'c2']],
+    ['branch delete', [{ kind: 'delete_topic', nodeId: 'a', branch: true }], ['a', 'a1', 'a11']]
+  ];
+  const nodes = [{ id: 'a', parentId: null }, { id: 'a1', parentId: 'a' }, { id: 'a11', parentId: 'a1' }, { id: 'o', parentId: null }];
+  for (const [name, actions, expected] of cases) {
+    // Merging: Apply is greyed with the reason and writes nothing, whichever of the named cards is merging.
+    for (const id of expected) {
+      const r = rig({ map: { id: 'm1', nodes }, merging: [id] });
+      const { card, token, result } = offer(r, actions);
+      assert.deepEqual([...r.state.asked[0]].sort(), [...expected].sort(), name);
+      assert.equal(card.blocked(), 'merging', `${name}: ${id}`);
+      await r.conv.applyChatPlan(card, token, result, { selectedCount: 0 }, { ...ANCHOR });
+      assert.equal(r.applyCalls.length, 0, `${name}: ${id} writes nothing`);
+      assert.equal(card.state, 'pending');
+    }
+    // Changed after the proposal: refused, greyed with the reason, nothing written.
+    const r = rig({ map: { id: 'm1', nodes } });
+    const { card, token, result } = offer(r, actions);
+    await flush();
+    r.state.stamp = 'v2';
+    await r.conv.applyChatPlan(card, token, result, { selectedCount: 0 }, { ...ANCHOR });
+    assert.equal(r.applyCalls.length, 0, `${name}: changed writes nothing`);
+    assert.equal(card.state, 'pending');
+    assert.match(card.blocked(), /changed after this proposal/, name);
+  }
 });

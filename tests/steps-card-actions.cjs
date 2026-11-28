@@ -147,6 +147,8 @@ const TABLE = [
   // F01: shown only where references may change and not on a merging card (applies); the card gates otherwise.
   ['knowledge-ref-copy', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: false } }],
   ['knowledge-ref-paste', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: true } }],
+  // F09: read only; only the notes-loading gate (decision #35) greys it.
+  ['impact', 'context', 'a', 'ok ro ok ok ok ok ok ok'],
   ['remove', 'context', 'a', 'ok ro mg ok pr ms ok bk'], // single && !bookLock.structure; removeByKey → confirmRemoveNode refuses a merging branch
   // Keys (card keydown in renderNode, the view scope in installUndoScope, searchKey).
   ['add-child', 'key', 'a', 'ok ro ok ok pr ms ok bk'], // Mod+Enter: presentation/notesLoading/bookLock.structure swallowed, selection mode passed on
@@ -295,8 +297,8 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, focus this branch (B13), add summary (B08), select subtopics, summary bracket, tidy this branch (A10), note style, run, AI card, book |
   // add subtopic (B08: off the toolbar), add sibling, add another type | fold, remove. An AI card has Style here (not on its toolbar).
   const grouped = (surface, ctx) => actionsFor(surface, ctx).map(entry => `${entry.action.group}:${entry.action.id}`);
-  eq(grouped('more', ctxFor('ai', 'normal')), ['2:style', '3:card-settings', '3:add-summary-field', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '5:remove']);
-  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:focus-branch', '3:add-summary-field', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
+  eq(grouped('more', ctxFor('ai', 'normal')), ['2:style', '3:card-settings', '3:add-summary-field', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '4:impact', '5:remove']);
+  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:focus-branch', '3:add-summary-field', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '4:impact', '5:toggle-collapse', '5:remove']);
   // addCardMenuActions (B07): the toolbar's actions in its order, then the ⋯ list in its order (the view puts a separator between them).
   eq(ids('context', ctxFor('a', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('a', 'normal'))]);
   eq(ids('context', ctxFor('ai', 'normal')), ['research', 'open-note', ...ids('more', ctxFor('ai', 'normal'))]);
@@ -463,7 +465,7 @@ test('card actions: F01 Copy as reference / Paste reference join the card list (
   for (const surface of ['toolbar', 'command', 'key', 'edge', 'canvas']) eq(refs(ids(surface, ctxFor('a', 'normal', copied))), [], surface);
   // After Add another type, before the fold / remove group.
   const grouped = actionsFor('more', ctxFor('a', 'normal', copied)).map(entry => `${entry.action.group}:${entry.action.id}`);
-  eq(grouped.slice(grouped.indexOf('4:add-other')), ['4:add-other', '4:knowledge-ref-copy', '4:knowledge-ref-paste', '5:toggle-collapse', '5:remove']);
+  eq(grouped.slice(grouped.indexOf('4:add-other')), ['4:add-other', '4:knowledge-ref-copy', '4:knowledge-ref-paste', '4:impact', '5:toggle-collapse', '5:remove']);
   const calls = recorder();
   for (const id of ['knowledge-ref-copy', 'knowledge-ref-paste']) action(id).run({ ...ctxFor('a', 'normal', copied), host: calls.host, surface: 'context' });
   eq(calls.calls.map(([name, node]) => [name, node.id]), [['copyKnowledgeRef', 'a'], ['pasteKnowledgeRef', 'a']]);

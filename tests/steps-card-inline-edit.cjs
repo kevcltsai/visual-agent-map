@@ -471,7 +471,7 @@ test('More lists card settings, the summary bracket, note style and the other to
   const leaf = more('leaf');
   // B06 (mockup §4): settings, Add summary (B08: off the toolbar; an empty summary), summary bracket, note style, AI card |
   // the new topics, Add subtopic included (B08: off the toolbar) | remove.
-  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add subtopic', 'Add sibling topic', 'Add another type', 'Copy as reference', '—', 'Remove from map']);
+  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add subtopic', 'Add sibling topic', 'Add another type', 'Copy as reference', 'Impact analysis', '—', 'Remove from map']);
   assert.ok(leaf.find(i => i.title === 'Add another type').sub.list.length >= 6, 'the topic types are in the submenu');
   assert.deepEqual(more('branch').map(i => i.title).slice(0, 5), ['Card settings…', 'Focus on this branch', 'Add summary', 'Select subtopics', 'Add summary bracket']);
 });
@@ -485,7 +485,7 @@ test('right-click on one card: the toolbar actions, then the ⋯ list in its ord
   }).map(i => i.title);
   const leaf = contextMenu('leaf');
   // B07: the toolbar's actions (B08: AI explore, Style…, Open note), a separator, then the ⋯ list as it is (Copy as reference: F01).
-  assert.deepEqual(leaf, ['AI explore', 'Style…', 'Open note', '—', 'Card settings…', 'Add summary', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add subtopic', 'Add sibling topic', 'Add another type', 'Copy as reference', '—', 'Remove from map']);
+  assert.deepEqual(leaf, ['AI explore', 'Style…', 'Open note', '—', 'Card settings…', 'Add summary', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add subtopic', 'Add sibling topic', 'Add another type', 'Copy as reference', 'Impact analysis', '—', 'Remove from map']);
   for (const gone of ['Research this card', 'This card', 'Select subtopics', 'Picture book', 'Collapse subtopics']) assert.ok(!leaf.includes(gone), `${gone} is not in a leaf card's menu`);
   assert.ok(contextMenu('branch').includes('Collapse subtopics'), 'a card with subtopics offers Collapse');
   node('branch').collapsed = true;

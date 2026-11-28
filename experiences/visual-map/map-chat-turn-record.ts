@@ -81,6 +81,7 @@ export class MapChatTurnRecord {
       path?: string;
       hash?: string;
       chars?: number;
+      topics?: { id: string; title: string }[];
     } = {}
   ): void {
     this.write({ type: "event", turn: this.turn, kind, ...extra });

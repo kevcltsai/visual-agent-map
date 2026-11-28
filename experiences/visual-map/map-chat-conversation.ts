@@ -159,7 +159,11 @@ export interface MapChatConversationPorts {
   autoApply(): boolean;
   planOptions(run: ChatChainRun, request: MapChatRequest): Parameters<typeof planFor>[2];
   replyEntry(): TransactionEntry | undefined;
-  markTurn(origin: MapChatOrigin, request: { imageDataUrl?: string }, written?: TransactionEntry): void;
+  markTurn(
+    origin: MapChatOrigin,
+    request: { imageDataUrl?: string; context?: object },
+    written?: TransactionEntry
+  ): void;
   errorText(error: unknown): { text: string; wrapped: boolean; technical?: string };
   notice(text: string): void;
   /**

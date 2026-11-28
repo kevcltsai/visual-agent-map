@@ -103,6 +103,7 @@ export interface RecordImagesLine extends RecordLineBase {
 }
 /** `file_written` notes a Markdown file this conversation created or edited: its path and the hash of the text it wrote (the chat sends the file back while it still holds that text). */
 /** `file_attached` notes a Markdown file the user dragged into the chat: its path and the hash of the text the chat was sent (it stays readable while the file holds that text). */
+/** `cards_found` notes the cards of other maps VAM found by itself and sent with the turn (`topics`: id = map title, title = card title; `reason: "cut"` when long ones were shortened); a restore ignores it. */
 /** `file_read` notes an own file the chat asked to read with `read_md_file` (accepted; its text goes in the next turn): path and characters. */
 /** `sources_read` marks that a turn sent the map's data sources (a restored conversation keeps its writes behind the plan). */
 /** `editor_opening` notes the chief editor's opening words of a book plan (`key` says which plan, `text` what was shown); `turn` is the last turn before it. */
@@ -119,6 +120,7 @@ export type RecordEventKind =
   | "file_written"
   | "file_attached"
   | "file_read"
+  | "cards_found"
   | "research_batch"
   | "research_batch_topic"
   | "research_batch_end";

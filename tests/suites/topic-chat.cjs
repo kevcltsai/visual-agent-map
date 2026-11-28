@@ -709,6 +709,86 @@ integrationTest('topic chat web search box at view level: ticked sends a researc
   calls[1].done({ summary: 'S', detail: 'D' }); calls[1].gate.resolve(); await finished(h);
 });
 
+// E1b: the provider request itself (what the Claude CLI or the Codex app server is handed), not the view's own options.
+const { claudeTaskArgs } = load('ai/runtime/claude-code-cli.ts');
+const { plainFailure } = load('ai/plain-error.ts');
+/** The real plugin's model call and outline service over runtimes that only record what they were handed. */
+function providerSpy(h) {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const real = new Plugin(); real.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; real.manifest = { dir: '.obsidian/plugins/visual-agent-map' }; real.settings = h.plugin.settings;
+  const requests = [];
+  const reply = schema => (schema ? JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] }) : '# Body\n> b\n## Light\n> l\n## Noise\n> n\n## Heat\n> h');
+  // `requests.hold` (a deferred) keeps every reply back until it resolves: the user can change the note meanwhile.
+  const answer = async (request, schema, controls) => { requests.push(request); controls.onAccepted?.(); await requests.hold?.promise; return reply(schema); };
+  // The Claude CLI turns its controls into its command line the way runTask does (ai/runtime/claude-code-cli.ts).
+  real.aiRuntime.claude = () => ({ prewarm() {}, runTask: async (_prompt, model, effort, schema, controls) => answer({ provider: 'claude', controls, args: claudeTaskArgs(model, effort, schema, controls.webSearch ?? (controls.searchBudget ?? 0) > 0) }, schema, controls) });
+  real.aiRuntime.codex = (_dir, local) => ({ runTask: async (_prompt, _model, _effort, schema, controls) => answer({ provider: 'codex', local, controls }, schema, controls) });
+  h.plugin.askModel = (...args) => real.askModel(...args);
+  h.plugin.outlineGeneration = real.outlineGeneration;
+  // A failure reads as the real plugin words it (the harness double gives only the label).
+  h.plugin.recordFailure = (context, error) => plainFailure(context, error);
+  return requests;
+}
+/** True when the request lets the model search or open the web. */
+const webAllowed = request => request.controls.webSearchOnly === true || (request.provider === 'claude' ? request.args.some(arg => /WebSearch|WebFetch/.test(arg)) : request.local !== true);
+const idle = (h, key) => waitFor(() => h.plugin.running.size === 0 && h.plugin.activeTasks.size === 0 && !h.entry(key)?.session.running);
+
+integrationTest('E1b: with web search unticked, the research, expand and integration requests the provider gets carry no web tool (Claude and Codex)', async () => {
+  for (const model of ['claude:sonnet', 'gpt-6-luna']) {
+    const h = await harness(); h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+    h.plugin.settings.cliModel = model;
+    const requests = providerSpy(h);
+    const seen = {};
+    const run = async (key, kind, text) => {
+      const host = h.host(key); assert.equal(h.entry(key).session.mode, 'quick', 'unticked');
+      const from = requests.length;
+      assert.equal(await host.submit(kind, text), true, kind);
+      await idle(h, key).catch(error => { throw new Error(`${model} ${kind}: ${error.message} ${JSON.stringify(h.entry(key).session.turns.at(-1))}`); });
+      seen[kind] = requests.slice(from);
+      assert.ok(seen[kind].length >= 1, `${model} ${kind}: the provider was asked`);
+      assert.ok(seen[kind].every(request => request.provider === (model.startsWith('claude') ? 'claude' : 'codex')), `${model} ${kind}: went to the chosen model's provider`);
+    };
+    await run('b', 'research', 'dig deeper');
+    // The integration of a branch whose subtopic was never researched researches it first, in the same mode.
+    await run('a', 'synthesize', 'Integrate the body');
+    assert.ok(seen.synthesize.length >= 2, `${model}: the subtopic research and the integration`);
+    await run('b', 'expand', 'split by cause');
+    for (const [kind, list] of Object.entries(seen))
+      assert.deepEqual(list.map(webAllowed), list.map(() => false), `${model} ${kind}: no web tool in ${JSON.stringify(list.map(r => r.args?.slice(r.args.indexOf('--no-session-persistence') + 1) ?? { local: r.local, webSearchOnly: r.controls.webSearchOnly }))}`);
+    // The same spy does see the web when it is ticked: a ticked research carries it.
+    h.host('b').setMode('standard');
+    const from = requests.length;
+    assert.equal(await h.host('b').submit('research', 'with web'), true);
+    await idle(h, 'b');
+    assert.ok(requests.slice(from).some(webAllowed), `${model}: a ticked research carries the web tool`);
+  }
+});
+
+integrationTest('E1b fence: a note changed after the send gets no research or integration result; the window and a Notice say why', async () => {
+  for (const [key, kind, message] of [['b', 'research', 'ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved'], ['root', 'synthesize', 'ui.the_topic_changed_the_synthesis_draft_was_not_saved']]) {
+    // A one-level branch (as the plain integration tests): a deeper one would go through the subtree chain.
+    const h = await harness(); if (kind === 'synthesize') h.flatten(); await researched(h); h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+    const path = h.node(key).path;
+    await h.repo.updateNote(path, { status: 'completed', summary: 'Old summary', detail: 'Old detail' }); await h.view.hydrate();
+    const requests = providerSpy(h); requests.hold = deferred();
+    const host = h.host(key);
+    assert.equal(await host.submit(kind, 'go'), true, kind);
+    await waitFor(() => requests.length >= 1);
+    // The user edits the card while the AI works; the window is closed, so the reason also comes as a Notice.
+    await h.repo.updateNote(path, { detail: 'My own edit' });
+    host.close();
+    requests.hold.resolve(); await idle(h, key);
+    const note = await h.repo.readNote(path);
+    assert.equal(note.detail, 'My own edit', `${kind}: the edit stays`); assert.equal(note.summary, 'Old summary', `${kind}: nothing of the result was written`);
+    assert.notEqual(note.status, 'running', `${kind}: the running mark is taken back`);
+    const said = h.entry(key).session.turns.at(-1).text;
+    assert.ok(said.startsWith(t('ui.topic_chat_failed_0', '')) && said.includes(t(message)), `${kind}: the conversation says why: ${said}`);
+    assert.ok(h.notices.includes(said), `${kind}: a Notice says it: ${h.notices.join(' | ')}`);
+    const lines = await topicLines(h, key);
+    assert.equal(lines.at(-1).status, 'failed', `${kind}: the record says failed`);
+  }
+});
+
 integrationTest('topic chat busy topic: submit is refused with a Notice and nothing starts', async () => {
   const h = await harness(); const calls = stubResearch(h);
   h.plugin.quickExpandPending.add(h.node('a').path);

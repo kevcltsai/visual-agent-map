@@ -208,6 +208,40 @@ test('B08 style popover: while the card is being merged, or read-only, a click w
   assert.equal(h.view.history.canUndo, false);
 });
 
+test('B08 style popover: "whole branch" with only the subtopic merging refuses the whole write (neither card changes); without it the card alone is styled', async () => {
+  const h = await harness([['a', null, { noAi: true }], ['kid', 'a', { noAi: true }]]);
+  const before = { a: h.raw('a'), kid: h.raw('kid') };
+  const kidId = h.node('kid').id;
+  h.view.isMerging = id => id === kidId;
+  const { choice } = openStyle(h, 'a');
+  choice('branch').checked = true; choice('branch').change();
+  choice('color-blue').click();
+  choice('bold').click();
+  await settle();
+  assert.deepEqual({ a: h.raw('a'), kid: h.raw('kid') }, before, 'a merging subtopic blocks the branch write for both cards');
+  assert.equal(h.view.history.canUndo, false);
+  choice('branch').checked = false; choice('branch').change();
+  choice('color-blue').click();
+  await until(() => h.raw('a') !== before.a);
+  await settle();
+  assert.equal(h.raw('kid'), before.kid, 'the merging subtopic stays as it was');
+});
+
+test('B08 render: an ordinary card builds one action context and never looks the selection up for references; an AI card reuses its toolbar context for the Run button', async () => {
+  const h = await harness([['a', null, { noAi: true }], ['b', null]]);
+  h.view.labelCard = () => {};
+  const count = { ctx: 0, outline: 0 };
+  const ctxOf = h.view.cardActionContext.bind(h.view), outlineOf = h.view.outlineImportTarget.bind(h.view);
+  h.view.cardActionContext = target => { count.ctx++; return ctxOf(target); };
+  h.view.outlineImportTarget = () => { count.outline++; return outlineOf(); };
+  h.view.renderNode(h.node('a'));
+  assert.deepEqual(count, { ctx: 1, outline: 0 }, 'ordinary card');
+  count.ctx = 0; count.outline = 0;
+  h.view.renderNode(h.node('b'));
+  assert.deepEqual(count, { ctx: 1, outline: 0 }, 'AI card: the Run button is drawn from the toolbar context');
+  assert.ok(findAll(h.view.cardEls.get(h.node('b').id), i => has(i, 'vam-card-tool-run')).length === 1, 'the AI card still has its Run');
+});
+
 test('B08 toolbar: Add subtopic and Add summary left the toolbar and are in both the card ⋯ and its right-click menu', async () => {
   const h = await harness([['a', null, { noAi: true }]]);
   const tools = paint(h, 'a');

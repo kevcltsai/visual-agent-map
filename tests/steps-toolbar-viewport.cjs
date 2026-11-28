@@ -880,7 +880,7 @@ test('a repaint gives the new stage its viewport before any card is drawn or foc
 test('card tools: labelled buttons from the card action list (AI explore, Style, Note, More) in the selected card toolbar; no Add, no icon-only hover tools, no + circle', () => {
   const view = read('experiences/visual-map/view.ts');
   // B08: the toolbar is drawn from the action list (CARD_TOOLBAR), each button's class from CARD_TOOL_CLASSES.
-  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode\): void \{[\s\S]*?actionsFor\("toolbar", ctx\)/);
+  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode\): CardActionContext \{[\s\S]*?actionsFor\("toolbar", ctx\)/);
   assert.match(view, /private openCardMoreMenu\(button: HTMLElement, node: MapNode\)/, 'the toolbar More menu');
   const classes = view.slice(view.indexOf('const CARD_TOOL_CLASSES'), view.indexOf('};', view.indexOf('const CARD_TOOL_CLASSES')));
   for (const cls of ['vam-ai-explore', 'vam-card-tool-style', 'vam-detail-button']) assert.match(classes, new RegExp(`"${cls}"`), `${cls} button`);

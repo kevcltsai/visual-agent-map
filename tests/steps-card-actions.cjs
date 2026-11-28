@@ -500,7 +500,7 @@ test('card actions: Run all Stop (V3.3 A5) only on the AI card Run all is workin
   eq(calls, [['stopRunAll']]);
   // B08: the toolbar draws it from the list; paintPromptState repaints the first button; a Stop and Note skip whenEditing.
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /const tools = cardToolbars\.get\(card\);\s*if \(tools\) this\.repaintRunTool\(tools, node\);/);
+  assert.match(view, /const tools = cardToolbars\.get\(card\);\s*if \(tools\) this\.repaintRunTool\(tools, node, toolbarContext\);/);
   assert.match(view, /const plain = stop \|\| action\.id === "open-note";/);
 });
 

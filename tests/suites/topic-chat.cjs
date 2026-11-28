@@ -560,7 +560,7 @@ integrationTest('topic chat entries: the empty suggestion panel, the card toolba
   sites.push(host);
   // B08: the toolbar's AI explore is the same research action (CARD_TOOLBAR, drawn by paintCardToolbar through actionsFor).
   assert.match(list, /card: \["research",/, 'the card toolbar lists the research action');
-  assert.match(source, /private paintCardToolbar\([^)]*\): void \{[\s\S]*?actionsFor\("toolbar", ctx\)/);
+  assert.match(source, /private paintCardToolbar\([^)]*\): CardActionContext \{[\s\S]*?actionsFor\("toolbar", ctx\)/);
   assert.ok(sites.length >= 2); assert.ok(sites.every(site => site.includes('openTopicChat') && !/NextStep|Modal/.test(site)), sites.join('\n'));
 });
 

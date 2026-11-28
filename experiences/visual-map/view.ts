@@ -10322,16 +10322,17 @@ export class VisualAgentMapView extends ItemView {
    * loading or a picture-book lock is not drawn (read-only leaves Note alone); another refusal says why on click. Every
    * button has a text label.
    */
-  private paintCardToolbar(tools: HTMLElement, node: MapNode): void {
+  private paintCardToolbar(tools: HTMLElement, node: MapNode): CardActionContext {
     const ctx = { ...this.cardActionContext(node), surface: "toolbar" as const };
     for (const entry of actionsFor("toolbar", ctx))
       this.paintCardTool(tools, node, ctx, entry.action, entry.availability);
-    if (ctx.readOnly) return;
+    if (ctx.readOnly) return ctx;
     const more = this.button(tools, "⋯", () => {});
     more.addEventListener("click", () => this.whenEditing(() => this.openCardMoreMenu(more, node)));
     more.addClass("vam-card-tool", "vam-card-tool-more");
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
+    return ctx;
   }
   /** One toolbar button for `action`, or nothing when it is not drawn now; returns the button. */
   private paintCardTool(
@@ -10370,12 +10371,12 @@ export class VisualAgentMapView extends ItemView {
    * The AI card's first toolbar button again (Run, its Stop, or Run all's Stop) after its state changed: the old one goes,
    * the new one comes first. Not while picking topics (no toolbar) or before the toolbar is drawn.
    */
-  private repaintRunTool(tools: HTMLElement, node: MapNode): void {
+  private repaintRunTool(tools: HTMLElement, node: MapNode, painted?: CardActionContext): void {
     for (const child of Array.from(tools.children))
       if (child.classList.contains("vam-card-tool-run") || child.classList.contains("vam-card-tool-stop"))
         child.remove();
     if (this.selection.state.multiSelectMode) return;
-    const ctx = { ...this.cardActionContext(node), surface: "toolbar" as const };
+    const ctx = { ...(painted ?? this.cardActionContext(node)), surface: "toolbar" as const };
     const first = actionsFor("toolbar", ctx).filter(
       entry => entry.action.id === "stop-run-all" || entry.action.id === "run-stop"
     );
@@ -12620,6 +12621,7 @@ export class VisualAgentMapView extends ItemView {
    */
   cardActionContext(target: MapNode | readonly string[] | null): CardActionContext {
     const node = target && "id" in target ? target : null;
+    const refsEditable = (): boolean => this.canEditKnowledgeRefs() && !(node && this.isMerging(node.id));
     this.cardActionHost ??= {
       stopRunAll: () => this.stopPromptBatch(),
       addTopic: () => this.enqueue(() => this.addNode(null)),
@@ -12681,8 +12683,12 @@ export class VisualAgentMapView extends ItemView {
       managedMap: !!this.plugin.settings && isManagedMapPath(this.plugin.settings, this.path),
       emptyCanvas: !!this.map && !this.map.nodes.length && this.emptyCanvasState() === "idle",
       branchFocused: !!this.branchFocus,
+      // A getter: canEditKnowledgeRefs looks the selection up in the map, and only the right-click's reference entries read it
+      // (every card's toolbar builds this context on each render).
       knowledgeRefs: {
-        editable: this.canEditKnowledgeRefs() && !(node && this.isMerging(node.id)),
+        get editable() {
+          return refsEditable();
+        },
         copied: !!sessionFor(this.plugin).getReference()
       },
       note: id => this.notes.get(id),
@@ -13667,7 +13673,8 @@ export class VisualAgentMapView extends ItemView {
     // and the model name live here and appear with the selection.
     const tools = card.createDiv("vam-node-tools");
     cardToolbars.set(card, tools);
-    if (!this.selection.state.multiSelectMode) this.paintCardToolbar(tools, node);
+    // The context the toolbar was drawn from also draws the AI card's first button below (paintPromptState), in this render.
+    const toolbarContext = this.selection.state.multiSelectMode ? undefined : this.paintCardToolbar(tools, node);
     if (note) this.paintCardEdgeEntries(card, node);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
@@ -13963,7 +13970,7 @@ export class VisualAgentMapView extends ItemView {
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
     // An AI card's star, question line and glyph hang on the title, so they are painted once it exists.
-    if (header) this.paintPromptState(card, header, node, note);
+    if (header) this.paintPromptState(card, header, node, note, toolbarContext);
     if (note && this.inlineName?.target === "card" && this.inlineName.id === node.id) {
       // The field takes the heading's place (the heading stays for the card's label and tests that read it, but hidden).
       title.addClass("vam-sr-only");
@@ -20951,7 +20958,13 @@ export class VisualAgentMapView extends ItemView {
    * What an AI card shows: a grey star before its name, its question (first line) under the name, and one state glyph after the
    * name (none when it is up to date; the lock button takes the place when locked). Safe to call again on the same card.
    */
-  private paintPromptState(card: HTMLElement, header: HTMLElement, node: MapNode, note: Note | undefined): void {
+  private paintPromptState(
+    card: HTMLElement,
+    header: HTMLElement,
+    node: MapNode,
+    note: Note | undefined,
+    toolbarContext?: CardActionContext
+  ): void {
     promptChips.get(header)?.forEach(chip => chip.remove());
     promptChips.delete(header);
     delete card.dataset.aiCard;
@@ -21019,7 +21032,7 @@ export class VisualAgentMapView extends ItemView {
     // The toolbar's first button follows the state (B08): Run, or Stop while the AI works on the card (the header keeps its
     // own Stop, decision #39).
     const tools = cardToolbars.get(card);
-    if (tools) this.repaintRunTool(tools, node);
+    if (tools) this.repaintRunTool(tools, node, toolbarContext);
     promptChips.set(header, parts);
     const named = cardLabels.get(card)?.textContent;
     const state = names.join(", ");

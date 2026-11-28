@@ -8,6 +8,7 @@ const { fixture, load, core, obsidian, DEFAULT_SETTINGS, withExpansionCoordinato
 const dom = require('./support-dom.cjs');
 const { element } = dom;
 
+const rankStep = load('core/steps/card-rank/step.ts', { obsidian });
 const retrieval = load('experiences/visual-map/knowledge-retrieval.ts', { obsidian });
 const corpus = load('experiences/visual-map/cross-map-corpus.ts', { obsidian });
 const { buildMapChatContext } = load('core/map-chat-context.ts');
@@ -153,12 +154,148 @@ test('context: found cards carry foundByAi and their own fixed note; user-added 
   assert.ok(ctx.mapSourcePaths.includes('Maps/O/T.md'), 'a found card note cannot be written');
 });
 
+// ---- ranking within the call budget (F05b) -------------------------------------------------------------------------------
+
+/** A fake provider: reserves like the real AiCalls before it "sends", records every request, answers with `reply(ids)` (or throws). */
+function fakeAiCalls(reply) {
+  const calls = { sent: [], prompts: [], reserved: 0 };
+  return {
+    calls,
+    run: async (prepared, options, finish) => {
+      assert.equal(options.noContentLog, true, 'the cards are private writing: no content in the exchange log');
+      assert.equal(options.signal instanceof AbortSignal, true);
+      await options.admission.reserve();
+      calls.reserved++;
+      calls.sent.push(prepared.input); calls.prompts.push(prepared.prompt);
+      return finish(await reply(prepared.input.cards.map(card => card.id)));
+    }
+  };
+}
+const reversed = ids => JSON.stringify({ ranked: [...ids].reverse() });
+const titlesOf = cards => cards.map(card => card.title);
+
+test('rank step: ids not offered and repeats are dropped, a reply with no offered id or no list is refused, at most five', () => {
+  const offered = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7'];
+  same(rankStep.parseCardRank('{"ranked":["c3","zz","c3","c1"]}', offered), ['c3', 'c1']);
+  same(rankStep.parseCardRank(JSON.stringify({ ranked: offered }), offered), offered.slice(0, 5));
+  for (const bad of ['nope', '{}', '{"ranked":"c1"}', '{"ranked":[1]}', '{"ranked":["zz"]}', '{"ranked":[]}']) assert.throws(() => rankStep.parseCardRank(bad, offered), bad);
+});
+
+test('rank step: the prompt carries only ids, titles and short excerpts, marked untrusted; a long excerpt and a long message are cut', () => {
+  const prompt = rankStep.cardRankStep.render({ message: 'm'.repeat(5000), cards: [{ id: 'c1', title: 'T', excerpt: 'x'.repeat(2000) }], language: 'en', model: 'm', reasoning: 'low' });
+  assert.match(prompt, /untrusted data, read-only/);
+  assert.ok(prompt.length < 2500, `prompt is bounded (${prompt.length})`);
+});
+
+test('budget: a turn has MAX_CONDENSE_CALLS requests; what the condensing used is already gone, the one after the last is refused', async () => {
+  const { MAX_CONDENSE_CALLS } = load('core/source-gateway.ts');
+  const fresh = retrieval.turnAdmission(0);
+  for (let i = 0; i < MAX_CONDENSE_CALLS; i++) await fresh.reserve();
+  await assert.rejects(fresh.reserve(), e => e.name === 'BudgetExhaustedError');
+  const spent = retrieval.turnAdmission(MAX_CONDENSE_CALLS - 1);
+  await spent.reserve();
+  await assert.rejects(spent.reserve(), e => e.name === 'BudgetExhaustedError');
+});
+
+test('rank step: the prompt asks for every offered id and never allows an empty list (the step refuses an empty reply)', () => {
+  for (const language of ['en', 'zh', 'zh-CN']) {
+    const prompt = rankStep.cardRankStep.render({ message: 'm', cards: [{ id: 'c1', title: 'T', excerpt: 'x' }], language, model: 'm', reasoning: 'low' });
+    const text = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
+    assert.match(text, /id of every candidate/, language);
+    assert.doesNotMatch(text, /empty list when none|leave out a candidate/, language);
+  }
+});
+
+test('pickRanked: up to five candidates need no call; more take the ranked ones first, the rest in word order; a failure keeps the word order and says so', async () => {
+  const items = Array.from({ length: 8 }, (_, i) => ({ k: `k${i}` }));
+  let asked = 0;
+  const few = await retrieval.pickRanked(items.slice(0, 5), x => x.k, async () => { asked++; return []; });
+  assert.equal(asked, 0); assert.equal(few.cards.length, 5); assert.equal(few.byWords, false);
+  const ranked = await retrieval.pickRanked(items, x => x.k, async () => ['k7', 'k3', 'zz', 'k3']);
+  same(ranked.cards.map(x => x.k), ['k7', 'k3', 'k0', 'k1', 'k2']); assert.equal(ranked.byWords, false);
+  const failed = await retrieval.pickRanked(items, x => x.k, async () => { throw new Error('boom'); });
+  same(failed.cards.map(x => x.k), ['k0', 'k1', 'k2', 'k3', 'k4']); assert.equal(failed.byWords, true);
+});
+
+test('view: five or fewer candidates never call the ranking', async () => {
+  const ai = fakeAiCalls(reversed);
+  const h = await harness({ aiCalls: ai });
+  assert.equal((await h.view.findPastCards(MESSAGE, live())).length, 1);
+  assert.equal(ai.calls.sent.length, 0); assert.equal(ai.calls.reserved, 0);
+});
+
+test('view: more than five candidates and budget left - one call, the first five by its order, counted against the turn budget', async () => {
+  const ai = fakeAiCalls(reversed);
+  const h = await harness({ many: 8, aiCalls: ai });
+  const exact = retrieval.findCards(await h.plugin.knowledgeIndex.get(), MESSAGE, { mapId: 'map-host', keys: new Set() }, 20);
+  assert.ok(exact.length > 5, `exact step gives more than five (${exact.length})`);
+  const found = await h.view.findPastCards(MESSAGE, live());
+  assert.equal(ai.calls.sent.length, 1, 'exactly one extra call'); assert.equal(ai.calls.reserved, 1);
+  assert.equal(found.length, 5);
+  const asked = ai.calls.sent[0].cards;
+  same(titlesOf(found), [...asked].reverse().slice(0, 5).map(card => card.title), 'the first five of the reply');
+  assert.equal(h.view.foundByWords, false);
+  // the budget is the turn's: with the condensing having used it all, the same send cannot reserve
+  const none = fakeAiCalls(reversed);
+  const spent = await harness({ many: 8, aiCalls: none });
+  spent.view.chatTurnCalls = load('core/source-gateway.ts').MAX_CONDENSE_CALLS;
+  await spent.view.findPastCards(MESSAGE, live());
+  assert.equal(none.calls.sent.length, 0, 'no budget: nothing is sent');
+});
+
+test('view: the ranking request carries the chat\'s own language, the one the chat request uses', async () => {
+  const { outputLanguageForMap, mapChatLanguageSources } = load('core/content-language.ts');
+  for (const [mapTitle, uiLang, text] of [['pstack 技能解析', 'zh-TW', 'Please explain the Starter plan'], ['Starter plan overview', 'en', '請說明 Starter 方案']]) {
+    const want = outputLanguageForMap({ title: mapTitle }, uiLang, ...mapChatLanguageSources(text));
+    const ai = fakeAiCalls(reversed);
+    const h = await harness({ many: 8, aiCalls: ai });
+    await h.view.findPastCards(MESSAGE, live(), want);
+    assert.equal(ai.calls.sent[0].contentLanguage, want, text);
+  }
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(view, /findPastCards\(message, signal, chatLanguage\)/, 'the send passes the language it computed');
+  assert.match(view, /contentLanguage: chatLanguage,/, 'and the chat request uses that same value');
+});
+
+test('view: no budget or a failed ranking keeps the word order, shows no error, and the record line says so', async () => {
+  const plain = await harness({ many: 8, aiCalls: fakeAiCalls(reversed) });
+  plain.plugin.aiCalls = undefined; // not even an AI object: still no error
+  const byWords = await plain.view.findPastCards(MESSAGE, live());
+  const exact = retrieval.findCards(await plain.plugin.knowledgeIndex.get(), MESSAGE, { mapId: 'map-host', keys: new Set() }, 20).slice(0, 5);
+  same(titlesOf(byWords), titlesOf(exact)); assert.equal(plain.view.foundByWords, true);
+  for (const reply of [() => { throw new Error('provider down'); }, () => 'not json', () => '{"ranked":["zz"]}']) {
+    const ai = fakeAiCalls(reply);
+    const h = await harness({ many: 8, aiCalls: ai });
+    same(titlesOf(await h.view.findPastCards(MESSAGE, live())), titlesOf(exact), 'word order');
+    assert.equal(h.view.foundByWords, true); assert.equal(ai.calls.sent.length, 1, 'one attempt, no retry');
+    assert.equal(h.notices.length, 0, 'no notice about the failure');
+  }
+  const h = await harness({ many: 8, aiCalls: fakeAiCalls(() => { throw new Error('x'); }) });
+  await h.view.takeOtherMapCards(await h.view.findPastCards(MESSAGE, live()), MESSAGE);
+  const context = {}; h.view.chatFound.set(context, h.view.foundSent);
+  const lines = []; h.view.markFoundRecorded({ event: (kind, extra) => lines.push(extra.reason) }, { context });
+  same(lines, ['ranked by words']);
+});
+
+test('view: the ranking request holds only authorised cards and only short excerpts - a card locked since indexing, its text and note path are not in it', async () => {
+  const ai = fakeAiCalls(reversed);
+  const h = await harness({ many: 8, aiCalls: ai });
+  await h.plugin.knowledgeIndex.get();
+  await h.repo.writeAiLocked(h.variants[0].path, true);
+  await h.view.findPastCards(MESSAGE, live());
+  assert.equal(ai.calls.sent.length, 1);
+  const prompt = ai.calls.prompts[0];
+  assert.equal(/"title":"Pricing tiers v1"/.test(prompt), false, 'the locked card is not offered');
+  assert.equal(prompt.includes('variant 1'), false, 'its text is not in it'); assert.equal(prompt.includes('.md'), false, 'no note path');
+  assert.equal(ai.calls.sent[0].cards.every(card => card.excerpt.length <= 820), true);
+});
+
 // ---- the view -----------------------------------------------------------------------------------------------------------------
 
 const HOST = 'Agent Workspace/Topics/map-host/Map.md';
 const OTHER = 'Agent Workspace/Topics/map-other/Map.md';
 
-async function harness({ detail = 'Starter and Team', locked = false } = {}) {
+async function harness({ detail = 'Starter and Team', locked = false, many = 0, aiCalls } = {}) {
   const { repo, app, contents } = fixture('en');
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings; app.scope = { appScope: true };
@@ -171,6 +308,16 @@ async function harness({ detail = 'Starter and Team', locked = false } = {}) {
     const filler = await repo.createNote(title, 'gpt-6-luna', other, OTHER, 'workspace', { detail: 'plants and water' });
     Object.assign(filler, { parentId: original.id, x: 100 * (i + 1), y: 0 }); other.nodes.push(filler);
   }
+  // `many` more cards that match the message (and enough that do not, so the words stay below the half-of-all-cards rule).
+  const variants = [];
+  for (let i = 1; i <= many; i++) {
+    const card = await repo.createNote(`Pricing tiers v${i}`, 'gpt-6-luna', other, OTHER, 'workspace', { detail: `pricing tiers variant ${i}` });
+    Object.assign(card, { parentId: original.id, x: 400 + i, y: 0 }); other.nodes.push(card); variants.push(card);
+  }
+  for (let i = 0; i < (many ? 24 : 0); i++) {
+    const card = await repo.createNote(`Filler ${i}`, 'gpt-6-luna', other, OTHER, 'workspace', { detail: 'plants and water' });
+    Object.assign(card, { parentId: original.id, x: 900 + i, y: 0 }); other.nodes.push(card);
+  }
   await app.vault.create(OTHER, core.serializeMap(other));
   const host = { id: 'map-host', title: 'Host map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   const root = await repo.createNote('Pricing tiers root', 'gpt-6-luna', host, HOST, 'workspace');
@@ -182,11 +329,12 @@ async function harness({ detail = 'Starter and Team', locked = false } = {}) {
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment, setTimeout, clearTimeout });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
-    knowledgeIndex: new retrieval.KnowledgeIndex(() => repo.knowledgeRefIO())
+    knowledgeIndex: new retrieval.KnowledgeIndex(() => repo.knowledgeRefIO()),
+    ...(aiCalls ? { aiCalls } : {})
   });
   const view = new VisualAgentMapView({ app }, plugin);
   view.path = HOST; view.map = await repo.readMap(HOST); view.stageEl = element('div'); view.contentEl = element('div');
-  return { view, plugin, repo, app, notices, ids: { original: original.id }, notePath: original.path };
+  return { view, plugin, repo, app, notices, ids: { original: original.id }, notePath: original.path, variants };
 }
 const live = () => new AbortController().signal;
 const MESSAGE = 'what about the pricing tiers';

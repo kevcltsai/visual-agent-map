@@ -526,6 +526,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "card-rank.en": {
+      "builder": "core/card-rank-service.ts buildCardRankPrompt (candidate cards with an injection attempt)",
+      "language": "en",
+      "schema": true
+    },
+    "card-rank.zh": {
+      "builder": "core/card-rank-service.ts buildCardRankPrompt (candidate cards with an injection attempt)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "card-rank.zh-CN": {
+      "builder": "core/card-rank-service.ts buildCardRankPrompt (candidate cards with an injection attempt)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "chart.add-none.en": {
       "builder": "core/steps/chart/step.ts chartStep (no existing diagram)",
       "language": "en",

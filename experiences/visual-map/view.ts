@@ -13593,6 +13593,8 @@ export class VisualAgentMapView extends ItemView {
   private adoptedHeldMap = false;
   private async travel(redo: boolean): Promise<void> {
     // Undo and redo replace Map.md like any change: an outside edit goes through the same conflict window first.
+    // The flag only counts for this click: a value left by another path must not show the notice.
+    this.adoptedHeldMap = false;
     if (
       this.map &&
       this.path &&

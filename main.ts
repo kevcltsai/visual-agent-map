@@ -2821,9 +2821,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     owner: string,
     isCurrent: () => boolean,
     warnings: readonly string[] = [],
-    changes?: LivingChangeSummary
+    changes?: LivingChangeSummary,
+    draft = false
   ): Promise<boolean> {
-    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent, warnings, changes);
+    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent, warnings, changes, draft);
   }
   invalidateLivingTrial(owner: string): void {
     this.nodeDetailsSidebar.invalidateLivingTrial(owner);

@@ -8,6 +8,8 @@ export const LIVING_READER_VIEW = "vam-living-node-reader";
 
 export class LivingReaderView extends ItemView {
   private file?: TFile;
+  /** An unsaved new card: the file only anchors links; it is not the card, so the official tab stays empty. */
+  private draft = false;
   private owner?: string;
   private preview = "";
   private warnings: readonly string[] = [];
@@ -43,8 +45,10 @@ export class LivingReaderView extends ItemView {
     owner: string,
     warnings: readonly string[] = [],
     invalid = false,
-    changes?: LivingChangeSummary
+    changes?: LivingChangeSummary,
+    draft = false
   ): Promise<void> {
+    this.draft = draft;
     this.file = file;
     this.owner = owner;
     this.preview = preview;
@@ -153,7 +157,7 @@ export class LivingReaderView extends ItemView {
     let raw = "";
     if (this.tab === "official") {
       try {
-        raw = await this.app.vault.read(file);
+        if (!this.draft) raw = await this.app.vault.read(file);
       } catch {
         // The content block below reports the missing note.
       }

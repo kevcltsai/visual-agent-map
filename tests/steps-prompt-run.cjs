@@ -1906,3 +1906,52 @@ test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers on
   assert.ok(buttons(ready).length > 1, 'editable again: the other tools are back');
   assert.ok(buttons(ready).some(b => hasCls(b, 'vam-card-tool-more')));
 });
+
+// ---- D1-x7: adopting a trial is the same commit as a formal Run Card; an unsaved draft can be tried ------------------------
+const sameNoteButTime = text => String(text)
+  // The save step the adopter needs writes the source refs, which also feed the input revision: the only two non-time differences.
+  .replace(/^living-node-refs:\n(  - .*\n)*/m, '')
+  .replace(/^(updated|living-node-input-revision|living-node-last-attempt|living-node-last-successful-check|living-node-last-content-change|living-node-commit|living-node-receipts|living-node-generation):.*\n?/gm, '')
+  .replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, 'T')
+  .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, 'U');
+
+test('D1-x7 adopt = formal submit: the adopted note has the same frontmatter, summary, status and knowledge revision as a Run Card of the same settings', async () => {
+  const formal = await popoverHarness([['A', null, { prompt: 'Why?\nSources: [[N]]' }], ['N', null, { noAi: true }]]);
+  formal.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  formal.view.startPromptRun([formal.node('A').id]); await formal.done();
+  assert.match(formal.raw('A'), /Result: A/, 'the formal run wrote the result');
+  const adopted = await trialHarness();
+  await adopted.ready();
+  adopted.saveButton().click(); // adoption needs the exact same configuration saved first
+  await until(() => adopted.view.history.past.length > 0);
+  for (let i = 0; i < 30; i++) await dom.tick();
+  adopted.button('Adopt trial').click();
+  await until(() => /Result: A/.test(adopted.raw('A')));
+  for (let i = 0; i < 20; i++) await dom.tick();
+  eq(sameNoteButTime(adopted.raw('A')), sameNoteButTime(formal.raw('A')), 'same bytes except time fields');
+  const a = await adopted.repo.readNote(adopted.node('A').path, adopted.mapDoc), f = await formal.repo.readNote(formal.node('A').path, formal.mapDoc);
+  assert.equal(a.summary, f.summary); assert.equal(a.livingNode.summary, f.livingNode.summary);
+  assert.equal(a.livingNode.knowledgeRevision, f.livingNode.knowledgeRevision);
+  assert.equal(a.status, f.status);
+  assert.ok(adopted.reader.some(r => r[0] === 'official'), 'the reader is handed back to the official note');
+});
+
+test('D1-x7 an unsaved new Living card can be tried (A23): it runs the draft, writes nothing, creates no formal config; an empty Prompt is still refused', async () => {
+  const h = await trialHarness();
+  const vault = () => [...h.contents.entries()].map(([k, v]) => k + '\n' + v).join('\n--\n');
+  h.view.openAiCardPopover(null);
+  const button = h.button;
+  assert.equal(button('Try prompt').disabled, true, 'empty Prompt: refused');
+  const before = vault();
+  h.question().value = 'What is new?'; h.question().input();
+  assert.equal(button('Try prompt').disabled, false, 'a non-empty unsaved draft may be tried');
+  button('Try prompt').click();
+  await until(() => ['ready', 'error', 'invalid'].includes(h.view.aiCardOpen?.trial.state)).catch(() => {});
+  for (let i = 0; i < 10; i++) await dom.tick();
+  assert.equal(h.view.aiCardOpen.trial.state, 'ready', 'the source watcher does not drop a draft preview');
+  assert.equal(h.calls.length, 1, 'one AI call');
+  assert.ok(h.reader.some(r => r[0] === 'trial'), 'the preview is shown');
+  assert.equal(vault(), before, 'vault bytes unchanged: no note, no map write');
+  h.question().value = ''; h.question().input();
+  assert.equal(button('Try prompt').disabled, true, 'emptied again: refused');
+});

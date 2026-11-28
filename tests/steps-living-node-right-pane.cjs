@@ -195,13 +195,14 @@ const events = {
 };
 
 // Expected pane after each transition. An AI card reads in the reader; an ordinary card natively; the native editor stays
-// only when the user opened it for that card and selects that same card again (D1-x11b). A closed pane leaves no leaf.
+// only when the user opened it for that card and selects that same card again (D1-x11b). A closed pane leaves no leaf,
+// and a pane the user closed (Cmd+W, detach; the blank state) stays closed when a card is selected (D1-x11d).
 const table = {
   reader: ['reader:A', 'reader:B', 'native:P', 'closed', 'closed', 'reader:A', 'reader:A'],
   'native editor': ['editor:A', 'reader:B', 'native:P', 'closed', 'closed', 'editor:A', 'editor:A'],
   'AI editor open': ['reader:A', 'reader:B', 'native:P', 'closed', 'closed', 'reader:A', 'reader:A'],
   'AI editor over native editor': ['reader:A', 'reader:B', 'native:P', 'closed', 'closed', 'reader:A', 'reader:A'],
-  blank: ['reader:A', 'reader:B', 'native:P', 'closed', 'closed', 'closed', 'closed']
+  blank: ['closed', 'closed', 'closed', 'closed', 'closed', 'closed', 'closed']
 };
 
 test('D1-x11c: every pane state × event lands on the reader for an AI card (state-transition table)', async () => {
@@ -220,9 +221,13 @@ test('D1-x11c: every pane state × event lands on the reader for an AI card (sta
       if (after.shown !== expected[index]) failures.push(`${label}: ${after.shown}, expected ${expected[index]}`);
       if (after.empty) failures.push(`${label}: ${after.empty} empty reader leaf left in the dock`);
       if (after.leaves > 1) failures.push(`${label}: ${after.leaves} pane leaves`);
-      // Recovery: from wherever the pane landed, the next selections read normally again.
+      // Recovery: from wherever the pane landed, the next selections read normally again. A pane the user closed stays
+      // closed (D1-x11d), unless the AI editor was still open: closing it returns to its card's reader.
+      const aiEditorOpen = !!w.popover();
       await closeAiEditor(w);
-      const followsSelection = !(state === 'blank' && event === 'reopen Obsidian'); // a fresh layout with no pane stays closed
+      const userClosed = state === 'blank' || event === 'Cmd+W' || event === 'leaf.detach()';
+      const followsSelection = !userClosed || aiEditorOpen;
+      if (pane(w).shown === 'closed' && followsSelection) failures.push(`${label} → close AI editor: closed, expected the reader`);
       if (followsSelection) {
         await w.click('B');
         if (pane(w).shown !== 'reader:B') failures.push(`${label} → select other AI card: ${pane(w).shown}, expected reader:B`);
@@ -260,4 +265,28 @@ test('D1-x11c: a restored reader shows its card; a stale or empty one closes its
   assert.deepEqual(pane(good), { shown: 'reader:B', leaves: 1, empty: 0 }, 'the restored reader is reused, not joined by a new one');
   const main = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'main.ts'), 'utf8');
   assert.match(main, /onLayoutReady\(\(\) => this\.nodeDetailsSidebar\.closeEmptyReaders\(\)\)/, 'the plugin runs the step when the layout is ready');
+});
+
+test('D1-x11d: after Cmd+W an ordinary and an AI card both stay closed on select and both reopen via 「筆記」', async () => {
+  for (const [key, opened] of [['P', 'native:P'], ['A', 'reader:A']]) {
+    const w = await world();
+    await w.click(key);
+    assert.equal(pane(w).shown, 'closed', `${key}: a selection alone does not open the pane`);
+    // The explicit entry: the card's Note action (toolbar 「筆記」, ⋯, context menu, command "open selected details").
+    assert.equal(w.view.mapCommand('open-details', false), true, `${key}: the open-details command runs`);
+    await w.settle();
+    assert.equal(pane(w).shown, opened, `${key}: the explicit entry opens the pane`);
+    w.ws.closeActive(); // Cmd+W
+    await w.settle();
+    assert.equal(pane(w).shown, 'closed', `${key}: Cmd+W closes the pane`);
+    for (const next of [key, key === 'P' ? 'A' : 'P', key]) {
+      await w.click(next);
+      assert.deepEqual(pane(w), { shown: 'closed', leaves: 0, empty: 0 }, `${key} closed → select ${next}: the pane stays closed`);
+    }
+    w.view.mapCommand('open-details', false);
+    await w.settle();
+    assert.deepEqual(pane(w), { shown: opened, leaves: 1, empty: 0 }, `${key}: the explicit entry reopens the pane after Cmd+W`);
+    await w.click(key === 'P' ? 'A' : 'P');
+    assert.equal(pane(w).shown, key === 'P' ? 'reader:A' : 'native:P', `${key}: the reopened pane follows the selection again`);
+  }
 });

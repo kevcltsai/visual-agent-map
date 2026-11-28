@@ -7,8 +7,6 @@ import { LIVING_READER_VIEW, LivingReaderView } from "./living-node-reader";
 export class NodeDetailsSidebar {
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
-  /** The pane was open and follows the selection; closing its tab (Cmd+W) does not end that, closing the map does. */
-  private following = false;
   private trialOwner?: string;
   private revision = 0;
   private pending: Promise<void> = Promise.resolve();
@@ -53,12 +51,11 @@ export class NodeDetailsSidebar {
   }
 
   /**
-   * The node-details sidebar counts as open while its pane is visible, and while the pane the user had open was closed
-   * as a tab (Cmd+W on the reader or the native editor): the next selection opens it again in the expanded right dock.
+   * The node-details sidebar counts as open only while its pane is visible. A pane the user closed (Cmd+W, detach) stays
+   * closed on selection, for every card; the card's Note action (「筆記」) opens it again.
    */
   detailsShown(): boolean {
     if (this.app().workspace.rightSplit.collapsed) return false;
-    if (this.following && this.detailsLeaf && !this.attached(this.detailsLeaf)) return true;
     return this.paneLeaves().some(leaf => leaf.view.containerEl.isShown());
   }
 
@@ -153,7 +150,6 @@ export class NodeDetailsSidebar {
     } else await leaf.openFile(file);
     if (revision !== this.revision || this.detailsLeaf !== leaf) return;
     this.detailsPath = file.path;
-    this.following = true;
     this.styleLeaf(leaf);
     await this.reveal(leaf);
   }
@@ -230,7 +226,6 @@ export class NodeDetailsSidebar {
   closeStaleDetails(): void {
     this.revision++;
     this.trialOwner = undefined;
-    this.following = false;
     const closed =
       this.detailsLeaf?.view instanceof LivingReaderView ||
       (this.detailsLeaf?.view instanceof MarkdownView && this.detailsLeaf.view.file?.path === this.detailsPath);

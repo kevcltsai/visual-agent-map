@@ -1981,6 +1981,9 @@ export class VisualAgentMapView extends ItemView {
   private refLayerEl: HTMLElement | null = null;
   /** The drawn references that resolved (an unavailable or orphan one is not here): a relation line may end at one (V3.3 P4.4). */
   private readonly refEls = new Map<string, HTMLElement>();
+  /** Every drawn reference card (loading, unavailable or resolved) with its parent card, and the connector line drawn to it (F01-x). */
+  private readonly refCardEls = new Map<string, { el: HTMLElement; parentId: string }>();
+  private readonly refConnectorEls = new Map<string, SVGPathElement>();
   private refResolveSeq = 0;
   private shareRefTitles = new Map<string, string | null>();
   private refResolveTimer: number | null = null;
@@ -8272,9 +8275,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.closed || seq !== this.refResolveSeq || this.map?.id !== map.id) return;
     this.refResolved = found;
     this.paintKnowledgeRefs();
-    // A relation line to a reference appears (or goes) with what the reference resolved to.
-    const refIds = new Set(refs.map(ref => ref.id));
-    if ((map.topicRelations ?? []).some(link => refIds.has(link.from) || refIds.has(link.to))) this.drawEdges();
+    // The connector to a reference, and a relation line to one, are redrawn once the reference has resolved.
+    this.drawEdges();
   }
   /**
    * Draws the references of the open map in a layer after the cards. They are not cards of the map: they live in
@@ -8284,6 +8286,7 @@ export class VisualAgentMapView extends ItemView {
     this.refLayerEl?.remove();
     this.refLayerEl = null;
     this.refEls.clear();
+    this.refCardEls.clear();
     const stage = this.stageEl,
       map = this.map;
     if (!stage || !map) return;
@@ -8303,6 +8306,7 @@ export class VisualAgentMapView extends ItemView {
       if (!found) missing = true;
       const el = layer.createDiv("vam-knowledge-ref");
       el.dataset.refId = ref.id;
+      this.refCardEls.set(ref.id, { el, parentId: ref.parentId });
       if (found?.ok) this.refEls.set(ref.id, el);
       el.setAttr("role", "note");
       el.tabIndex = 0;
@@ -8384,6 +8388,7 @@ export class VisualAgentMapView extends ItemView {
         dy = (e.clientY - start.y) / zoom;
         el.style.left = `${origin.x + dx}px`;
         el.style.top = `${origin.y + dy}px`;
+        this.placeRefConnector(ref.id);
       };
       const settle = (): void => {
         done = true;
@@ -8406,6 +8411,7 @@ export class VisualAgentMapView extends ItemView {
         settle();
         el.style.left = from.left;
         el.style.top = from.top;
+        this.placeRefConnector(ref.id);
       };
       el.addEventListener("pointermove", move);
       el.addEventListener("pointerup", up);
@@ -8565,6 +8571,7 @@ export class VisualAgentMapView extends ItemView {
     }, false);
     this.refResolved.set(ref.id, probe);
     this.paintKnowledgeRefs();
+    this.drawEdges();
   }
   /** "Paste reference" under a card: uses only what "Copy as reference" remembered. */
   private pasteKnowledgeRef(parentId: string | null): void {
@@ -28449,6 +28456,8 @@ export class VisualAgentMapView extends ItemView {
               : line;
           this.placeAnchorLine(key, from, box);
         }
+        for (const [refId, { parentId }] of this.refCardEls)
+          if (group.has(parentId)) this.placeRefConnector(refId, shifted(parentId, dx, dy));
         for (const edge of tree) {
           const path = this.edgeEls.get(edge.key);
           const parent = shifted(edge.parentId, dx, dy),
@@ -28619,6 +28628,14 @@ export class VisualAgentMapView extends ItemView {
       )
     );
   }
+  /** Re-aims a reference's connector at where its card (or its parent, when `parentBox` is given) now is, while either is dragged. */
+  private placeRefConnector(refId: string, parentBox?: CardBox): void {
+    const path = this.refConnectorEls.get(refId),
+      ref = this.refCardEls.get(refId),
+      parent = ref ? this.cardEls.get(ref.parentId) : undefined;
+    if (!path || !ref || !parent) return;
+    path.setAttribute("d", relationPathData(parentBox ?? boxOf(parent), boxOf(ref.el)));
+  }
   private drawEdges(): void {
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
@@ -28747,6 +28764,19 @@ export class VisualAgentMapView extends ItemView {
         path.setAttribute("data-card-id", cardId);
         lines.push(path);
       }
+    }
+    // A reference hangs from its parent card by a dashed line (F01-x); an orphan reference is not drawn, so it has none.
+    this.refConnectorEls.clear();
+    for (const [refId, { el, parentId }] of this.refCardEls) {
+      const parent = this.cardEls.get(parentId);
+      if (!parent) continue;
+      const path = createSvg("path");
+      path.setAttribute("d", relationPathData(boxFor(parent), boxFor(el)));
+      path.addClass("vam-edge", "vam-ref-connector");
+      path.setAttribute("data-ref-id", refId);
+      if (!this.map.aim) path.setAttribute("data-parent-line", "");
+      lines.push(path);
+      this.refConnectorEls.set(refId, path);
     }
     // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
     if (mapDirection === "fishbone") {

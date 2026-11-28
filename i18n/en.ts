@@ -1244,6 +1244,7 @@ export const en = {
   "ui.living_node_trial_unsaved": "Trial · not saved",
   "ui.living_node_changes_title": "This run's changes",
   "ui.living_node_changes_first_run": "First run: there is no baseline to compare against.",
+  "ui.living_node_changes_no_baseline": "No baseline to compare against.",
   "ui.living_node_changes_none": "No changes this time.",
   "ui.living_node_changes_added_0": "Added: {0}",
   "ui.living_node_changes_supplemented_0": "Supplemented with new evidence: {0}",

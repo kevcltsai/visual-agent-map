@@ -1177,6 +1177,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.living_node_trial_unsaved": "試跑・尚未儲存",
   "ui.living_node_changes_title": "本次變化",
   "ui.living_node_changes_first_run": "第一次執行，沒有可比基準。",
+  "ui.living_node_changes_no_baseline": "沒有可比基準。",
   "ui.living_node_changes_none": "本次沒有變化。",
   "ui.living_node_changes_added_0": "新增：{0}",
   "ui.living_node_changes_supplemented_0": "補充佐證：{0}",

@@ -92,8 +92,8 @@ export { setUiLanguage } from "./i18n";
     const later = await shown(note('living-node-last-change: ' + JSON.stringify(JSON.stringify(key)) + '\n', 't3'));
     assert.ok(later.includes('本次沒有變化。') && !later.includes('新增：2'));
     const old = await shown(note(''));
-    assert.ok(old.includes('本次變化') && old.includes('第一次執行，沒有可比基準。'));
+    assert.ok(old.includes('本次變化') && old.includes('沒有可比基準。') && !old.some(x => x.includes('第一次執行')));
     const bad = await shown(note('living-node-last-change: "{not json"\n'));
-    assert.ok(bad.includes('第一次執行，沒有可比基準。'));
+    assert.ok(bad.includes('沒有可比基準。') && !bad.some(x => x.includes('第一次執行')));
   } finally { view.setUiLanguage('en'); }
 });

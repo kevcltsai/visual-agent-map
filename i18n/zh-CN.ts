@@ -1176,6 +1176,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_trial_unsaved": "试跑・尚未保存",
   "ui.living_node_changes_title": "本次变化",
   "ui.living_node_changes_first_run": "第一次运行，没有可比基准。",
+  "ui.living_node_changes_no_baseline": "没有可比基准。",
   "ui.living_node_changes_none": "本次没有变化。",
   "ui.living_node_changes_added_0": "新增：{0}",
   "ui.living_node_changes_supplemented_0": "补充佐证：{0}",

@@ -191,6 +191,14 @@ S.test('A43 grammar: YYYY, YYYY-MM, YYYY-MM-DD, a day range, Qn YYYY and known r
   // Not selectors: impossible dates, a reversed range, digits inside words, quarters 0 and 5, plain numbers.
   for (const text of ['2024-13', '2024-02-30', '2024-03-09..2024-03-05', 'v12024', 'id2024-03', 'price 12345', 'build 2024x'])
     assert.deepEqual(range(text), [], text);
+  // D2-6b: everyday range wording reads as the same day range; "and" alone still names two days.
+  for (const text of ['between 2020-03-01 and 2020-03-10', 'Between 2020-03-01 AND 2020-03-10', '2020-03-01 到 2020-03-10', '從 2020-03-01至2020-03-10', '2020-03-01–2020-03-10', '2020-03-01 — 2020-03-10', '2020-03-01~2020-03-10', '2020-03-01～2020-03-10'])
+    assert.deepEqual(range(text), [['2020-03-01', '2020-03-10']], text);
+  assert.deepEqual(range('compare 2020-03-01 and 2020-03-10'), [['2020-03-01', '2020-03-01'], ['2020-03-10', '2020-03-10']]);
+  // Not loosened: a reversed or impossible new-wording range is no selector, and an incomplete end date keeps the old reading.
+  for (const text of ['between 2020-03-10 and 2020-03-01', '2020-03-10 到 2020-03-01', '2020-03-10–2020-03-01', '2020-02-30~2020-03-10'])
+    assert.deepEqual(range(text), [], text);
+  assert.deepEqual(range('2020-03 到 2020-03-10'), [['2020-03-01', '2020-03-31'], ['2020-03-10', '2020-03-10']]);
   assert.deepEqual(S.plain(parseLivingSelectors('compare r5 with evt:9, not r6 or r50.', ['r5', 'evt:9']).ids), ['r5', 'evt:9']);
   assert.deepEqual(S.plain(parseLivingSelectors('Use "Notes > Plan > Risks" and 「Notes > Plan」 but not "no path" or "a > "', []).paths), [['Notes', 'Plan', 'Risks'], ['Notes', 'Plan']]);
 });
@@ -270,6 +278,13 @@ S.integrationTest('A43: a 600-record history answers an exact old date in one ca
   assert.ok(!f.prompts[0].includes('"id":"r0"') && f.prompts[0].includes('"id":"r599"'), 'the rest is newest first');
   assert.match(f.prompts[0], /"omitted":\{"count":\d+/);
   assert.ok(elapsed < baseline * 40 + 1000, 'a 600-record round costs about a small one, not a scan per record (' + elapsed + ' vs ' + baseline + ' ms)');
+});
+
+S.integrationTest('D2-6b A43: "between X and Y" on a 600-record history sends every record of those ten days', async () => {
+  const f = await runtimeFixture({ count: 600, prompt: 'Summarize what was recorded between 2020-03-01 and 2020-03-10 from the existing history.' });
+  await runLivingRound(f.port, ['parent']);
+  assert.equal(f.prompts.length, 1);
+  for (let n = 60; n <= 69; n++) assert.ok(f.prompts[0].includes('"id":"r' + n + '"'), 'r' + n + ' is in the range and must be sent');
 });
 
 S.integrationTest('A43: a required range that cannot fit fails closed before any call and leaves every byte unchanged', async () => {

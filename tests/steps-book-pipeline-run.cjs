@@ -1981,6 +1981,39 @@ test('apply notes: a replaced run or a card taken out of the order before the co
   }
 });
 
+// B33-y: the reader locks the chapter while the AI works; the answer must not reach the locked text (ai-flows §AI 鎖定).
+test('apply notes (B33-y): a chapter ai-locked while the AI works is not written; refused as ai_locked with the locked notice, the notes stay', async () => {
+  // The ui bundle carries its own copy of the error class: the refusal is rebuilt there from the code the runner threw.
+  const ui = require('./support-replay.cjs').loadSource(`
+export { bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
+export { BookPipelineRunError } from "./experiences/visual-map/book-pipeline-run";
+`, { obsidian: S.obsidian });
+  let locked;
+  const r = await notesRig({ notes: async request => {
+    await r.repo.writeAiLocked(r.nodes[1].path, true);
+    locked = r.cardRaw();
+    return reply(request);
+  } });
+  const used = (await r.state()).budget.used;
+  let caught;
+  await r.runs.applyNotes(r.mapPath, r.nodes[1].id).catch(error => { caught = error; });
+  assert.ok(refusal('ai_locked')(caught), `refused as ai_locked: ${caught?.code ?? caught}`);
+  assert.match(locked, /^ai-locked: true$/m);
+  assert.equal(r.cardRaw(), locked, 'the locked chapter: not one byte changed after the lock');
+  assert.ok(r.cardRaw().includes('%%備註#1') && !r.cardRaw().includes('Alpha BETA2 gamma.'), 'the note is still unapplied');
+  assert.equal(r.calls.length, 1);
+  assert.equal((await r.state()).budget.used, used + 1, 'the call was spent (it was made)');
+  assert.ok(!(await r.note(0)).pipelineSeam && !(await r.note(2)).pipelineSeam, 'no seam is marked');
+  assert.match(ui.bookRefusalText(new ui.BookPipelineRunError(caught.code)), /^(?:Topic is locked; AI will not change it|議題已鎖定，AI 不會修改)$/, 'the reader gets the locked notice');
+  assert.equal(r.runs.isApplyingNotes(r.mapPath), false, 'the slot is released (can be tried again)');
+});
+test('apply notes (B33-y, control): with no lock the same answer is applied', async () => {
+  const r = await notesRig({ notes: async request => reply(request) });
+  const result = await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  assert.equal(result.applied, 1);
+  assert.ok(r.cardRaw().includes('Alpha BETA2 gamma.') && !r.cardRaw().includes('%%備註#1'));
+});
+
 test('apply notes: cancel, a late answer after dispose, and the caller signal write nothing', async () => {
   for (const stop of [
     (r, controller) => r.runs.cancelNotes(r.mapPath),
@@ -6361,4 +6394,80 @@ test('AI lock, whole book: "fix again" whose problems are all in a locked chapte
   assert.ok(refused instanceof BookPipelineRunError && refused.code === 'ai_locked', `refused as locked: ${refused && refused.code}`);
   assert.equal(JSON.stringify(await r.state()), saved, 'the saved state is not touched');
   for (let i = 0; i < 3; i++) assert.equal(r.raw(i), raws[i]);
+});
+
+// ai-flows §AI 鎖定 ("AI 不會修改"): after the whole-book proofread the callouts writer (BookCallouts, as main.ts wires it over the note
+// writer) leaves a locked chapter's bytes alone: no "AI 校對：查了 0 項" box is put in, an old box is neither rewritten nor taken off. Only
+// the pipeline's own frontmatter keys may change on a locked chapter; the run writes none of them after the lock here, so the list is
+// what the program could write (writePipelineFields / writePipelineRole), not what it did.
+const { BookCallouts } = S.load('experiences/visual-map/book-pipeline-callouts.ts');
+const PIPELINE_KEYS = ['pipeline-stage', 'pipeline-issue', 'pipeline-seam', 'pipeline-role', 'book-role'];
+const withoutPipelineKeys = raw => raw.split('\n').filter(line => !PIPELINE_KEYS.some(key => line.startsWith(`${key}:`))).join('\n');
+const calloutsOf = r => new BookCallouts({
+  readMap: p => r.repo.readMap(p),
+  readCard: p => r.ports.readCard(p),
+  readText: async p => r.contents.get(p),
+  write: createNoteWriter({ openViews: () => [], rawGuarded: (p, transform, options) => r.repo.updateNoteRawGuarded(p, transform, options) }),
+  log: () => {}
+});
+const AI_BOX = /AI 校對|vam-review/;
+test('AI lock, whole book: the callouts writer leaves a chapter locked during the run as locked: no AI box, every byte but the pipeline keys kept; the open chapter gets its box', async () => {
+  const holder = {};
+  const r = await aiRig({
+    aiProof: async request => {
+      if (request.title === 'SecretTitleA') { await holder.r.repo.writeAiLocked(holder.r.nodes[1].path, true); holder.locked = holder.r.raw(1); }
+      return { checks: [], prior: [], dropped: {} };
+    }
+  });
+  holder.r = r;
+  await finishAi(r);
+  assert.equal((await r.state()).phase, 'done');
+  const callouts = calloutsOf(r);
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  assert.ok(AI_BOX.test(r.raw(2)), 'the open chapter has its AI box (the writer ran)');
+  assert.ok(!AI_BOX.test(r.raw(1)), 'no AI box in the locked chapter');
+  assert.equal(withoutPipelineKeys(r.raw(1)), withoutPipelineKeys(holder.locked), 'the locked chapter is byte for byte as locked, the pipeline keys aside');
+});
+test('AI lock, whole book: a box written before the lock stays as it was through the next align, a clear and an align with no run', async () => {
+  const r = await aiRig({});
+  await finishAi(r);
+  const callouts = calloutsOf(r);
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  assert.ok(AI_BOX.test(r.raw(1)), 'chapter A got its box while open');
+  await r.repo.writeAiLocked(r.nodes[1].path, true);
+  const locked = r.raw(1);
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; });
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  assert.equal(r.raw(1), locked, 'an align that wants no box leaves the locked box');
+  assert.ok(!AI_BOX.test(r.raw(2)), 'the open chapter\'s box goes (the writer ran)');
+  await callouts.clear(r.mapPath);
+  assert.equal(r.raw(1), locked, 'a clear leaves the locked box');
+  await r.repo.updateMap(r.mapPath, d => { delete d.bookPipeline; });
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  assert.equal(r.raw(1), locked, 'an align with no run leaves the locked box');
+});
+test('AI lock, whole book: every chapter locked and nothing checked: no new file in the vault (no "still open" page), every chapter as locked', async () => {
+  const holder = { raws: {} };
+  const files = { get: p => holder.r.contents.get(p), set: (p, text) => holder.r.contents.set(p, text) };
+  const v = pageVault(files);
+  const r = await aiRig({
+    aiProof: async request => {
+      const at = TITLES.indexOf(request.title);
+      await holder.r.repo.writeAiLocked(holder.r.nodes[at].path, true);
+      holder.raws[at] = holder.r.raw(at);
+      holder.files = [...holder.r.contents.keys()].sort();
+      return { checks: [], prior: [], dropped: {} };
+    }
+  }, { ports: { writeOpenIssues: v.port } });
+  holder.r = r;
+  await finishAi(r);
+  same(Object.keys(holder.raws).sort(), ['0', '1', '2'], 'every chapter was locked');
+  assert.equal((await r.state()).phase, 'done', 'the book is done without the page');
+  const callouts = calloutsOf(r);
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  same([...r.contents.keys()].sort(), holder.files, 'no file added after the last lock');
+  for (let i = 0; i < 3; i++) {
+    assert.ok(!AI_BOX.test(r.raw(i)), `no AI box in chapter ${i}`);
+    assert.equal(withoutPipelineKeys(r.raw(i)), withoutPipelineKeys(holder.raws[i]), `chapter ${i} is byte for byte as locked, the pipeline keys aside`);
+  }
 });

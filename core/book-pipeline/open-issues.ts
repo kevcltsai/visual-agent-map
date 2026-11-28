@@ -81,6 +81,10 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
         en: "It was first found in the last check, so there was no round left to fix it"
       },
       fix_failed: { zh: "修正這步一直失敗", en: "The fix step kept failing" },
+      ai_locked: {
+        zh: "這章已鎖定，AI 沒有再查也沒有修改",
+        en: "This chapter is locked, so the AI did not check it again or change it"
+      },
       proof_incomplete: {
         zh: "AI 校對沒有跑完，這章沒有完整查過",
         en: "The AI proofread did not finish, so this chapter was not fully checked"

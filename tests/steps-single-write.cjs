@@ -75,6 +75,22 @@ test('B30: a new card (child or sibling) writes Map.md once (the camera follows 
   }
 });
 
+test('B28 fix: a new card at 41% keeps the zoom (the camera only pans) and the new card is on screen', async () => {
+  for (const sibling of [false, true]) {
+    const h = await harness([['Root', null, 80, 80], ['Kid', 'Root', 420, 80]]);
+    h.view.map.viewport = { x: 0, y: 0, zoom: 0.41 };
+    const ids = new Set(h.view.map.nodes.map(n => n.id));
+    await h.view.addNode(sibling ? h.node('Root') : h.node('Kid'));
+    const placed = h.view.map.nodes.find(n => !ids.has(n.id));
+    const label = sibling ? 'sibling' : 'child';
+    const v = h.view.map.viewport;
+    assert.equal(v.zoom, 0.41, `${label}: zoom stays at 41%`);
+    const left = placed.x * v.zoom + v.x, top = placed.y * v.zoom + v.y;
+    assert.ok(left >= 0 && left + 280 * v.zoom <= 1200 && top >= 0 && top + 180 * v.zoom <= 800, `${label}: the new card is inside the 1200x800 canvas`);
+    await wait(400);
+  }
+});
+
 test('B30: moving a card without crossing a sibling writes Map.md once and no topic note', async () => {
   const h = await harness([['Root', null, 80, 80], ['A', 'Root', 420, 80], ['B', 'Root', 420, 300], ['C', 'Root', 420, 520]]);
   h.writes.length = 0;

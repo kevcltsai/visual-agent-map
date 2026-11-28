@@ -157,6 +157,17 @@ test('topic chat scope pill: this card by default, this branch when the draft is
   assert.equal(f.scope().text, t('ui.topic_chat_scope_card'));
 });
 
+test('P2.2a topic chat: a line above the message box says a reply may change this card and the cards under it; three languages', () => {
+  const writable = f => find(f.win.el, i => hasClass(i, 'vam-topic-chat-writable'));
+  const f = fixture(); const kids = f.win.el.children;
+  assert.ok(kids.indexOf(writable(f)) < kids.findIndex(c => hasClass(c, 'vam-topic-chat-composer')), 'before the message box');
+  assert.equal(writable(f).text, 'This turn may change: this card and the cards under it.');
+  f.action('synthesize').click(); assert.equal(writable(f).text, 'This turn may change: this card and the cards under it.', 'the same for an integration');
+  // The window reads the line through t(); the two Chinese tables say the same thing.
+  assert.equal(load('i18n/zh-TW.ts').zhTW['ui.topic_chat_writable'], '這輪可改：這張卡和它底下的卡。');
+  assert.equal(load('i18n/zh-CN.ts').zhCN['ui.topic_chat_writable'], '这轮可改：这张卡和它下面的卡。');
+});
+
 test('topic chat Escape: an open depth card takes the first Escape, then the window closes', () => {
   const f = fixture();
   f.session.choice = { levels: 3, topics: 9, researched: 0, leaves: 5, children: 2, calls: 4, selected: 'quick', turn: { role: 'user', kind: 'synthesize', text: 'x' } };

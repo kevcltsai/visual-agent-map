@@ -159,6 +159,8 @@ export class TopicChatWindow {
       this.on(button, "click", () => this.pickKind(kind));
     }
 
+    // What a reply of this window may write: the card and its subtree (anything else is skipped as out of scope).
+    this.el.createDiv({ cls: "vam-topic-chat-writable", text: t("ui.topic_chat_writable") });
     const composer = this.el.createDiv("vam-topic-chat-composer");
     this.inputEl = composer.createEl("textarea", {
       cls: "vam-topic-chat-input",

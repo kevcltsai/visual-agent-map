@@ -165,3 +165,15 @@ test("book styles: body pictures are not stretched, and the [!vam-book] hide rul
   });
   assert.ok(hideRules > 0, "the [!vam-book] hide rule is still there");
 });
+
+// B08: while notes load the toolbar (notes + the more button) stays reachable; only the resize handles are hidden.
+test("is-notes-loading rules do not hide the card toolbar", () => {
+  const css = readFileSync(resolve(root, "styles.css"), "utf8");
+  const hiding = [];
+  postcss.parse(css).walkRules((rule) => {
+    if (!rule.selector.includes("is-notes-loading")) return;
+    if (!rule.some((d) => d.prop === "display" && d.value === "none")) return;
+    for (const sel of rule.selectors) if (/vam-node-tools|vam-card-tool/.test(sel)) hiding.push(sel);
+  });
+  assert.deepEqual(hiding, []);
+});

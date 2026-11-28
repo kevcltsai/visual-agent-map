@@ -67,7 +67,9 @@ export type CardActionId =
 export type CardSurface = "toolbar" | "more" | "context" | "command" | "key" | "edge" | "canvas";
 /** What an action acts on: an ordinary card, an AI card, a topic selection, the map itself, or one canvas image (P5.3). */
 export type CardScope = "card" | "ai-card" | "multi" | "map" | "image";
-export type CardAvailability = { ok: true } | { ok: false; reasonKey: TranslationKey };
+/** An unavailable action's reason; `reasonArgs` fill its {0}, {1}… (the locked cards of a selection, P1.9). */
+export type CardAvailability =
+  { ok: true } | { ok: false; reasonKey: TranslationKey; reasonArgs?: readonly (string | number)[] };
 
 /** The six plain reasons an action cannot run now (more specific ones come from the selection, such as mergeCheck's). */
 export const CARD_ACTION_REASONS = {
@@ -163,6 +165,8 @@ export interface CardActionContext {
   knowledgeRefs: { editable: boolean; copied: boolean };
   note(id: string): PromptNoteRef | undefined;
   isMerging(id: string): boolean;
+  /** The cards' titles as one list, joined with the language's list separator. */
+  titles(ids: readonly string[]): string;
   isArgumentCard(id: string): boolean;
   /** Add summary (an empty summary the card face does not draw). */
   summaryFieldOffered(): boolean;
@@ -235,6 +239,16 @@ const then = (first: CardAvailability, next: () => CardAvailability): CardAvaila
 const merging = (ctx: CardActionContext, ids: Iterable<string | null>): CardAvailability => {
   for (const id of ids) if (id && ctx.isMerging(id)) return off(CARD_ACTION_REASONS.merging);
   return OK;
+};
+/**
+ * P1.9: a selection holding an AI-locked or merging card refuses its batch actions (colour, size, position, merge) as a
+ * whole, and the reason names those cards.
+ */
+const selectionLock = (ctx: CardActionContext): CardAvailability => {
+  const locked = ctx.ids.filter(id => ctx.note(id)?.aiLocked === true || ctx.isMerging(id));
+  return locked.length
+    ? { ok: false, reasonKey: "ui.selection_locked_0_1", reasonArgs: [locked.length, ctx.titles(locked)] }
+    : OK;
 };
 const branch = (ctx: CardActionContext, id: string): string[] => {
   const out = [id];
@@ -739,10 +753,12 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     order: 300,
     group: 1,
     available: ctx =>
-      then(gate(ctx, ["bookAi"]), () => {
-        const reason = ctx.mergeBlock();
-        return reason ? off(reason) : OK;
-      }),
+      then(gate(ctx, ["bookAi"]), () =>
+        then(selectionLock(ctx), () => {
+          const reason = ctx.mergeBlock();
+          return reason ? off(reason) : OK;
+        })
+      ),
     run: ctx => ctx.host.merge()
   },
   {
@@ -765,7 +781,8 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     surfaces: ["toolbar"],
     order: 320,
     group: 1,
-    available: ctx => then(gate(ctx, ["bookStructure"]), () => merging(ctx, selectionBranches(ctx))),
+    available: ctx =>
+      then(gate(ctx, ["bookStructure"]), () => then(selectionLock(ctx), () => merging(ctx, selectionBranches(ctx)))),
     run: ctx => ctx.host.chooseParent(false)
   },
   {

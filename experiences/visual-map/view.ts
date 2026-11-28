@@ -3700,10 +3700,26 @@ export class VisualAgentMapView extends ItemView {
     this.inlineNameInput = input;
     return input;
   }
+  /** B28-x: how long a name field may stay without focus or without being visible before it is closed like a blur. 300 ms covers the two focus calls of an add plus a repaint, yet is short enough that the next "+" click is not felt as dead. */
+  private static readonly INLINE_NAME_FOCUS_GRACE_MS = 300;
+  private inlineNameGuardTimer: number | null = null;
+  /** Checked once, a grace period after the field is shown (never per frame): a field that is hidden or never got focus would keep `inlineName.created` set and block every later add. */
+  private guardInlineNameFocus(input: HTMLInputElement): void {
+    if (this.inlineNameGuardTimer !== null) window.clearTimeout(this.inlineNameGuardTimer);
+    this.inlineNameGuardTimer = window.setTimeout(() => {
+      this.inlineNameGuardTimer = null;
+      if (this.closed || this.inlineNameInput !== input || !this.inlineName) return;
+      const active = input.ownerDocument?.activeElement;
+      const unfocused = active !== undefined && active !== input;
+      const hidden = !input.isConnected || input.checkVisibility?.({ visibilityProperty: true }) === false;
+      if (unfocused || hidden) this.finishInlineName?.(true);
+    }, VisualAgentMapView.INLINE_NAME_FOCUS_GRACE_MS);
+  }
   /** After a repaint: the live name field takes focus (all text selected the first time, so typing replaces the default). */
   private focusInlineName(): void {
     const input = this.inlineNameInput;
     if (!input || !input.isConnected || !this.inlineName) return;
+    this.guardInlineNameFocus(input);
     this.restoringFocus = true;
     this.keepCanvasOnFieldRestore = true;
     try {
@@ -4094,6 +4110,8 @@ export class VisualAgentMapView extends ItemView {
     this.endNoteLoad();
     this.cancelPendingRefresh();
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
+    if (this.inlineNameGuardTimer !== null) window.clearTimeout(this.inlineNameGuardTimer);
+    this.inlineNameGuardTimer = null;
     this.hoverCard?.remove();
     this.dragCleanup?.();
     this.anchorDragCancel?.(false);

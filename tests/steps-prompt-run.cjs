@@ -729,6 +729,20 @@ test('D2-3 real round: queued cards wait, the running one runs, a blocked one sa
   eq(['leaf1', 'mid', 'root'].map(key => f.view.aiStatusOf(f.node(key).id)), ['failed', 'blocked', 'blocked'], 'a failure is "failed", the cards that needed it "blocked"');
 });
 
+test('D2-3 Stop: a locked card was never part of the round, so it is skipped in the count and not stopped on its face', async () => {
+  const h = await harness([...TREE, ['lk', null, { locked: true }]]);
+  h.plan.hang.add('leaf1');
+  // The toolbar refuses a locked target; a caller that does not (chat tools) puts it in the round as excluded.
+  void h.view.runLivingBatch([h.node('root').id, h.node('lk').id]);
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  h.view.stopPromptBatch(); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 1, failed: 0, blocked: 0, stopped: true, noChange: 0, cancelled: 4, skipped: 1, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run stopped: 1 done, 4 cancelled, 1 skipped');
+  h.view.aiStatusMemo.clear();
+  assert.notEqual(h.view.aiStatusOf(h.node('lk').id), 'stopped');
+  assert.equal(h.view.aiStatusOf(h.node('leaf1').id), 'stopped');
+});
+
 test('D2-3 Stop before the round is planned still says the run stopped', async () => {
   const h = await harness(TREE);
   await h.runAll();

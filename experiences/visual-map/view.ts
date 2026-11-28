@@ -21070,7 +21070,8 @@ export class VisualAgentMapView extends ItemView {
     const results = new Map<string, LivingSettlement>();
     let excluded = new Set<string>();
     const outcomeOf = (stopped: boolean): PromptOutcome => {
-      const { success, ...rest } = livingRoundStats(results.values(), stopped);
+      // Whether a not-run card counts as cancelled was decided when it settled (same as its face), not by the round's end.
+      const { success, ...rest } = livingRoundStats(results.values());
       return { done: success, ...rest, stopped };
     };
     let warnedOptionalSources = false;
@@ -21108,7 +21109,7 @@ export class VisualAgentMapView extends ItemView {
           break;
         case "settled": {
           const result = event.result as LivingSettlement;
-          results.set(event.id, result);
+          results.set(event.id, result === "not-run" && run.signal.aborted ? "cancelled" : result);
           if (!excluded.has(event.id)) state.finished = Math.min(state.total, state.finished + 1);
           const usable = result === "changed" || result === "no-change" || result === "reused";
           this.setPromptStatus(

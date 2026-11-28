@@ -224,7 +224,7 @@ export function livingCardState(input: LivingCardStateInput): LivingCardState {
     case "cancelled":
       return "stopped";
     case "ok":
-      return input.validity === "stale" ? "suggested" : "done";
+      return input.validity === "valid" ? "done" : "suggested";
     default:
       return input.validity === "valid" ? "done" : "suggested";
   }

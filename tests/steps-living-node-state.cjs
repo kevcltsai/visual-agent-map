@@ -9,6 +9,8 @@ test('card state: the seven states come from the actual task result', () => {
   const table = [
     ['suggested: never run', {}, 'suggested'],
     ['suggested: ok but stale', { latestOutcome: 'ok', validity: 'stale' }, 'suggested'],
+    ['suggested: ok but the knowledge is gone (validity none)', { latestOutcome: 'ok', validity: 'none' }, 'suggested'],
+    ['suggested: ok with validity not loaded', { latestOutcome: 'ok', validity: undefined }, 'suggested'],
     ['waiting', { runtime: 'waiting' }, 'waiting'],
     ['running', { runtime: 'running' }, 'running'],
     ['done: changed', { settlement: 'changed' }, 'done'],

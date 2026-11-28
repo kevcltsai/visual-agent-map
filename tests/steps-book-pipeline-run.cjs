@@ -1981,6 +1981,39 @@ test('apply notes: a replaced run or a card taken out of the order before the co
   }
 });
 
+// B33-y: the reader locks the chapter while the AI works; the answer must not reach the locked text (ai-flows §AI 鎖定).
+test('apply notes (B33-y): a chapter ai-locked while the AI works is not written; refused as ai_locked with the locked notice, the notes stay', async () => {
+  // The ui bundle carries its own copy of the error class: the refusal is rebuilt there from the code the runner threw.
+  const ui = require('./support-replay.cjs').loadSource(`
+export { bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
+export { BookPipelineRunError } from "./experiences/visual-map/book-pipeline-run";
+`, { obsidian: S.obsidian });
+  let locked;
+  const r = await notesRig({ notes: async request => {
+    await r.repo.writeAiLocked(r.nodes[1].path, true);
+    locked = r.cardRaw();
+    return reply(request);
+  } });
+  const used = (await r.state()).budget.used;
+  let caught;
+  await r.runs.applyNotes(r.mapPath, r.nodes[1].id).catch(error => { caught = error; });
+  assert.ok(refusal('ai_locked')(caught), `refused as ai_locked: ${caught?.code ?? caught}`);
+  assert.match(locked, /^ai-locked: true$/m);
+  assert.equal(r.cardRaw(), locked, 'the locked chapter: not one byte changed after the lock');
+  assert.ok(r.cardRaw().includes('%%備註#1') && !r.cardRaw().includes('Alpha BETA2 gamma.'), 'the note is still unapplied');
+  assert.equal(r.calls.length, 1);
+  assert.equal((await r.state()).budget.used, used + 1, 'the call was spent (it was made)');
+  assert.ok(!(await r.note(0)).pipelineSeam && !(await r.note(2)).pipelineSeam, 'no seam is marked');
+  assert.match(ui.bookRefusalText(new ui.BookPipelineRunError(caught.code)), /^(?:Topic is locked; AI will not change it|議題已鎖定，AI 不會修改)$/, 'the reader gets the locked notice');
+  assert.equal(r.runs.isApplyingNotes(r.mapPath), false, 'the slot is released (can be tried again)');
+});
+test('apply notes (B33-y, control): with no lock the same answer is applied', async () => {
+  const r = await notesRig({ notes: async request => reply(request) });
+  const result = await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  assert.equal(result.applied, 1);
+  assert.ok(r.cardRaw().includes('Alpha BETA2 gamma.') && !r.cardRaw().includes('%%備註#1'));
+});
+
 test('apply notes: cancel, a late answer after dispose, and the caller signal write nothing', async () => {
   for (const stop of [
     (r, controller) => r.runs.cancelNotes(r.mapPath),

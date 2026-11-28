@@ -2499,7 +2499,7 @@ export class BookPipelineRuns {
    * Applies the reader's notes of one chapter (one model call, one budget unit). A separate slot: it refuses while a drive holds the
    * map ("drive_running") or another notes job does ("notes_busy"), and a drive entry refuses ("busy") while it runs. It never changes
    * the book's phase or status (a stopped book stays stopped). Order: reservation check, backup (a failed one writes nothing and spends
-   * nothing), the call, a re-check (same run, card still in order, not cancelled), then one writer transform. A late answer after a
+   * nothing), the call, a re-check (same run, card still in order, not ai-locked, not cancelled), then one writer transform. A late answer after a
    * cancel, a dispose or a replaced run is never written.
    */
   async applyNotes(mapPath: string, nodeId: string, options: { signal?: AbortSignal } = {}): Promise<NotesApplyResult> {
@@ -2630,7 +2630,7 @@ export class BookPipelineRuns {
     } finally {
       store.dispose();
     }
-    // Re-check before the commit: same run, the card still in order and on the map, no cancel.
+    // Re-check before the commit: same run, the card still in order and on the map, not locked meanwhile, no cancel.
     refuseIfGone();
     const fresh = await this.ports.readMap(mapPath);
     const again = readBookPipeline(fresh);
@@ -2638,6 +2638,8 @@ export class BookPipelineRuns {
     if (again.kind !== "usable" || again.data.runId !== state.runId || !effectiveOrder(again.data).includes(nodeId))
       throw new BookPipelineRunError("stale");
     if (fresh.nodes.find(item => item.id === nodeId)?.path !== path) throw new BookPipelineRunError("stale");
+    if ((await this.ports.readCard(path).catch(() => undefined))?.aiLocked) throw new BookPipelineRunError("ai_locked");
+    refuseIfGone();
     let outcome: ApplyOutcome | undefined;
     const written = await notes.write(path, text => {
       // The last gate, inside the write: a cancel that came while the writer waited changes nothing.

@@ -1,7 +1,7 @@
 import type { AiCalls } from "../../core/ai-calls";
 import { allowedUrl, openedUrlsFromEvents, searchQueriesFromEvents } from "../../core/argument-map/source-proof";
 import { stepEffort } from "../../core/provider-step-runner";
-import { prepareStep, type StepDefinition } from "../../core/step-runner";
+import { prepareStep, renderTemplate, type StepDefinition } from "../../core/step-runner";
 import type { ModelChoice } from "../../ai/model-resolution";
 import {
   applyLivingChanges,
@@ -13,6 +13,7 @@ import {
 } from "./living-node-changes";
 import { livingSnapshotRevision } from "./living-node-markdown";
 import { buildLivingPrompt, LIVING_PROMPT_BUDGET } from "./living-node-retrieval";
+import { livingNodeRepairTemplate } from "./steps/fragments";
 
 export interface LivingProviderInput extends ModelChoice {
   prompt: string;
@@ -42,13 +43,11 @@ interface LivingRepair {
 type LivingStepInput = LivingProviderInput & { repair?: LivingRepair };
 
 const repairNote = (repair: LivingRepair): string =>
-  "\n\nThe program rejected your previous reply: " +
-  repair.code +
-  (repair.operation ? " at operation " + repair.operation : "") +
-  ". Send the whole JSON reply again in the same format. Every operation's evidence must cite at least one of these ids" +
-  " (a correction must also cite one its record does not already have; a cited URL still needs its webExcerpts entry);" +
-  " drop any operation they cannot support: " +
-  JSON.stringify(repair.allowed);
+  renderTemplate(livingNodeRepairTemplate, {
+    code: repair.code,
+    operation: repair.operation ? " at operation " + repair.operation : "",
+    allowed: JSON.stringify(repair.allowed)
+  });
 
 const step: StepDefinition<LivingStepInput, unknown> = {
   id: "living-node-change-set",

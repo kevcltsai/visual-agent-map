@@ -2582,7 +2582,10 @@ export class VisualAgentMapView extends ItemView {
   private onMapKeydown(event: KeyboardEvent): void {
     // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
     const target = event.target as HTMLElement | null;
-    if (target?.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
+    if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+    // A button in the chat window (its toggle) keeps Esc for an outline reveal's opening, which folds back; the rest of the window is the chat's.
+    const revealOpen = event.key === "Escape" && !this.mapSearch && !!this.searchOpen;
+    if (target?.closest(".vam-map-chat") && !(revealOpen && target.closest("button"))) return;
     // Something that already took this Esc (a menu, a dialog), or a menu still open, closes alone; only a bare Esc clears the selection.
     // A menu that this very key just closed is already gone from the page, so its hide is remembered for the rest of the key event.
     if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
@@ -15208,6 +15211,10 @@ export class VisualAgentMapView extends ItemView {
   applySelectionChange(change: SelectionChange): void {
     // Choosing a card ends the picture selection of the chat (D7).
     if (change.touched.length) this.clearChatImage();
+    // Every way of choosing a card (pointer release, click, keys) ends here: an outline reveal's opening folds back unless it holds the new pick.
+    const picked = this.selection.state.selected;
+    const pickedNode = change.touched.length && picked ? this.map?.nodes.find(item => item.id === picked) : undefined;
+    if (pickedNode) this.foldRevealUnless(pickedNode);
     if (change.multiSelectModeChanged) {
       if (!this.closed) this.render();
       return;
@@ -16338,7 +16345,6 @@ export class VisualAgentMapView extends ItemView {
     if ((event.target as Element).closest("button")) return;
     // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
     if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
-    this.foldRevealUnless(node);
     if (this.selection.state.multiSelectMode) {
       this.applySelectionChange(this.selection.toggleByClick(node.id));
       return;

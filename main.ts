@@ -1872,7 +1872,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       } catch (replaceError) {
         sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
-      const { changed, error, nodePaths } = await this.rebaseMaps(pairs);
+      const { changed, error, nodePaths, scope } = await this.rebaseMaps(pairs);
       // A map node whose title was its old file name follows the new one (a custom title, a folder move and other notes are left alone).
       // Only the owner's own renames (not VAM's collision numbering) are followed, and a batch is first collapsed to origin -> final
       // so a chain (A -> B -> C) or a swap through a temporary name reads each file against the name it started with.
@@ -1901,7 +1901,10 @@ export default class VisualAgentMapPlugin extends Plugin {
           value => value === true || value === "true"
         );
       });
-      if (changed || vamFile) await this.rebuildDerivedData();
+      // VAM's own moves (an undo or redo parking pasted copies, for one) rebuild only the maps they touch: notes of a map
+      // nobody operated on stay as written (B27x). A move made outside VAM still rebuilds everything.
+      const outsideMove = renames.some(rename => rename.external);
+      if (changed || vamFile) await this.rebuildDerivedData(outsideMove ? undefined : scope);
       // Only one error can be thrown; the other is logged so it is not lost.
       if (sourceError && error) this.logs.appendLog("error", t("log.operation_failed_0", error.message));
       if (sourceError) throw sourceError;
@@ -1928,11 +1931,21 @@ export default class VisualAgentMapPlugin extends Plugin {
    */
   private async rebaseMaps(
     pairs: readonly RenamePair[]
-  ): Promise<{ changed: boolean; error?: Error; nodePaths: Set<string> }> {
+  ): Promise<{ changed: boolean; error?: Error; nodePaths: Set<string>; scope: { roots: string[]; paths: string[] } }> {
     let changed = false;
     const failed: string[] = [];
     const nodePaths = new Set<string>();
     const rebase = chainRebase(pairs);
+    // The maps a move touches: rebased, holding a moved note, or with a moved path in their folder; and the moved notes.
+    const moved = touchedPaths(pairs);
+    const scope = { roots: new Set<string>(), paths: new Set(pairs.map(([, to]) => to)) };
+    const touch = (mapPath: string, map: MapDocument, rebased: boolean): void => {
+      const root = this.repo.topicRoot(mapPath);
+      if (!rebased && !moved.some(path => path.startsWith(`${root}/`) || map.nodes.some(node => node.path === path)))
+        return;
+      scope.roots.add(root);
+      for (const node of map.nodes) scope.paths.add(node.path);
+    };
     // The scan identifies affected maps; it is not a write snapshot. Apply only the path change to the
     // current Map.md inside vault.process, preserving concurrent structural and coordinate edits.
     const save = async (path: string): Promise<void> => {
@@ -1941,11 +1954,13 @@ export default class VisualAgentMapPlugin extends Plugin {
         rebased = rebaseMapNotePaths(map, rebase);
       });
       changed ||= rebased;
+      touch(path, current, true);
       for (const node of current.nodes) nodePaths.add(node.path);
     };
     for (const { file, map } of await this.repo.readableMaps()) {
       const rebased = rebaseMapNotePaths(map, rebase);
       if (!rebased) {
+        touch(file.path, map, false);
         for (const node of map.nodes) nodePaths.add(node.path);
         continue;
       }
@@ -1966,7 +1981,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         error ??= retryError instanceof Error ? retryError : new Error(String(retryError));
       }
     }
-    return { changed, error, nodePaths };
+    return { changed, error, nodePaths, scope: { roots: [...scope.roots], paths: [...scope.paths] } };
   }
   private readonly unreadableReported = new Map<string, number>();
   /** One Notice and log line per scan; the same map and error is not repeated within a few seconds (one rename = two scans). */
@@ -2770,7 +2785,7 @@ export default class VisualAgentMapPlugin extends Plugin {
    * Rebuilds derived note data; `paths` limits the rewrite to those notes (the ends of a changed relation), `roots` to
    * the notes under those folders (a paste rebuilds only the target map, B27).
    */
-  async rebuildDerivedData(scope?: string[] | { roots: string[] }): Promise<void> {
+  async rebuildDerivedData(scope?: string[] | { roots: string[]; paths?: string[] }): Promise<void> {
     try {
       await this.repo.rebuildDerivedData(Array.isArray(scope) ? { roots: [], paths: scope } : scope);
     } catch (error) {

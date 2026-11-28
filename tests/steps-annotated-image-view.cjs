@@ -1539,3 +1539,67 @@ test('image exploration: the plain image row in Traditional Chinese (the annotat
   h.view.render();
   assert.equal(h.titleOf(h.contextMenu().items[0]), '圖像探索…');
 });
+
+// V3.3 G04-y: the right-click goes through the real binding (setupCanvasImageInput on the viewport), not the handler. It was
+// bound only while the canvas was editable, so with several topics picked (or the notes loading) no menu ever opened.
+/** Binds a fresh viewport like a render does, then right-clicks the image on it; returns the menu it opened, if any. */
+const boundRightClick = h => {
+  const el = h.imageEl(), before = h.menus.length;
+  h.view.viewportEl = element('div');
+  h.view.setupCanvasImageInput();
+  h.view.viewportEl.fire('contextmenu', { target: { closest: sel => (sel === '.vam-canvas-image' ? el : null) }, clientX: 5, clientY: 5 });
+  return h.menus.length > before ? h.menus.at(-1) : null;
+};
+const G04Y_ITEMS = [
+  ['plain', [image()], ['Image exploration…', 'Convert to annotated image…', 'Open original file', 'Delete image']],
+  ['annotated', [annotated({ note: 'n' })], ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']]
+];
+const assertGreyed = (h, menu, titles, reason, label) => {
+  assert.ok(menu, label);
+  assert.deepEqual(menu.items.map(h.titleOf), titles, label);
+  for (const row of menu.items) {
+    const readOnly = h.titleOf(row) === 'Open original file';
+    assert.equal(row.disabled, !readOnly, `${label}: ${h.titleOf(row)}`);
+    assert.equal(reasonOf(row), readOnly ? undefined : reason, `${label}: ${h.titleOf(row)}`);
+    if (!readOnly) assert.equal(row.fn, undefined, `${label}: ${h.titleOf(row)} has no click`);
+  }
+};
+
+for (const [kind, items, titles] of G04Y_ITEMS) {
+  test(`G04-y: ${kind} image, several topics picked: the real contextmenu binding opens the menu, writing rows greyed with the reason`, async () => {
+    const h = await harness(items);
+    h.view.selection.toggleMultiSelect();
+    h.view.render();
+    assertGreyed(h, boundRightClick(h), titles, 'Not available while selecting several topics', 'multi-select');
+  });
+  test(`G04-y: ${kind} image, re-render while the notes load: the real binding opens the menu, writing rows greyed`, async () => {
+    const h = await harness(items);
+    h.view.render();
+    h.view.notesLoading = () => true;
+    h.view.render();
+    assertGreyed(h, boundRightClick(h), titles, 'Notes are still loading', 'loading');
+  });
+  test(`G04-y: ${kind} image in a presentation: the real binding opens no menu; editable state still opens the full one`, async () => {
+    const h = await harness(items);
+    h.view.render();
+    h.view.presentation = {};
+    assert.equal(boundRightClick(h), null);
+    h.view.presentation = null;
+    const menu = boundRightClick(h);
+    assert.deepEqual(menu.items.map(h.titleOf), titles);
+    assert.ok(menu.items.filter(row => h.titleOf(row) !== 'Convert back to plain image').every(row => !row.disabled && row.fn));
+  });
+}
+
+test('G04-y counter-example: without edit rights the binding answers only the image; other targets get no menu and no drop/drag listener', async () => {
+  const h = await harness([image()]);
+  h.view.selection.toggleMultiSelect();
+  h.view.render();
+  const before = h.menus.length;
+  h.view.viewportEl = element('div');
+  h.view.setupCanvasImageInput();
+  h.view.viewportEl.fire('contextmenu', { target: { closest: () => null }, clientX: 5, clientY: 5 });
+  assert.equal(h.menus.length, before);
+  for (const name of ['dragover', 'dragleave', 'drop', 'dragstart', 'dragend', 'pointerdown', 'pointermove'])
+    assert.equal(h.view.viewportEl.listeners[name], undefined, name);
+});

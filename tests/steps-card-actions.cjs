@@ -100,8 +100,9 @@ const TABLE = [
   // Card toolbar (paintCardToolbar, from CARD_TOOLBAR since B08): drawn only outside topic selection; a button refused for
   // loading or a picture-book lock is not drawn; every other button runs through whenEditing (presentation, notesLoading).
   ['research', 'toolbar', 'a', 'ok ro ok al pr ms bk ok'], // if (!bookLock.ai); openTopicChat refuses an AI-locked card
-  // B08: Style (hidden under the structure lock; each popover choice also goes through mergeUnlocked).
-  ['style', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'],
+  // B08: Style (each popover choice also goes through mergeUnlocked). B19b-x (decision #62): the structure lock covers parent
+  // and order only, so Style stays under both picture-book locks.
+  ['style', 'toolbar', 'a', 'ok ro ok ok pr ms ok ok'],
   // B08: the AI card's Run (as Run card), Lock and Settings (as Edit AI card).
   ['run-stop', 'toolbar', 'ai', 'ok ro ok al pr ms bk ok'],
   ['ai-lock', 'toolbar', 'ai', 'ok ro ok ok pr ms ok ok'],

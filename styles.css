@@ -2246,6 +2246,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-map-chat-resume-record { flex-basis: 100%; }
 .vam-map-chat-resume-record[hidden] { display: none; }
 .vam-map-chat-resume-locate { padding: 0 8px; height: 24px; font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-map-chat-comparison { margin-top: 6px; padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); font-size: var(--font-ui-smaller); }
+.vam-map-chat-comparison-scroll { overflow-x: auto; margin-top: 4px; }
+.vam-map-chat-comparison-table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.vam-map-chat-comparison-table th, .vam-map-chat-comparison-table td { padding: 2px 8px; border: 1px solid var(--background-modifier-border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.vam-map-chat-comparison-table thead th, .vam-map-chat-comparison-table tr:first-child th { font-weight: var(--font-semibold); }
+.vam-map-chat-comparison-unknown { color: var(--text-muted); font-style: italic; }
 .vam-map-chat-impact-heading { margin-top: 6px; font-weight: var(--font-semibold); }
 .vam-map-chat-impact .vam-map-chat-resume-record { flex-basis: auto; }
 .vam-map-chat-impact .vam-map-chat-resume-record[hidden] { display: none; }

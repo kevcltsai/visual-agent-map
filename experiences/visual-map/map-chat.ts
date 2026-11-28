@@ -29,6 +29,7 @@ import {
 import { MapChatPaintScope } from "./map-chat-paint-scope";
 import type { ResumeItem, ResumeSummary } from "../../core/map-chat-resume";
 import type { ImpactItem, ImpactResult } from "../../core/map-impact";
+import { buildComparisonTable, type MapChatComparison } from "../../core/map-chat-comparison";
 
 /**
  * How much of each earlier round's reply a chain keeps in history. A chain has up to {@link MAP_CHAT_CHAIN_MAX_ROUNDS} rounds in one
@@ -348,6 +349,8 @@ export interface MapChatMessage {
   /** Expansion failures that came in before the turn ended: merged into the result lines by {@link MapChatPanel.finish} (in memory only). */
   lateFailures?: ExpandFailure[];
   plan?: MapChatPlanCard;
+  /** On an assistant message: the comparison table of the reply (V3.3 P4.5), read only; in memory only, never saved. */
+  comparison?: MapChatComparison;
   choices?: MapChatChoices;
   /** More result lines than fit are folded into a count; true while they are all shown. */
   linesOpen?: boolean;
@@ -3211,6 +3214,14 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     }
   }
 
+  /** The reply that was just finished carries a comparison table (P4.5): shown under it, read only. Nothing is written. */
+  attachComparison(comparison: MapChatComparison): void {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    last.comparison = comparison;
+    this.renderLog();
+  }
+
   /** The turn that was just finished sent a picture and/or wrote an undo step: its row says so. */
   markTurn(extra: { seenImage?: { note: string }; replyUndo?: { token: object } }): void {
     const last = this.messages.at(-1);
@@ -3336,6 +3347,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       message.linesOpen ? "o" : "",
       message.seenImage ? `seen:${message.seenImage.note}` : "",
       message.replyUndo ? "undo" : "",
+      message.comparison
+        ? `cmp:${JSON.stringify(message.comparison)}:${t("ui.map_chat_comparison_title")}:${t("ui.map_chat_comparison_unknown")}:${this.comparisonTitles(message.comparison)}`
+        : "",
       message.bookOffer ? `book:${t("ui.map_chat_book_offer")}` : "",
       this.chainWaitingState && this.messages.at(-1) === message
         ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}`
@@ -3541,6 +3555,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const undoPlaced = message.lines.length > 0 || applied ? this.buildOutcome(row, message, applied) : false;
     this.buildBasis(row, message);
     if (message.images?.length) this.buildImages(row, message.images);
+    if (message.comparison) this.buildComparison(row, message.comparison);
     if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
     if (message.seenImage) {
       // The words stay one plain-text element; the eye sits beside it.
@@ -4069,6 +4084,57 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * how many have ended, and offers Stop for the ones that have not. Nothing here is run or fetched except the thumbnails,
    * which are https images shown without a referrer. All text goes in as text.
    */
+  /** The titles the comparison's cards have now (part of the row's signature: a renamed or deleted card repaints the table). */
+  private comparisonTitles(comparison: MapChatComparison): string {
+    return comparison.rows.map(entry => this.host.topicTitle(entry.nodeId) ?? "").join("\u0001");
+  }
+  /**
+   * The comparison table of a reply (P4.5), read only, in the same block look as the resume and impact blocks: one row per card
+   * (its title as it is on the map now), one column per attribute, split per unit when the values carry different units; a value
+   * the cards do not give reads "Unknown". It has no button: saving it is a separate step. All text goes in as text.
+   */
+  private buildComparison(row: HTMLElement, comparison: MapChatComparison): void {
+    const unknown = t("ui.map_chat_comparison_unknown");
+    const table = buildComparisonTable(comparison, { titleOf: id => this.host.topicTitle(id), unknown });
+    const box = row.createDiv({
+      cls: "vam-map-chat-comparison",
+      attr: { role: "group", "aria-label": t("ui.map_chat_comparison_title") }
+    });
+    box.createDiv({
+      cls: "vam-map-chat-resume-head vam-map-chat-comparison-title",
+      text: t("ui.map_chat_comparison_title")
+    });
+    const scroll = box.createDiv("vam-map-chat-comparison-scroll");
+    const grid = scroll.createEl("table", { cls: "vam-map-chat-comparison-table" });
+    const head = grid.createEl("tr");
+    head.createEl("th", { text: "", attr: { scope: "col" } });
+    for (const column of table.columns) {
+      const text =
+        column.unit !== null
+          ? t("ui.map_chat_comparison_header_0_1", column.name, column.unit)
+          : column.split
+            ? t("ui.map_chat_comparison_no_unit_0", column.name)
+            : column.name;
+      head.createEl("th", { text, attr: { scope: "col" } });
+    }
+    for (const line of table.rows) {
+      const tr = grid.createEl("tr");
+      tr.createEl("th", { text: line.title ?? t("ui.map_chat_comparison_gone"), attr: { scope: "row" } });
+      line.cells.forEach(cell =>
+        tr.createEl("td", { text: cell, cls: cell === unknown ? "vam-map-chat-comparison-unknown" : "" })
+      );
+    }
+    if (comparison.truncated?.rows)
+      box.createDiv({
+        cls: "vam-map-chat-resume-note",
+        text: t("ui.map_chat_comparison_cut_rows_0", String(comparison.truncated.rows))
+      });
+    if (comparison.truncated?.attributes)
+      box.createDiv({
+        cls: "vam-map-chat-resume-note",
+        text: t("ui.map_chat_comparison_cut_attributes_0", String(comparison.truncated.attributes))
+      });
+  }
   private buildImages(row: HTMLElement, blocks: MapChatImages[]): void {
     const live = blocks.filter(block => !block.stale);
     if (live.length) this.buildImageResult(row, live);

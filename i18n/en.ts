@@ -2919,6 +2919,13 @@ export const en = {
   "ui.map_chat_impact_reference_card": "Reference card",
   "ui.map_chat_impact_guess_0": "Guess: the text mentions “{0}”",
   "ui.map_chat_impact_more_0": "{0} more not shown",
+  "ui.map_chat_comparison_title": "Comparison (read only)",
+  "ui.map_chat_comparison_unknown": "Unknown",
+  "ui.map_chat_comparison_header_0_1": "{0} ({1})",
+  "ui.map_chat_comparison_no_unit_0": "{0} (no unit)",
+  "ui.map_chat_comparison_gone": "(card no longer on the map)",
+  "ui.map_chat_comparison_cut_rows_0": "{0} more rows are not shown (at most 8 rows).",
+  "ui.map_chat_comparison_cut_attributes_0": "{0} more attributes are not shown (at most 8 attributes).",
   "ui.map_chat_restored_0": "Restored the conversation from {0}",
   "ui.map_chat_record_stale":
     "No longer valid: this cannot be applied after reopening. Ask again if you still need it.",

@@ -2553,10 +2553,11 @@ const addRoot = (ref, title, parentId = '') => ({ kind: 'add_child', parentId, t
 const children = (h, id) => h.view.map.nodes.filter(n => n.parentId === id);
 const titleOf = async (h, node) => (await h.repo.readNote(node.path)).title;
 
+// A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：第六行是自動整圖排版；新：卡片局部放置，沒有整圖排版行。
 integrationTest('B1 core: a root card plus three levels, tied together with new:<ref>, are built on an empty map with the same parent/child shape as the reply', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); assert.equal(h.view.map.nodes.length, 0);
   const lines = await apply(h, [addRoot('r', 'Coffee'), addRoot('o', 'Origins', 'new:r'), addRoot('p', 'Processing', 'new:r'), addRoot('e', 'Ethiopia', 'new:o'), addRoot('w', 'Washed', 'new:p'), addRoot('x', 'Anaerobic', 'new:p')]);
-  eq(lines.slice(0, 6).map(l => l.status), Array(6).fill('done'), JSON.stringify(lines)); assert.equal(lines.length, 7, 'six cards: the sixth line is the automatic layout');
+  eq(lines.slice(0, 6).map(l => l.status), Array(6).fill('done'), JSON.stringify(lines)); assert.equal(lines.length, 6, 'six cards: one line each, no whole-map layout line (A9)');
   const saved = await h.saved(); assert.equal(saved.length, 6);
   const byTitle = {}; for (const n of saved) byTitle[await titleOf(h, n)] = n;
   assert.equal(byTitle.Coffee.parentId, null); assert.equal(byTitle.Origins.parentId, byTitle.Coffee.id); assert.equal(byTitle.Processing.parentId, byTitle.Coffee.id);
@@ -2782,14 +2783,15 @@ integrationTest('B1 view operations: collapse, expand, auto layout and focus eac
   assert.equal((await h.saved()).find(n => n.id === h.ids.a).collapsed, true, 'saved'); assert.equal(chat.isBusy, false);
   await apply(h, [{ kind: 'expand_topic', nodeId: h.ids.a }]); assert.equal(!!(await h.saved()).find(n => n.id === h.ids.a).collapsed, false);
 });
+// A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：第六行是自動整圖排版；新：卡片局部放置，沒有整圖排版行。
 integrationTest('B1 view operations: a reply that adds five cards is arranged once and the view shows the whole map and the new root is selected; four cards are not; an explicit auto_layout is not doubled', async () => {
   const counted = async () => { const h = await harness({ empty: true }); await h.view.hydrate(); h.layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { h.layouts++; return original(change, rebuild); }; return h; };
   const tree = count => [addRoot('r', 'Root'), ...Array.from({ length: count - 1 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
   const four = await counted(); const fourLines = await apply(four, tree(4));
   assert.equal(four.layouts, 0, 'four cards: no layout'); eq(four.focused, []); eq(four.fits, []); eq([four.view.selection.state.selected], [four.view.map.nodes.find(n => !n.parentId).id]); assert.ok(!fourLines.some(l => /Arranged the map automatically/.test(l.text)));
   const five = await counted(); const fiveLines = await apply(five, tree(5)); const root = five.view.map.nodes.find(n => !n.parentId);
-  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, []); eq(five.fits.length, 1); eq([five.view.selection.state.selected], [root.id]); assert.ok(fiveLines.some(l => l.status === 'done' && /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines));
-  assert.equal(fiveLines.at(-1).text, 'Arranged the map automatically after adding many topics', 'it comes after every card line');
+  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, []); eq(five.fits.length, 1); eq([five.view.selection.state.selected], [root.id]); assert.ok(!fiveLines.some(l => /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines)); // A9: the batch is placed locally, no whole-map layout line
+  assert.equal(fiveLines.length, 5, 'one line per card, nothing after the last card line'); // A9: no whole-map layout line any more
   const explicit = await counted(); const explicitLines = await apply(explicit, [...tree(5), { kind: 'auto_layout' }]);
   assert.equal(explicit.layouts, 1, 'the reply\'s own auto_layout is the only one'); assert.equal(explicitLines.filter(l => /Arrange/.test(l.text)).length, 1);
   const skipped = await counted(); const skippedLines = await apply(skipped, [...tree(5).slice(0, 4), { kind: 'add_child', parentId: 'ghost', title: 'Lost', summary: '', ref: '' }, { kind: 'add_child', parentId: 'ghost', title: 'Lost 2', summary: '', ref: '' }]);
@@ -3967,10 +3969,12 @@ integrationTest('B2-0 L4: an auto_layout that comes before the add_child actions
   assert.equal(lines.filter(l => l.status === 'done').length, 11); assert.equal(h.view.map.nodes.length, 10);
   eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
 });
-integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid out as before (the whole map, once)', async () => {
+// A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：第六行是自動整圖排版；新：卡片局部放置，沒有整圖排版行。
+integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid out as before (the whole map, once) (A9: local placement)', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
   let layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { if (rebuild === false) layouts++; return original(change, rebuild); };
-  const lines = await apply(h, spread()); assert.ok(lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one layout, no extra local step'); eq(overlaps(h.view.map.nodes), []);
+  const lines = await apply(h, spread()); assert.ok(!lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one placement, no extra local step');
+  eq(overlaps(h.view.map.nodes), []);
 });
 
 // ---- B2-feat: research options, shallow research, headless integration, two merges ---------------------------------------

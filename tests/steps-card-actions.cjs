@@ -134,7 +134,6 @@ const TABLE = [
   ['merge', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok bk ok'], // if (!bookLock.ai); aria-disabled by mergeCheck (below)
   ['multi-research', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok bk ok'],
   ['move-to', 'toolbar', ['a', 'd'], 'ok ok mg ok ok ok ok bk'], // chooseSelectedParent refuses merging branches
-  ['selection-help', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['finish-selection', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['synthesize', 'more', ['a', 'd'], 'ok ok ok ok ok ok bk ok'],
   ['copy-to', 'more', ['a', 'd'], 'ok ok mg ok ok ok ok bk'],
@@ -143,6 +142,7 @@ const TABLE = [
   ['ai-lock-selected', 'more', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['clear-selection', 'more', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['remove-selected', 'more', ['a', 'd'], 'ok ok mg ok ok ok ok bk'], // confirmRemoveSelected refuses merging branches
+  ['selection-help', 'more', ['a', 'd'], 'ok ok ok ok ok ok ok ok'], // B09: the bar's "?" is the ⋯ menu's last row
   // Right-click on a selection (the !single branch): canEditSummary.
   ['summary-add-selected', 'context', ['a', 'd'], 'ok ro ok ok pr ok ok ok'],
   ['note-style', 'context', ['a'], 'ok ro ok ok pr ok ok ok'] // one topic in selection mode
@@ -166,7 +166,7 @@ test('card actions: the table covers every action, and every unavailable answer 
       const result = availability(id, surface, ctxFor(target, state, extra));
       if (!result.ok) reasons.add(result.reasonKey);
     }
-  reasons.add('ui.select_at_least_two_topics').add('ui.multi_research_already_running');
+  reasons.add('ui.select_at_least_two_topics').add('ui.multi_research_already_running').add('ui.card_action_off_no_lockable');
   for (const key of [...reasons, ...Object.values(R)])
     for (const [name, dictionary] of [['en', en], ['zh-TW', zhTW], ['zh-CN', zhCN]]) assert.ok(dictionary[key]?.trim(), `${key} in ${name}`);
   assert.equal(Object.keys(R).length, 6);
@@ -208,10 +208,11 @@ test('card actions: what a card offers follows the card, as the entries decide i
   // Note style on a selection only for one topic; the selection ⋯ never has it.
   assert.ok(!ids('context', ctxFor(['a', 'd'], 'normal')).includes('note-style'));
   assert.ok(!ids('more', ctxFor(['a'], 'normal')).includes('note-style'));
-  // Lock from AI: the label follows the selection (all locked → Unlock), and a selection with no lockable topic has none.
+  // Lock from AI: the label follows the selection (all locked → Unlock); a selection with no lockable topic still lists it (B09), off, with the reason.
   assert.equal(titleKeyFor(action('ai-lock-selected'), 'more', ctxFor(['a', 'd'], 'aiLocked')), 'ui.ai_unlock_selected');
   assert.equal(titleKeyFor(action('ai-lock-selected'), 'more', ctxFor(['a', 'd'], 'normal')), 'ui.ai_lock_toggle');
-  assert.ok(!ids('more', ctxFor(['a', 'd'], 'normal', { isArgumentCard: () => true })).includes('ai-lock-selected'));
+  eq(availability('ai-lock-selected', 'more', ctxFor(['a', 'd'], 'normal', { isArgumentCard: () => true })), { ok: false, reasonKey: 'ui.card_action_off_no_lockable' });
+  eq(availability('ai-lock-selected', 'more', ctxFor(['a', 'd'], 'normal')), { ok: true });
   assert.equal(titleKeyFor(action('synthesize'), 'more', ctxFor(['a', 'd'], 'normal')), 'ui.synthesize_0_topics');
   assert.equal(titleKeyFor(action('synthesize'), 'more', ctxFor(['a'], 'normal')), 'ui.synthesize');
   // A card's actions never come with a selection context, nor a selection's with a card's.
@@ -237,9 +238,9 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   const context = actionsFor('context', ctxFor('a', 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`);
   eq(context, ['1:add-child', '1:add-sibling', '2:research', '2:toggle-collapse', '3:open-note', '3:card-settings', '3:ai-card', '3:book', '5:remove']);
   assert.equal(action('add-other').group, 4, 'the ⋯ list puts a separator before Add another type');
-  // renderSelectionBar: Merge, Research, Move to (⋯) ?, Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove.
-  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['merge', 'multi-research', 'move-to', 'selection-help', 'finish-selection']);
-  eq(actionsFor('more', ctxFor(['a', 'd'], 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`), ['1:synthesize', '1:copy-to', '1:add-frame', '1:summary-add-selected', '1:ai-lock-selected', '2:clear-selection', '2:remove-selected']);
+  // renderSelectionBar (B09): Move to, Merge, Research, (⋯) Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove, Selection help.
+  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['move-to', 'merge', 'multi-research', 'finish-selection']);
+  eq(actionsFor('more', ctxFor(['a', 'd'], 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`), ['1:synthesize', '1:copy-to', '1:add-frame', '1:summary-add-selected', '1:ai-lock-selected', '2:clear-selection', '2:remove-selected', '2:selection-help']);
   // The rules B06/B07 move to: ⋯ = the card's menu actions minus the toolbar set; right-click = toolbar, separator, ⋯.
   for (const kind of ['card', 'ai-card']) {
     const more = ruleMoreSet(kind);
@@ -326,12 +327,15 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('finish-selection', ['a', 'd'], 'toolbar'), [['finishSelection']]);
 });
 
-test('card actions: the view builds the context next to mapCommand, and no entry uses the registry yet', () => {
+test('card actions: the view builds the context next to mapCommand, and only the selection bar and its ⋯ use the registry so far', () => {
   const view = read('experiences/visual-map/view.ts');
   const at = view.indexOf('  cardActionContext(');
   assert.ok(at > view.indexOf('  mapCommand(action: MapCommandAction'), 'cardActionContext follows mapCommand');
   assert.ok(at < view.indexOf('  openKeyboardShortcuts(): void'));
-  assert.equal((view.match(/actionsFor\(|CARD_ACTIONS/g) ?? []).length, 0, 'entries migrate in B05–B10');
+  const selectionStart = view.indexOf('  private renderSelectionBar('), selectionEnd = view.indexOf("  /** The dialog's choices for each child's research");
+  assert.ok(selectionStart > 0 && selectionEnd > selectionStart);
+  assert.equal((view.slice(selectionStart, selectionEnd).match(/actionsFor\(/g) ?? []).length, 2, 'B09: the bar and its ⋯');
+  assert.equal(((view.slice(0, selectionStart) + view.slice(selectionEnd)).match(/actionsFor\(|CARD_ACTIONS/g) ?? []).length, 0, 'the other entries migrate in B05–B08');
 });
 
 test('card actions: the edge "+ Topic card" (V3.3 A6) as paintCardEdgeEntries and addTopicFromEdge have it', () => {

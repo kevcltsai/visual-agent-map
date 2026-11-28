@@ -1468,7 +1468,10 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   h.view.selection.selectSubtopics([h.nodes[0].id]); // enters selection mode like the user's own pick
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
   assert.equal(h.view.selection.state.multiSelectMode, false); assert.equal(h.view.selection.state.multiSelected.size, 0);
-  h.view.selection.replaceMulti([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, true);
+  h.view.selection.replaceMulti([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, false, 'B09: stays focusable'); assert.equal(research().attrs['aria-disabled'], 'true');
+  assert.ok(items.find(i => i.cls === 'vam-selection-why' && i.text.includes('A multi-topic research is already running on this map.')), 'the reason is written under the row');
+  h.notices.length = 0; research().listeners.click({ stopPropagation() {} }); await new Promise(r => setTimeout(r, 20));
+  assert.equal(h.runs.length, 1, 'B09: an aria-disabled Research never starts another run'); assert.equal(h.notices.length, 1, 'B09: and says why'); assert.match(String(h.notices[0]), /already running/);
   assert.equal(items.find(i => i.text === 'In progress: 0 of 1 done'), undefined);
   items = toolbar();
   assert.ok(items.find(i => i.tag === 'span' && i.text === `In progress: 0 of 1 done · ${h.nodes[0].id}`), items.map(i => i.text).join('|'));

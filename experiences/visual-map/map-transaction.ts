@@ -197,7 +197,10 @@ const relationEnds = (map: MapDocument): Map<string, string[]> => {
   const add = (id: string, end: string): void => {
     ends.set(id, [...(ends.get(id) ?? []), end]);
   };
+  const cards = new Set(map.nodes.map(node => node.id));
   for (const r of map.topicRelations ?? []) {
+    // A relation whose end is a knowledge reference writes no line in any note (F07b-y), so it changes no note.
+    if (!cards.has(r.from) || !cards.has(r.to)) continue;
     add(r.from, `${r.kind}>${r.to}`);
     add(r.to, `${r.kind}<${r.from}`);
   }

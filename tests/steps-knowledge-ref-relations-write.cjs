@@ -59,24 +59,30 @@ test('F07b write path: an ordinary card relation rewrites the two end notes only
   assert.match(h.contents.get(h.paths.alpha), /Supports: \[\[/);
 });
 
-// What changed in a live alpha.md was the note's own rebuild (a note whose derived Reference Links block was stale or absent is
-// rewritten into the current shape by any relation write), not a line about the reference.
+// A note whose derived Reference Links block is stale or absent is rewritten into the current shape by a card -> card relation write
+// (control below), but a relation to a reference touches no note at all (F07b-y).
 const stale = (h, path) => h.contents.set(path, h.contents.get(path).replace(/\n## Reference Links\n[\s\S]*?<!-- visual-agent-map:references:end -->\n?/, '\n'));
 
-test('F07b write path: a note with a stale Reference Links block is refreshed the same way for a reference end and for a card end, and never mentions the reference', async () => {
+test('F07b write path: a note with a stale Reference Links block stays byte-identical for a reference end, and is still rebuilt for a card end', async () => {
   const h = await harness();
   stale(h, h.paths.alpha);
   const staleText = h.contents.get(h.paths.alpha);
   assert.doesNotMatch(staleText, /Reference Links/, 'precondition: block removed');
   await relate(h, h.ids.alpha, 'ref-1');
-  const afterRef = h.contents.get(h.paths.alpha);
-  assert.notEqual(afterRef, staleText, 'the rebuild restores the derived block');
-  assert.doesNotMatch(afterRef, /ref-1|Supports:|Supported by:|Mind Maps\/Other/);
-  const extra = afterRef.split('\n').filter(line => !staleText.split('\n').includes(line));
-  assert.ok(extra.every(line => /Reference Links|Topic:|Mind map:|Parent topic:|Child topics:|references:|^\s*$|^- /.test(line) || line.includes('agent-map-references')), `unexpected lines: ${JSON.stringify(extra)}`);
+  assert.equal(h.contents.get(h.paths.alpha), staleText, 'the reference end does not rebuild the note');
   const c = await harness();
   stale(c, c.paths.alpha);
   await relate(c, c.ids.alpha, c.ids.beta);
-  const afterCard = c.contents.get(c.paths.alpha).split('\n').filter(line => !/Supports: /.test(line)).join('\n');
-  assert.equal(afterRef.replace(/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/g, 'ID'), afterCard.replace(/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/g, 'ID'), 'same as the ordinary-card relation minus its own relation line');
+  assert.match(c.contents.get(c.paths.alpha), /## Reference Links[\s\S]*Supports: \[\[/, 'a card end is still rebuilt with its own line');
+});
+
+test('F07b-y: a relation card -> reference touches no note, also when the card note never had a derived Reference Links block', async () => {
+  const h = await harness();
+  for (const path of Object.values(h.paths)) stale(h, path);
+  const before = new Map(h.contents);
+  assert.doesNotMatch(h.contents.get(h.paths.alpha), /Reference Links/, 'precondition');
+  assert.deepEqual(plain(await relate(h, h.ids.alpha, 'ref-1')), { status: 'done' });
+  assert.deepEqual(plain(await relate(h, 'ref-1', h.ids.beta)), { status: 'done' });
+  const changed = [...h.contents.keys()].filter(path => h.contents.get(path) !== before.get(path));
+  assert.deepEqual(changed.filter(path => !path.endsWith('/Map.md')), [], `notes changed: ${changed.join(', ')}`);
 });

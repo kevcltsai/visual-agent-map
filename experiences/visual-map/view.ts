@@ -5305,8 +5305,10 @@ export class VisualAgentMapView extends ItemView {
   private openTidyPreview(branchId?: string): void {
     if (!this.map || this.presentation || this.notesLoading()) return;
     this.clearTidy(false);
-    const active = activeDocument.activeElement as HTMLElement | null;
-    this.tidyReturnFocus = active && this.contentEl.contains(active) ? active : null;
+    // A view built without a document (tests) has nothing to give back.
+    const active = typeof activeDocument === "undefined" ? null : (activeDocument.activeElement as HTMLElement | null);
+    this.tidyReturnFocus =
+      active && typeof this.contentEl.contains === "function" && this.contentEl.contains(active) ? active : null;
     const result = computeTidy(this.map, copy => this.tidyArrange(copy, branchId));
     this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
     this.tidyKeys = event => {

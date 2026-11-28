@@ -637,6 +637,58 @@ S.integrationTest('D1-x11: the right pane shows an AI card through the reader (o
   assert.ok(leaf.view instanceof Reader);
 });
 
+S.integrationTest('D1-x11b: adopt refreshes the reader even when the metadata cache is stale; it never opens a native leaf', async () => {
+  const { sidebar, leaf, calls, aiCards, Reader } = livingReaderFixture();
+  const ai = new S.TFile('ai.md');
+  aiCards.add('ai.md');
+  await sidebar.openDetails(ai, 'editor');
+  const reader = leaf.view;
+  reader.official = false;
+  aiCards.delete('ai.md'); // metadataCache has not caught up with the adopted write yet
+  await sidebar.restoreLivingOfficial(ai, 'editor');
+  assert.equal(leaf.view, reader, 'the same reader stays');
+  assert.ok(leaf.view instanceof Reader);
+  assert.equal(leaf.view.official, true, 'its content is refreshed');
+  assert.equal(calls.some(call => call[0] === 'official'), false, 'no native leaf was opened');
+});
+
+S.integrationTest('D1-x11b: adopt leaves a native editor the user opened untouched', async () => {
+  const { sidebar, leaf, calls, aiCards, MarkdownView } = livingReaderFixture();
+  const ai = new S.TFile('ai.md');
+  aiCards.add('ai.md');
+  await sidebar.openDetails(ai, 'editor');
+  await leaf.openFile(ai); // the 「在編輯器開啟」 button
+  const editor = leaf.view;
+  const before = calls.length;
+  await sidebar.restoreLivingOfficial(ai, 'editor');
+  assert.equal(leaf.view, editor);
+  assert.ok(leaf.view instanceof MarkdownView);
+  assert.equal(calls.length, before, 'nothing was opened or replaced');
+});
+
+S.integrationTest('D1-x11b: re-selecting the same AI card keeps its open native editor; another card still switches; a closed editor returns to the reader', async () => {
+  const { sidebar, leaf, calls, aiCards, Reader, MarkdownView } = livingReaderFixture();
+  const ai = new S.TFile('ai.md'), other = new S.TFile('other.md'), plain = new S.TFile('plain.md');
+  aiCards.add('ai.md'); aiCards.add('other.md');
+  await sidebar.openDetails(ai);
+  await leaf.openFile(ai);
+  const editor = leaf.view;
+  const before = calls.length;
+  await sidebar.openDetails(ai);
+  assert.equal(leaf.view, editor, 'same card: the editor is kept');
+  assert.equal(calls.length, before);
+  await sidebar.openDetails(other);
+  assert.ok(leaf.view instanceof Reader, 'a different AI card reads in the reader');
+  await leaf.openFile(ai);
+  await sidebar.openDetails(plain);
+  assert.ok(leaf.view instanceof MarkdownView);
+  assert.equal(leaf.view.file.path, 'plain.md', 'an ordinary card opens natively');
+  await leaf.openFile(ai);
+  leaf.view = new MarkdownView(null); // the editor shows no file / was closed
+  await sidebar.openDetails(ai);
+  assert.ok(leaf.view instanceof Reader, 'once the editor is gone the next selection reads again');
+});
+
 S.integrationTest('Living Node reader: stopping during reader creation restores official content and does not poison another trial', async () => {
   const { sidebar, leaf, calls, MarkdownView, Reader } = livingReaderFixture();
   const a = new S.TFile('a.md');

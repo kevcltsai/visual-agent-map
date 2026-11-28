@@ -78,7 +78,18 @@ export class NodeDetailsSidebar {
     }
     if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
     const leaf = this.detailsLeaf;
-    if (this.app().metadataCache.getFileCache(file)?.frontmatter?.["ai-card"] === true) {
+    const aiCard = this.app().metadataCache.getFileCache(file)?.frontmatter?.["ai-card"] === true;
+    if (
+      aiCard &&
+      leaf.view instanceof MarkdownView &&
+      leaf.view.file?.path === file.path &&
+      this.detailsPath === file.path
+    ) {
+      // The user opened this card in the native editor ("Open in editor"): keep it so cursor, focus and undo
+      // survive. It is left when the editor closes or when another card is selected.
+      return;
+    }
+    if (aiCard) {
       // An AI card is read through the reader (same presentation as the trial preview), not as raw Markdown.
       if (!(leaf.view instanceof LivingReaderView))
         await leaf.setViewState({ type: LIVING_READER_VIEW, active: false });
@@ -135,7 +146,16 @@ export class NodeDetailsSidebar {
 
   restoreLivingOfficial(file: TFile | undefined, owner: string, release = false): Promise<void> {
     if (this.trialOwner !== owner) return Promise.resolve();
-    if (file) return this.openDetails(file, release ? undefined : owner);
+    if (file && release) return this.openDetails(file, undefined);
+    if (file) {
+      // After Adopt only the reader's content is refreshed: the card was just written, so the metadata cache
+      // may not say "ai-card" yet and a normal open would swap the pane to the native editor.
+      return this.enqueue(async () => {
+        const leaf = this.detailsLeaf;
+        if (this.trialOwner === owner && this.detailsPath === file.path && leaf?.view instanceof LivingReaderView)
+          await leaf.view.showOfficial(file, owner);
+      });
+    }
     // The edited card may have been deleted, or its view may have closed. Clear
     // ownership immediately, then discard only the matching transient reader.
     this.trialOwner = undefined;

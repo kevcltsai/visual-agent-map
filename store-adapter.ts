@@ -5,6 +5,8 @@ export interface StoreAdapter {
   write(path: string, data: string): Promise<void>;
   rename(path: string, newPath: string): Promise<void>;
   remove(path: string): Promise<void>;
+  /** Optional: atomically overwrite `path` with `newPath` (the primary never disappears). Desktop file systems only. */
+  replace?(path: string, newPath: string): Promise<void>;
 }
 
 /**
@@ -30,7 +32,8 @@ export async function readStoreText(adapter: StoreAdapter, path: string): Promis
 
 /**
  * Writes `<path>.tmp` then renames it over `path`. Obsidian's `DataAdapter.rename` refuses an existing destination
- * (unlike `fs.rename`), so the old file is removed first; the window between the two calls is kept to those two awaits.
+ * (unlike `fs.rename`). When the adapter offers `replace` (desktop `fs.rename`, atomic overwrite) the primary never
+ * disappears; otherwise the old file is removed first and a crash in that window is repaired by `readStoreValue`.
  */
 export async function writeStoreAtomically(adapter: StoreAdapter, path: string, text: string): Promise<void> {
   const temporary = `${path}.tmp`;
@@ -43,6 +46,14 @@ export async function writeStoreAtomically(adapter: StoreAdapter, path: string, 
   }
   if (await adapter.exists(path)) {
     await adapter.write(temporary, text);
+    if (adapter.replace) {
+      try {
+        await adapter.replace(temporary, path);
+        return;
+      } catch {
+        // The primary is untouched after a failed replace (e.g. a file lock on Windows): use the recoverable path below.
+      }
+    }
     await adapter.remove(path);
   } else {
     // A partially written first snapshot must not look like a recoverable temp.

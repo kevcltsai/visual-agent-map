@@ -165,6 +165,8 @@ const CASES = [
   // ---- J. images (no real picture is sent; only the rules around selection) ----
   kase("J1", "圖片", "選了普通圖片：請先轉成標註圖", "prompt: 普通圖片不要猜內容、不給動作", [], { message: "這張圖裡有什麼？", outline: COFFEE, selectedImage: { id: "img1", kind: "plain", imageAttached: false } },
     [...Q, C.replyMatch(/標註|annotat/i, "asks to convert to an annotated image")]),
+  kase("J7", "圖片", "錨點放錯：對既有錨點 id 發 move_anchor，不做其他寫入", "prompt: move_anchor 只用於使用者說錨點放錯或要求移動，anchorId 必須是既有錨點，座標 0–1，僅是建議", ["move_anchor"], { message: "「左翼」那個錨點放錯了，應該在圖的右上角（約 x 0.85、y 0.15），幫我移過去", outline: COFFEE, selectedImage: { id: "img1", kind: "annotated", note: "鳥", anchors: [{ id: "anc-1", x: 0.2, y: 0.5, note: "左翼" }], relations: [], imageAttached: true } },
+    [C.noRejected(), C.hasAction("move_anchor", a => a.anchorId === "anc-1" && a.imageId === "img1" && a.x >= 0.7 && a.y <= 0.3, "moves the existing anchor to the upper right"), C.onlyKinds(["move_anchor"])]),
   kase("J2", "圖片", "沒選圖卻要看圖放錨點", "prompt: 沒有 selectedImage 時請先點選圖片", [], { message: "幫我在圖上的左翼放一個錨點", outline: COFFEE },
     [...Q, C.noKinds(["add_anchor", "link_anchor"]), C.replyMatch(/選|點|select|click/i, "asks the user to select the image first")]),
   kase("J3", "圖片", "一句話第 1 輪：place_image 加 remaining", "prompt: 第 1 輪只發 place_image（direction 是搜尋詞），把看圖、建議題、研究寫進 remaining", ["place_image"], { message: "幫我找一張胸肌的肌肉部位圖，標出各部位，每個部位建一張議題，再研究每個部位的訓練動作，每個動作附一部 YouTube 影片", outline: tree([]) },

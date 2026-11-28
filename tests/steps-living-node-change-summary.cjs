@@ -67,3 +67,33 @@ export { setUiLanguage } from "./i18n";
     assert.equal((await shown(undefined)).includes('本次變化'), false);
   } finally { view.setUiLanguage('en'); }
 });
+
+test('last change: the formal tab shows the stored changes, "no changes" for a later no-change run, and no baseline without the key', async () => {
+  const S = require('./support.cjs');
+  const { element, findAll } = require('./support-dom.cjs');
+  const view = require('./support-replay.cjs').loadSource(`
+export { LivingReaderView } from "./experiences/visual-map/living-node-reader";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: { ...S.obsidian, Component: class { load() {} unload() {} }, ItemView: class { constructor() { this.contentEl = element('div'); this.app = { vault: { read: async () => this.note } }; } }, MarkdownRenderer: { render: async () => {} } } });
+  view.setUiLanguage('zh-TW');
+  try {
+    const key = { at: 't2', added: ['a', 'b'], supplemented: [], corrected: ['c'], disputed: [], invalidated: [], output: true };
+    const note = (line, check = 't2') => `---\nai-card: true\nliving-node-last-successful-check: "${check}"\n${line}---\n# T\n`;
+    const shown = async content => {
+      const reader = new view.LivingReaderView({});
+      reader.note = content;
+      await reader.show({ path: 'a.md' }, 'preview', 'owner');
+      reader.tab = 'official';
+      await reader.paint();
+      return findAll(reader.contentEl, () => true).map(i => i.text).filter(Boolean);
+    };
+    const withKey = await shown(note('living-node-last-change: ' + JSON.stringify(JSON.stringify(key)) + '\n'));
+    assert.ok(withKey.includes('本次變化') && withKey.includes('新增：2') && withKey.includes('修正：1') && withKey.includes('目前結果已更新。'));
+    const later = await shown(note('living-node-last-change: ' + JSON.stringify(JSON.stringify(key)) + '\n', 't3'));
+    assert.ok(later.includes('本次沒有變化。') && !later.includes('新增：2'));
+    const old = await shown(note(''));
+    assert.ok(old.includes('本次變化') && old.includes('沒有可比基準。') && !old.some(x => x.includes('第一次執行')));
+    const bad = await shown(note('living-node-last-change: "{not json"\n'));
+    assert.ok(bad.includes('沒有可比基準。') && !bad.some(x => x.includes('第一次執行')));
+  } finally { view.setUiLanguage('en'); }
+});

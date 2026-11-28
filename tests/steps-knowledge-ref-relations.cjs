@@ -96,6 +96,34 @@ test('P4.4 chat: an unknown id stays unknown_node; a reference id is not accepte
   assert.deepEqual(rename.rejected, [{ index: 0, code: 'unknown_node' }]);
 });
 
+test('P4.4 chat: remove_relation accepts a reference id end like add_relation; one the context did not send is unknown_node', () => {
+  const have = context({ refIds: ['ref-1'], relations: [rel('c', 'ref-1')] });
+  const removed = plain(parseMapChat(reply({ kind: 'remove_relation', fromId: 'c', toId: 'ref-1' }), have));
+  assert.deepEqual(removed.rejected, []);
+  assert.deepEqual(removed.actions, [{ kind: 'remove_relation', fromId: 'c', toId: 'ref-1' }]);
+  const unsent = plain(parseMapChat(reply({ kind: 'remove_relation', fromId: 'c', toId: 'ref-1' }), context({ refIds: [], relations: [rel('c', 'ref-1')] })));
+  assert.deepEqual(unsent.rejected, [{ index: 0, code: 'unknown_node' }]);
+  const none = plain(parseMapChat(reply({ kind: 'remove_relation', fromId: 'd', toId: 'ref-1' }), have));
+  assert.deepEqual(none.rejected, [{ index: 0, code: 'unknown_relation' }]);
+});
+
+// ---- context builder ---------------------------------------------------------------------------------------------------
+
+test('P4.4 context: relations with a sent reference end are kept, one whose reference was not sent is filtered, AIM sends none', () => {
+  const { buildMapChatContext } = load('core/map-chat-context.ts', { obsidian });
+  const base = { mapTitle: 'M', outline: [{ id: 'c', title: 'C', summary: '', parentId: null, depth: 0 }, { id: 'd', title: 'D', summary: '', parentId: null, depth: 0 }], selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] };
+  const relations = [rel('c', 'ref-1'), rel('d', 'ref-2'), rel('c', 'd', 'related')];
+  const parsed = input => JSON.parse(buildMapChatContext({ ...base, ...input }).json);
+  const sent = parsed({ relations, knowledgeRefs: [{ id: 'ref-1' }] });
+  assert.deepEqual(plain(sent.relations).map(link => `${link.from}>${link.to}`), ['c>ref-1', 'c>d']);
+  assert.deepEqual(parsed({ relations }).relations.map(link => `${link.from}>${link.to}`), ['c>d'], 'no refs sent: the ref relation is filtered');
+  const aim = parsed({ aim: true, relations, knowledgeRefs: [{ id: 'ref-1' }] });
+  assert.equal('knowledgeRefs' in aim, false);
+  assert.ok(!aim.relations || aim.relations.length === 0);
+  assert.deepEqual(plain(buildMapChatContext({ ...base, knowledgeRefs: [{ id: 'ref-1' }, { id: 'ref-2' }] }).refIds), ['ref-1', 'ref-2']);
+  assert.equal((buildMapChatContext({ ...base, aim: true, knowledgeRefs: [{ id: 'ref-1' }] }).refIds ?? []).length, 0);
+});
+
 // ---- Reference Links (notes) -------------------------------------------------------------------------------------------
 
 test('P4.4 Reference Links: a relation that ends at a reference is kept in Map.md but writes no line in either note', async () => {

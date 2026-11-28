@@ -1133,8 +1133,13 @@ export function parseMapChat(
           break;
         }
         case "remove_relation": {
-          const fromId = node("fromId", true),
-            toId = node("toId", true);
+          // An end may be a knowledge reference of this map, as in add_relation (the writer allows it).
+          const end = (key: string): string => {
+            const id = text(key);
+            return !created && referenceIds.has(id) ? id : resolve(id, true);
+          };
+          const fromId = end("fromId"),
+            toId = end("toId");
           if (context.aim) throw new Dropped("no_relations");
           if (!relations.some(link => samePair(link, fromId, toId))) throw new Dropped("unknown_relation");
           relations = relations.filter(link => !samePair(link, fromId, toId));
